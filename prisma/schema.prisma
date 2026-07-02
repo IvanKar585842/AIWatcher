@@ -1,0 +1,213 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Plan {
+  FREE
+  PRO
+  BUSINESS
+}
+
+enum MonitorStatus {
+  ACTIVE
+  PAUSED
+  ERROR
+}
+
+enum MonitoringMode {
+  ENTIRE_PAGE
+  CSS_SELECTOR
+  XPATH
+  PRICE_DETECTION
+  KEYWORD_DETECTION
+  TABLE_DETECTION
+  JOB_LISTINGS
+  AI_SMART
+}
+
+enum NotificationMethod {
+  TELEGRAM
+  EMAIL
+  BOTH
+}
+
+enum MonitoringInterval {
+  FIVE_MIN
+  FIFTEEN_MIN
+  THIRTY_MIN
+  ONE_HOUR
+  SIX_HOURS
+  TWELVE_HOURS
+  TWENTY_FOUR_HOURS
+}
+
+enum ChangeCategory {
+  PRICE
+  CONTENT
+  JOBS
+  POLICY
+  CONTACT_INFO
+  PRODUCT
+  DOCUMENTATION
+  FEATURES
+  OTHER
+}
+
+enum ChangeImportance {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum NotificationChannel {
+  TELEGRAM
+  EMAIL
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+model User {
+  id               String         @id @default(cuid())
+  clerkId          String         @unique
+  email            String         @unique
+  name             String?
+  imageUrl         String?
+  telegramChatId   String?
+  telegramUsername String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  subscription     Subscription?
+  monitors         Monitor[]
+  notifications    Notification[]
+
+  @@index([clerkId])
+  @@index([email])
+}
+
+model Subscription {
+  id                   String    @id @default(cuid())
+  userId               String    @unique
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan                 Plan      @default(FREE)
+  stripeCustomerId     String?   @unique
+  stripeSubscriptionId String?   @unique
+  stripePriceId        String?
+  status               String    @default("active")
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([stripeCustomerId])
+}
+
+model Monitor {
+  id                 String             @id @default(cuid())
+  userId             String
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name               String
+  url                String
+  mode               MonitoringMode     @default(ENTIRE_PAGE)
+  selector           String?
+  keywords           String[]           @default([])
+  interval           MonitoringInterval @default(TWELVE_HOURS)
+  notificationMethod NotificationMethod @default(EMAIL)
+  status             MonitorStatus      @default(ACTIVE)
+  respectRobots      Boolean            @default(true)
+  lastCheckedAt      DateTime?
+  lastChangedAt      DateTime?
+  nextCheckAt        DateTime?
+  errorMessage       String?
+  errorCount         Int                @default(0)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  snapshots          Snapshot[]
+  changes            Change[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([nextCheckAt])
+}
+
+model Snapshot {
+  id           String   @id @default(cuid())
+  monitorId    String
+  monitor      Monitor  @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  rawHtml      String   @db.Text
+  cleanedHtml  String   @db.Text
+  contentHash  String
+  extractedText String? @db.Text
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  @@index([monitorId])
+  @@index([contentHash])
+  @@index([createdAt])
+}
+
+model Change {
+  id            String           @id @default(cuid())
+  monitorId     String
+  monitor       Monitor          @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  summary       String           @db.Text
+  importance    ChangeImportance @default(MEDIUM)
+  category      ChangeCategory   @default(CONTENT)
+  oldValue      String?          @db.Text
+  newValue      String?          @db.Text
+  bulletPoints  String[]         @default([])
+  emoji         String           @default("🔔")
+  oldHtml       String?          @db.Text
+  newHtml       String?          @db.Text
+  diffHtml      String?          @db.Text
+  aiRawResponse Json?
+  createdAt     DateTime         @default(now())
+  notifications Notification[]
+
+  @@index([monitorId])
+  @@index([createdAt])
+  @@index([category])
+  @@index([importance])
+}
+
+model Notification {
+  id        String              @id @default(cuid())
+  userId    String
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  changeId  String
+  change    Change              @relation(fields: [changeId], references: [id], onDelete: Cascade)
+  channel   NotificationChannel
+  status    NotificationStatus  @default(PENDING)
+  sentAt    DateTime?
+  error     String?
+  createdAt DateTime            @default(now())
+
+  @@index([userId])
+  @@index([changeId])
+  @@index([status])
+}
+
+model MonitorQueue {
+  id          String   @id @default(cuid())
+  monitorId   String   @unique
+  scheduledAt DateTime
+  attempts    Int      @default(0)
+  lockedAt    DateTime?
+  lockedBy    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([scheduledAt])
+  @@index([lockedAt])
+}
