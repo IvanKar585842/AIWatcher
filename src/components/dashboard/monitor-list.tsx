@@ -14,7 +14,15 @@ function isRealFailure(status: number): boolean {
   return status === 0 || status >= 500;
 }
 
-export function MonitorList({ embedded }: { embedded?: boolean }) {
+export function MonitorList({
+  embedded,
+  showHeaderCreate = true,
+  emptyStateShowCreate = true,
+}: {
+  embedded?: boolean;
+  showHeaderCreate?: boolean;
+  emptyStateShowCreate?: boolean;
+}) {
   const { isLoaded, isSignedIn } = useAuth();
   const [monitors, setMonitors] = useState<MonitorWithCount[]>([]);
   const [loading, setLoading] = useState(true);
@@ -126,14 +134,16 @@ export function MonitorList({ embedded }: { embedded?: boolean }) {
             </p>
           </div>
         </div>
-        <CreateMonitorDialog
-          onCreated={handleCreated}
-          variant="os"
-          prefillRequest={duplicatePrefill}
-          onPrefillConsumed={() => setDuplicatePrefill(null)}
-          triggerLabel="+ Create Monitor"
-          triggerClassName="h-11 px-6 text-sm font-medium shadow-[0_0_32px_-8px_rgba(34,211,238,0.55)]"
-        />
+        {showHeaderCreate && monitors.length > 0 && (
+          <CreateMonitorDialog
+            onCreated={handleCreated}
+            variant="os"
+            prefillRequest={duplicatePrefill}
+            onPrefillConsumed={() => setDuplicatePrefill(null)}
+            triggerLabel="+ Create Monitor"
+            triggerClassName="h-11 px-6 text-sm font-medium shadow-[0_0_32px_-8px_rgba(34,211,238,0.55)]"
+          />
+        )}
       </div>
 
       {error ? (
@@ -156,7 +166,7 @@ export function MonitorList({ embedded }: { embedded?: boolean }) {
           </button>
         </motion.div>
       ) : monitors.length === 0 ? (
-        <MonitorsEmptyState onCreated={handleCreated} />
+        <MonitorsEmptyState onCreated={handleCreated} showCreateButton={emptyStateShowCreate} />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {monitors.map((monitor, i) => (

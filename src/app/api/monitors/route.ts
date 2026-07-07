@@ -13,6 +13,7 @@ import { apiFailure, apiFailureFromError } from "@/lib/api-response";
 import { assertNotificationAllowed } from "@/lib/plan-guards";
 import { withRateLimit } from "@/lib/rate-limit";
 import { createMonitorSchema } from "@/lib/validations";
+import { syncMonitorQueue } from "@/lib/monitoring/queue";
 
 function isSchemaMismatch(error: unknown): boolean {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -129,6 +130,7 @@ export async function POST(request: NextRequest) {
             );
           }
 
+          const nextCheckAt = new Date();
           const monitor = await prisma.monitor.create({
             data: {
               userId: user.id,
@@ -145,9 +147,11 @@ export async function POST(request: NextRequest) {
               interval: parsed.data.interval,
               notificationMethod: parsed.data.notificationMethod,
               respectRobots: parsed.data.respectRobots,
-              nextCheckAt: new Date(),
+              nextCheckAt,
             },
           });
+
+          await syncMonitorQueue(monitor.id, nextCheckAt);
 
           return NextResponse.json({ success: true, monitor }, { status: 201 });
         } catch (error) {

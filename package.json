@@ -14,6 +14,8 @@
     "db:cleanup": "npx tsx scripts/cleanup-database.ts",
     "db:sync": "npm run db:cleanup && npx prisma migrate deploy",
     "db:verify": "npx tsx scripts/verify-monitor-crud.ts",
+    "monitor:test": "npx tsx scripts/test-monitoring-engine.ts",
+    "playwright:install": "npx playwright install chromium",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate",
     "trigger:dev": "npx trigger.dev@latest dev",

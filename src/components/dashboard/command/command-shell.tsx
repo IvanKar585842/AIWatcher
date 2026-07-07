@@ -7,7 +7,6 @@ import { Syne, IBM_Plex_Mono } from "next/font/google";
 import { cn } from "@/lib/utils";
 
 import { ToastProvider } from "@/components/ui/os-toast";
-import { CreateMonitorFab } from "@/components/dashboard/create-monitor-fab";
 import { CommandProvider, useCommand } from "./command-context";
 
 import { CommandSidebar } from "./command-sidebar";
@@ -65,10 +64,6 @@ function CommandMain({ children }: { children: React.ReactNode }) {
       <CommandTopbar />
 
       <div className="relative min-h-[calc(100vh-4rem)] overflow-x-hidden">{children}</div>
-
-      <CreateMonitorFab
-        onCreated={() => window.dispatchEvent(new CustomEvent("monitors-updated"))}
-      />
 
     </div>
 

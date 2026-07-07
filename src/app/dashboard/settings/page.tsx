@@ -5,9 +5,12 @@ import { UserProfile, useUser } from "@clerk/nextjs";
 import {
   Bell,
   Bot,
+  Clock,
   ExternalLink,
+  Eye,
   Globe,
   Loader2,
+  Lock,
   Monitor,
   Palette,
   Shield,
@@ -15,25 +18,81 @@ import {
   Unlink,
   User,
 } from "lucide-react";
+import { MonitoringInterval, MonitoringMode, NotificationMethod } from "@prisma/client";
 import { CommandPageHeader } from "@/components/dashboard/command/command-page-header";
 import { OsExpandableSection, OsFieldLabel } from "@/components/dashboard/os/os-primitives";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { INTERVAL_LABELS, MODE_LABELS, NOTIFICATION_LABELS } from "@/lib/constants";
+import { CREATE_AI_PROMPT_EXAMPLES } from "@/lib/monitor-config";
+import {
+  AI_PROVIDER_OPTIONS,
+  DEFAULT_USER_SETTINGS,
+  IMPORTANCE_OPTIONS,
+  TIMEZONE_OPTIONS,
+  loadUserSettings,
+  saveUserSettings,
+  type UserSettings,
+} from "@/lib/user-settings";
+import { cn } from "@/lib/utils";
+
+function SettingRow({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-white/[0.06] bg-black/30 px-4 py-3">
+      <div className="min-w-0">
+        <p className="text-sm text-zinc-200">{title}</p>
+        {description && <p className="text-xs text-zinc-600">{description}</p>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function OsSelectTrigger({ className, ...props }: React.ComponentProps<typeof SelectTrigger>) {
+  return (
+    <SelectTrigger
+      {...props}
+      className={cn(
+        "w-full min-w-[180px] border-white/[0.08] bg-black/50 text-zinc-100 sm:w-56",
+        className
+      )}
+    />
+  );
+}
 
 export default function SettingsPage() {
   const { user } = useUser();
+  const [settings, setSettings] = useState<UserSettings>(DEFAULT_USER_SETTINGS);
   const [telegram, setTelegram] = useState<{
     linked: boolean;
     telegramUsername: string | null;
     linkUrl: string | null;
   } | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [telegramLoading, setTelegramLoading] = useState(true);
+  const [telegramError, setTelegramError] = useState(false);
   const [unlinking, setUnlinking] = useState(false);
-  const [compactMode, setCompactMode] = useState(false);
-  const [emailDigest, setEmailDigest] = useState(true);
   const [showAccountPanel, setShowAccountPanel] = useState(false);
+  const [newTemplate, setNewTemplate] = useState("");
+
+  useEffect(() => {
+    setSettings(loadUserSettings());
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -44,11 +103,19 @@ export default function SettingsPage() {
       })
       .then(setTelegram)
       .catch((err) => {
-        if (err.name !== "AbortError") setError(true);
+        if (err.name !== "AbortError") setTelegramError(true);
       })
-      .finally(() => setLoading(false));
+      .finally(() => setTelegramLoading(false));
     return () => controller.abort();
   }, []);
+
+  function updateSettings(patch: Partial<UserSettings>) {
+    setSettings((prev) => {
+      const next = { ...prev, ...patch };
+      saveUserSettings(next);
+      return next;
+    });
+  }
 
   async function unlinkTelegram() {
     setUnlinking(true);
@@ -56,6 +123,13 @@ export default function SettingsPage() {
     const data = await fetch("/api/telegram/link").then((r) => r.json());
     setTelegram(data);
     setUnlinking(false);
+  }
+
+  function addTemplate() {
+    const trimmed = newTemplate.trim();
+    if (!trimmed || settings.aiPromptTemplates.includes(trimmed)) return;
+    updateSettings({ aiPromptTemplates: [...settings.aiPromptTemplates, trimmed] });
+    setNewTemplate("");
   }
 
   return (
@@ -69,7 +143,7 @@ export default function SettingsPage() {
       <div className="mx-auto max-w-3xl space-y-3">
         <OsExpandableSection
           title="General"
-          subtitle="Workspace name and default behavior"
+          subtitle="Workspace identity and locale"
           icon={<Globe className="h-5 w-5" />}
           defaultOpen
         >
@@ -90,46 +164,45 @@ export default function SettingsPage() {
         </OsExpandableSection>
 
         <OsExpandableSection
-          title="Appearance"
-          subtitle="Visual preferences for the command center"
-          icon={<Palette className="h-5 w-5" />}
-        >
-          <div className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-black/30 px-4 py-3">
-            <div>
-              <p className="text-sm text-zinc-200">Compact dashboard layout</p>
-              <p className="text-xs text-zinc-600">Reduce spacing in monitor grids</p>
-            </div>
-            <Switch
-              checked={compactMode}
-              onCheckedChange={setCompactMode}
-              className="data-[state=checked]:bg-cyan-500"
-            />
-          </div>
-        </OsExpandableSection>
-
-        <OsExpandableSection
           title="Notifications"
-          subtitle="Telegram, email, and alert preferences"
+          subtitle="Email, Telegram, and alert delivery"
           icon={<Bell className="h-5 w-5" />}
         >
-          <div className="space-y-4">
-            <div className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-black/30 px-4 py-3">
-              <div>
-                <p className="text-sm text-zinc-200">Weekly email digest</p>
-                <p className="text-xs text-zinc-600">Summary of detected changes</p>
-              </div>
+          <div className="space-y-3">
+            <SettingRow title="Email notifications" description="Receive alerts via email">
               <Switch
-                checked={emailDigest}
-                onCheckedChange={setEmailDigest}
+                checked={settings.emailNotifications}
+                onCheckedChange={(v) => updateSettings({ emailNotifications: v })}
                 className="data-[state=checked]:bg-cyan-500"
               />
-            </div>
+            </SettingRow>
+            <SettingRow title="Telegram notifications" description="Instant alerts through Telegram">
+              <Switch
+                checked={settings.telegramNotifications}
+                onCheckedChange={(v) => updateSettings({ telegramNotifications: v })}
+                className="data-[state=checked]:bg-cyan-500"
+              />
+            </SettingRow>
+            <SettingRow title="Weekly summary" description="Digest of all detected changes">
+              <Switch
+                checked={settings.weeklySummary}
+                onCheckedChange={(v) => updateSettings({ weeklySummary: v })}
+                className="data-[state=checked]:bg-cyan-500"
+              />
+            </SettingRow>
+            <SettingRow title="Instant alerts" description="Notify immediately on important changes">
+              <Switch
+                checked={settings.instantAlerts}
+                onCheckedChange={(v) => updateSettings({ instantAlerts: v })}
+                className="data-[state=checked]:bg-cyan-500"
+              />
+            </SettingRow>
 
             <div className="rounded-xl border border-white/[0.06] bg-black/20 p-4">
-              <p className="mb-3 text-sm font-medium text-zinc-200">Telegram Integration</p>
-              {loading ? (
+              <p className="mb-3 text-sm font-medium text-zinc-200">Telegram connection</p>
+              {telegramLoading ? (
                 <Loader2 className="h-5 w-5 animate-spin text-cyan-400" />
-              ) : error ? (
+              ) : telegramError ? (
                 <p className="text-sm text-red-400">Failed to load Telegram settings.</p>
               ) : telegram?.linked ? (
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -178,40 +251,242 @@ export default function SettingsPage() {
                   )}
                 </div>
               )}
+            </div>
+          </div>
+        </OsExpandableSection>
 
-              <div className="mt-4 space-y-1 rounded-lg border border-white/[0.04] bg-black/30 p-3 font-mono text-xs text-zinc-600">
-                <p className="text-zinc-400">/list · /pause · /resume · /delete · /latest</p>
+        <OsExpandableSection
+          title="AI"
+          subtitle="Provider, templates, and analysis thresholds"
+          icon={<Bot className="h-5 w-5" />}
+        >
+          <div className="space-y-4">
+            <div>
+              <OsFieldLabel>Default AI provider</OsFieldLabel>
+              <Select
+                value={settings.aiProvider}
+                onValueChange={(v) =>
+                  updateSettings({ aiProvider: v as UserSettings["aiProvider"] })
+                }
+              >
+                <OsSelectTrigger>
+                  <SelectValue />
+                </OsSelectTrigger>
+                <SelectContent>
+                  {AI_PROVIDER_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="mt-2 text-xs text-zinc-600">
+                Server override via <code className="text-cyan-400/80">AI_PROVIDER</code> takes
+                precedence when set.
+              </p>
+            </div>
+
+            <div>
+              <OsFieldLabel>Importance threshold</OsFieldLabel>
+              <Select
+                value={settings.importanceThreshold}
+                onValueChange={(v) =>
+                  updateSettings({ importanceThreshold: v as UserSettings["importanceThreshold"] })
+                }
+              >
+                <OsSelectTrigger>
+                  <SelectValue />
+                </OsSelectTrigger>
+                <SelectContent>
+                  {IMPORTANCE_OPTIONS.map((imp) => (
+                    <SelectItem key={imp} value={imp}>
+                      {imp} and above
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <SettingRow
+              title="Ignore cosmetic changes"
+              description="Filter layout-only and styling noise"
+            >
+              <Switch
+                checked={settings.ignoreCosmeticChanges}
+                onCheckedChange={(v) => updateSettings({ ignoreCosmeticChanges: v })}
+                className="data-[state=checked]:bg-cyan-500"
+              />
+            </SettingRow>
+
+            <div>
+              <OsFieldLabel>AI prompt templates</OsFieldLabel>
+              <div className="flex flex-wrap gap-1.5">
+                {[...CREATE_AI_PROMPT_EXAMPLES, ...settings.aiPromptTemplates].map((tpl) => (
+                  <span
+                    key={tpl}
+                    className="rounded-full border border-white/[0.08] bg-black/30 px-2.5 py-1 text-[10px] text-zinc-500"
+                  >
+                    {tpl}
+                  </span>
+                ))}
+              </div>
+              <div className="mt-3 flex gap-2">
+                <input
+                  value={newTemplate}
+                  onChange={(e) => setNewTemplate(e.target.value)}
+                  placeholder="Add a custom template..."
+                  className="flex-1 rounded-lg border border-white/[0.08] bg-black/50 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/40"
+                  onKeyDown={(e) => e.key === "Enter" && addTemplate()}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={addTemplate}
+                  className="rounded-full bg-cyan-500/15 text-cyan-200 hover:bg-cyan-500/25"
+                >
+                  Add
+                </Button>
               </div>
             </div>
           </div>
         </OsExpandableSection>
 
         <OsExpandableSection
-          title="AI Settings"
-          subtitle="Provider and analysis preferences"
-          icon={<Bot className="h-5 w-5" />}
+          title="Appearance"
+          subtitle="Visual preferences for the command center"
+          icon={<Palette className="h-5 w-5" />}
         >
-          <p className="text-sm leading-relaxed text-zinc-500">
-            The AI provider is configured server-side via{" "}
-            <code className="rounded bg-white/[0.06] px-1.5 py-0.5 font-mono text-xs text-cyan-400/80">
-              AI_PROVIDER
-            </code>
-            . Supported: OpenAI, Claude, Gemini.
-          </p>
-          <p className="mt-3 text-sm text-zinc-600">
-            Per-monitor AI prompts can be configured when creating or editing a monitor.
+          <SettingRow title="Compact dashboard layout" description="Reduce spacing in monitor grids">
+            <Switch
+              checked={settings.compactMode}
+              onCheckedChange={(v) => updateSettings({ compactMode: v })}
+              className="data-[state=checked]:bg-cyan-500"
+            />
+          </SettingRow>
+        </OsExpandableSection>
+
+        <OsExpandableSection
+          title="Monitoring Defaults"
+          subtitle="Defaults applied when creating new monitors"
+          icon={<Monitor className="h-5 w-5" />}
+        >
+          <div className="space-y-4">
+            <div>
+              <OsFieldLabel>Default interval</OsFieldLabel>
+              <Select
+                value={settings.defaultInterval}
+                onValueChange={(v) =>
+                  updateSettings({ defaultInterval: v as MonitoringInterval })
+                }
+              >
+                <OsSelectTrigger>
+                  <SelectValue />
+                </OsSelectTrigger>
+                <SelectContent>
+                  {Object.entries(INTERVAL_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <OsFieldLabel>Default monitoring mode</OsFieldLabel>
+              <Select
+                value={settings.defaultMode}
+                onValueChange={(v) => updateSettings({ defaultMode: v as MonitoringMode })}
+              >
+                <OsSelectTrigger>
+                  <SelectValue />
+                </OsSelectTrigger>
+                <SelectContent>
+                  {Object.entries(MODE_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <OsFieldLabel>Timezone</OsFieldLabel>
+              <Select
+                value={settings.timezone}
+                onValueChange={(v) => updateSettings({ timezone: v })}
+              >
+                <OsSelectTrigger>
+                  <SelectValue />
+                </OsSelectTrigger>
+                <SelectContent>
+                  {TIMEZONE_OPTIONS.map((tz) => (
+                    <SelectItem key={tz} value={tz}>
+                      {tz}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <OsFieldLabel>Default notification method</OsFieldLabel>
+              <Select
+                value={settings.defaultNotificationMethod}
+                onValueChange={(v) =>
+                  updateSettings({ defaultNotificationMethod: v as NotificationMethod })
+                }
+              >
+                <OsSelectTrigger>
+                  <SelectValue />
+                </OsSelectTrigger>
+                <SelectContent>
+                  {Object.entries(NOTIFICATION_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </OsExpandableSection>
+
+        <OsExpandableSection
+          title="Privacy"
+          subtitle="Data collection and visibility"
+          icon={<Eye className="h-5 w-5" />}
+        >
+          <SettingRow
+            title="Usage analytics"
+            description="Help improve WatchFlow with anonymous usage data"
+          >
+            <Switch
+              checked={settings.analyticsEnabled}
+              onCheckedChange={(v) => updateSettings({ analyticsEnabled: v })}
+              className="data-[state=checked]:bg-cyan-500"
+            />
+          </SettingRow>
+          <p className="text-xs leading-relaxed text-zinc-600">
+            Monitor URLs and change history are stored securely and never shared with third parties.
           </p>
         </OsExpandableSection>
 
         <OsExpandableSection
-          title="Monitoring"
-          subtitle="Default check intervals and detection"
-          icon={<Monitor className="h-5 w-5" />}
+          title="Security"
+          subtitle="Sessions, passwords, and two-factor auth"
+          icon={<Shield className="h-5 w-5" />}
         >
-          <p className="text-sm text-zinc-500">
-            Default monitoring behavior respects robots.txt and uses smart diff filtering.
-            Configure per-monitor settings from the monitor detail page.
-          </p>
+          <div className="space-y-3">
+            <SettingRow title="Active sessions" description="Managed via your account provider">
+              <Clock className="h-4 w-4 text-zinc-600" />
+            </SettingRow>
+            <SettingRow title="Two-factor authentication" description="Enable in Account settings">
+              <Lock className="h-4 w-4 text-zinc-600" />
+            </SettingRow>
+            <p className="text-sm text-zinc-500">
+              Security settings are managed through your account provider. Use the Account section
+              below to update password, enable 2FA, and review active sessions.
+            </p>
+          </div>
         </OsExpandableSection>
 
         <OsExpandableSection
@@ -238,17 +513,6 @@ export default function SettingsPage() {
               />
             </div>
           )}
-        </OsExpandableSection>
-
-        <OsExpandableSection
-          title="Security"
-          subtitle="Sessions, passwords, and two-factor auth"
-          icon={<Shield className="h-5 w-5" />}
-        >
-          <p className="text-sm text-zinc-500">
-            Security settings are managed through your account provider. Use the Account section
-            above to update password, enable 2FA, and review active sessions.
-          </p>
         </OsExpandableSection>
 
         <OsExpandableSection

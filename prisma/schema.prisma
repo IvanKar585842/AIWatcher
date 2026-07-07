@@ -55,6 +55,13 @@ enum MonitoringInterval {
   TWENTY_FOUR_HOURS
 }
 
+enum AnalysisStatus {
+  PENDING
+  COMPLETED
+  SKIPPED
+  FAILED
+}
+
 enum ChangeCategory {
   PRICE
   CONTENT
@@ -188,6 +195,7 @@ model Change {
   newHtml       String?          @db.Text
   diffHtml      String?          @db.Text
   aiRawResponse Json?
+  analysisStatus AnalysisStatus  @default(PENDING)
   createdAt     DateTime         @default(now())
   notifications Notification[]
 
@@ -196,6 +204,7 @@ model Change {
   @@index([monitorId, createdAt])
   @@index([category])
   @@index([importance])
+  @@index([analysisStatus])
 }
 
 model Notification {

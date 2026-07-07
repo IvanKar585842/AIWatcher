@@ -14,6 +14,53 @@ const AD_SELECTORS = [
   ".adsbygoogle",
 ];
 
+export const COOKIE_BANNER_SELECTORS = [
+  '[class*="cookie"]',
+  '[class*="Cookie"]',
+  '[class*="consent"]',
+  '[class*="Consent"]',
+  '[class*="gdpr"]',
+  '[class*="GDPR"]',
+  '[id*="cookie"]',
+  '[id*="consent"]',
+  '[aria-label*="cookie" i]',
+  '[aria-label*="consent" i]',
+  "#onetrust-banner-sdk",
+  "#CybotCookiebotDialog",
+  ".cc-banner",
+  ".cookie-notice",
+  ".cookie-banner",
+  ".cookie-consent",
+  ".gdpr-banner",
+];
+
+const TRACKING_QUERY_PARAMS = [
+  "utm_source",
+  "utm_medium",
+  "utm_campaign",
+  "utm_term",
+  "utm_content",
+  "utm_id",
+  "gclid",
+  "fbclid",
+  "msclkid",
+  "mc_cid",
+  "mc_eid",
+  "_ga",
+  "_gl",
+  "ref",
+  "referrer",
+  "sessionid",
+  "session_id",
+  "sid",
+  "cachebuster",
+  "cb",
+  "nocache",
+  "timestamp",
+  "ts",
+  "_t",
+];
+
 const TRACKING_PATTERNS = [
   /<script[\s\S]*?<\/script>/gi,
   /<noscript[\s\S]*?<\/noscript>/gi,
@@ -23,6 +70,12 @@ const TRACKING_PATTERNS = [
   /<meta[^>]*>/gi,
   /data-[a-z-]+="[^"]*"/gi,
   /nonce="[^"]*"/gi,
+];
+
+const COOKIE_HTML_PATTERNS = [
+  /<div[^>]*(?:cookie|consent|gdpr)[^>]*>[\s\S]*?<\/div>/gi,
+  /<section[^>]*(?:cookie|consent|gdpr)[^>]*>[\s\S]*?<\/section>/gi,
+  /<dialog[^>]*(?:cookie|consent)[^>]*>[\s\S]*?<\/dialog>/gi,
 ];
 
 const DYNAMIC_PATTERNS = [
@@ -48,6 +101,28 @@ export interface CleanOptions {
   ignoreTimestamps?: boolean;
   ignoreRandomIds?: boolean;
   ignoreDynamicContent?: boolean;
+  ignoreCookies?: boolean;
+  ignoreAds?: boolean;
+}
+
+export function stripTrackingParamsFromUrls(html: string): string {
+  return html.replace(
+    /(href|src)=(["'])([^"']+)\2/gi,
+    (_match, attr: string, quote: string, url: string) => {
+      try {
+        const parsed = new URL(url, "https://placeholder.local");
+        for (const param of TRACKING_QUERY_PARAMS) {
+          parsed.searchParams.delete(param);
+        }
+        const cleaned = parsed.hostname === "placeholder.local"
+          ? `${parsed.pathname}${parsed.search}`
+          : parsed.toString();
+        return `${attr}=${quote}${cleaned}${quote}`;
+      } catch {
+        return `${attr}=${quote}${url}${quote}`;
+      }
+    }
+  );
 }
 
 export function cleanHtml(html: string, options: CleanOptions = {}): string {
@@ -55,6 +130,7 @@ export function cleanHtml(html: string, options: CleanOptions = {}): string {
     ignoreTimestamps = true,
     ignoreRandomIds = true,
     ignoreDynamicContent = true,
+    ignoreCookies = true,
   } = options;
 
   let cleaned = html;
@@ -62,6 +138,14 @@ export function cleanHtml(html: string, options: CleanOptions = {}): string {
   for (const pattern of TRACKING_PATTERNS) {
     cleaned = cleaned.replace(pattern, "");
   }
+
+  if (ignoreCookies) {
+    for (const pattern of COOKIE_HTML_PATTERNS) {
+      cleaned = cleaned.replace(pattern, "");
+    }
+  }
+
+  cleaned = stripTrackingParamsFromUrls(cleaned);
 
   if (ignoreTimestamps || ignoreDynamicContent) {
     for (const pattern of DYNAMIC_PATTERNS) {
@@ -108,6 +192,10 @@ export function getAdSelectors(): string[] {
   return AD_SELECTORS;
 }
 
+export function getCookieBannerSelectors(): string[] {
+  return COOKIE_BANNER_SELECTORS;
+}
+
 export function normalizeForComparison(text: string): string {
   return text
     .toLowerCase()
@@ -130,4 +218,8 @@ export function hasMeaningfulChange(oldContent: string, newContent: string): boo
   }
 
   return true;
+}
+
+export function contentHashesEqual(a: string, b: string): boolean {
+  return a === b;
 }

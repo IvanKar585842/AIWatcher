@@ -1,16 +1,9 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Radar } from "lucide-react";
-import { CreateMonitorDialog } from "@/components/dashboard/create-monitor-dialog";
+import { History } from "lucide-react";
 
-export function MonitorsEmptyState({
-  onCreated,
-  showCreateButton = true,
-}: {
-  onCreated?: (monitorId: string) => void;
-  showCreateButton?: boolean;
-}) {
+export function HistoryEmptyState({ filtered }: { filtered?: boolean }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -25,7 +18,7 @@ export function MonitorsEmptyState({
         transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
         className="relative mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-2xl border border-cyan-400/25 bg-cyan-500/10 shadow-[0_0_48px_-10px_rgba(34,211,238,0.55)]"
       >
-        <Radar className="h-10 w-10 text-cyan-400/90" />
+        <History className="h-10 w-10 text-cyan-400/90" />
         <motion.span
           className="absolute inset-0 rounded-2xl border border-cyan-400/20"
           animate={{ scale: [1, 1.08, 1], opacity: [0.5, 0, 0.5] }}
@@ -33,25 +26,14 @@ export function MonitorsEmptyState({
         />
       </motion.div>
 
-      <h3 className="relative text-xl font-semibold text-zinc-100">No monitors yet</h3>
+      <h3 className="relative text-xl font-semibold text-zinc-100">
+        {filtered ? "No changes found" : "No changes yet"}
+      </h3>
       <p className="relative mx-auto mt-2 max-w-md text-sm leading-relaxed text-zinc-500">
-        Create your first AI monitor and start watching any website.
+        {filtered
+          ? "Try adjusting your search or filters to find what you're looking for."
+          : "Detected changes will appear here once your monitors start watching websites."}
       </p>
-
-      {showCreateButton && (
-        <motion.div
-          className="relative mt-8"
-          whileHover={{ scale: 1.04 }}
-          whileTap={{ scale: 0.97 }}
-        >
-          <CreateMonitorDialog
-            onCreated={onCreated}
-            variant="os"
-            triggerLabel="+ Create Monitor"
-            triggerClassName="h-12 px-8 text-sm font-medium shadow-[0_0_40px_-8px_rgba(34,211,238,0.65)]"
-          />
-        </motion.div>
-      )}
     </motion.div>
   );
 }

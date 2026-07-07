@@ -5,9 +5,36 @@ import {
   cleanHtml,
   extractTextFromHtml,
   getAdSelectors,
+  getCookieBannerSelectors,
   hashContent,
   type CleanOptions,
 } from "./content-cleaner";
+
+const FETCH_RETRY_BASE_MS = 1000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function withFetchRetry<T>(
+  fn: () => Promise<T>,
+  maxAttempts = 3
+): Promise<T> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      if (attempt < maxAttempts - 1) {
+        await sleep(FETCH_RETRY_BASE_MS * Math.pow(2, attempt));
+      }
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("Fetch failed after retries");
+}
 
 let browserInstance: Browser | null = null;
 
@@ -19,25 +46,40 @@ function isServerlessRuntime(): boolean {
   );
 }
 
+async function launchWithSparticuz(): Promise<Browser> {
+  const chromium = (await import("@sparticuz/chromium")).default;
+  const executablePath = await chromium.executablePath();
+
+  if (executablePath) {
+    process.env.LD_LIBRARY_PATH = path.dirname(executablePath);
+  }
+
+  return playwrightChromium.launch({
+    args: chromium.args,
+    executablePath,
+    headless: chromium.headless ?? true,
+  });
+}
+
+function isMissingBrowserError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const msg = error.message;
+  return (
+    msg.includes("Executable doesn't exist") ||
+    msg.includes("browserType.launch") ||
+    msg.includes("Failed to launch") ||
+    msg.includes("playwright install")
+  );
+}
+
 async function launchBrowser(): Promise<Browser> {
   if (isServerlessRuntime()) {
-    const chromium = (await import("@sparticuz/chromium")).default;
-    const executablePath = await chromium.executablePath();
-
-    if (executablePath) {
-      process.env.LD_LIBRARY_PATH = path.dirname(executablePath);
-    }
-
-    return playwrightChromium.launch({
-      args: chromium.args,
-      executablePath,
-      headless: true,
-    });
+    return launchWithSparticuz();
   }
 
   try {
     const { chromium } = await import("playwright");
-    return chromium.launch({
+    return await chromium.launch({
       headless: true,
       args: [
         "--no-sandbox",
@@ -46,15 +88,22 @@ async function launchBrowser(): Promise<Browser> {
         "--disable-gpu",
       ],
     });
-  } catch {
-    const chromium = (await import("@sparticuz/chromium")).default;
-    const executablePath = await chromium.executablePath();
-
-    return playwrightChromium.launch({
-      args: chromium.args,
-      executablePath,
-      headless: true,
-    });
+  } catch (error) {
+    if (isMissingBrowserError(error)) {
+      console.warn(
+        "Local Playwright browser not found, falling back to bundled Chromium. " +
+          "For best results run: npx playwright install chromium"
+      );
+      try {
+        return await launchWithSparticuz();
+      } catch (fallbackError) {
+        throw new Error(
+          "Playwright browser is not installed. Run: npx playwright install chromium",
+          { cause: fallbackError }
+        );
+      }
+    }
+    throw error;
   }
 }
 
@@ -89,6 +138,12 @@ export interface FetchOptions {
   timeout?: number;
   ignoreAds?: boolean;
   cleanOptions?: CleanOptions;
+  maxRetries?: number;
+}
+
+export async function fetchPageContent(options: FetchOptions): Promise<FetchResult> {
+  const maxRetries = options.maxRetries ?? 3;
+  return withFetchRetry(() => fetchPageContentOnce(options), maxRetries);
 }
 
 async function checkRobotsTxt(url: string): Promise<boolean> {
@@ -124,7 +179,7 @@ async function checkRobotsTxt(url: string): Promise<boolean> {
   }
 }
 
-export async function fetchPageContent(options: FetchOptions): Promise<FetchResult> {
+async function fetchPageContentOnce(options: FetchOptions): Promise<FetchResult> {
   const {
     url,
     mode,
@@ -171,6 +226,15 @@ export async function fetchPageContent(options: FetchOptions): Promise<FetchResu
         await page.evaluate((sel) => {
           document.querySelectorAll(sel).forEach((el) => el.remove());
         }, adSelector);
+      }
+    }
+
+    const ignoreCookies = cleanOptions?.ignoreCookies !== false;
+    if (ignoreCookies) {
+      for (const cookieSelector of getCookieBannerSelectors()) {
+        await page.evaluate((sel) => {
+          document.querySelectorAll(sel).forEach((el) => el.remove());
+        }, cookieSelector);
       }
     }
 

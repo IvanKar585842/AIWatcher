@@ -4,8 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { HistoryEmptyState } from "@/components/dashboard/history-empty-state";
+import { OsInput } from "@/components/dashboard/os/os-primitives";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
@@ -81,8 +82,8 @@ export function ChangeHistory() {
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600" />
+          <OsInput
             placeholder="Search changes..."
             value={query}
             onChange={(e) => {
@@ -129,11 +130,7 @@ export function ChangeHistory() {
           ))}
         </div>
       ) : changes.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            No changes found.
-          </CardContent>
-        </Card>
+        <HistoryEmptyState filtered={Boolean(query || category !== "all" || importance !== "all")} />
       ) : (
         <div className="space-y-3">
           {changes.map((change) => (

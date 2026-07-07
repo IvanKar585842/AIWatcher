@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Download, Pause, Play, Plus, Loader2 } from "lucide-react";
-import { CreateMonitorDialog } from "@/components/dashboard/create-monitor-dialog";
+import { Download, Pause, Play, Loader2 } from "lucide-react";
 
 interface QuickActionsProps {
   onRefresh: () => void;
@@ -12,7 +11,6 @@ interface QuickActionsProps {
 }
 
 export function QuickActions({ onRefresh, pausedCount, activeCount }: QuickActionsProps) {
-  const [createOpen, setCreateOpen] = useState(false);
   const [loading, setLoading] = useState<string | null>(null);
 
   function notifyMonitorsUpdated() {
@@ -50,14 +48,6 @@ export function QuickActions({ onRefresh, pausedCount, activeCount }: QuickActio
 
   const actions = [
     {
-      id: "create",
-      label: "Create Monitor",
-      icon: Plus,
-      onClick: () => setCreateOpen(true),
-      primary: true,
-      disabled: false,
-    },
-    {
       id: "pause_all",
       label: "Pause All",
       icon: Pause,
@@ -81,54 +71,37 @@ export function QuickActions({ onRefresh, pausedCount, activeCount }: QuickActio
   ] as const;
 
   return (
-    <>
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.05 }}
-        className="flex flex-wrap gap-2"
-      >
-        {actions.map((action, i) => {
-          const Icon = action.icon;
-          const isLoading = loading === action.id;
-          return (
-            <motion.button
-              key={action.id}
-              type="button"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.08 + i * 0.04 }}
-              whileHover={{ scale: action.disabled ? 1 : 1.02 }}
-              whileTap={{ scale: action.disabled ? 1 : 0.98 }}
-              onClick={action.onClick}
-              disabled={action.disabled || isLoading}
-              className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-medium transition-all disabled:cursor-not-allowed disabled:opacity-40 ${
-                "primary" in action && action.primary
-                  ? "border-cyan-400/30 bg-cyan-500/15 text-cyan-100 hover:border-cyan-300/50 hover:bg-cyan-500/20"
-                  : "border-white/[0.08] bg-white/[0.03] text-zinc-400 hover:border-white/[0.14] hover:bg-white/[0.05] hover:text-zinc-200"
-              }`}
-            >
-              {isLoading ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Icon className="h-3.5 w-3.5" />
-              )}
-              {action.label}
-            </motion.button>
-          );
-        })}
-      </motion.div>
-
-      <CreateMonitorDialog
-        open={createOpen}
-        onOpenChange={setCreateOpen}
-        hideTrigger
-        onCreated={() => {
-          onRefresh();
-          notifyMonitorsUpdated();
-        }}
-        variant="os"
-      />
-    </>
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.05 }}
+      className="flex flex-wrap gap-2"
+    >
+      {actions.map((action, i) => {
+        const Icon = action.icon;
+        const isLoading = loading === action.id;
+        return (
+          <motion.button
+            key={action.id}
+            type="button"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.08 + i * 0.04 }}
+            whileHover={{ scale: action.disabled ? 1 : 1.02 }}
+            whileTap={{ scale: action.disabled ? 1 : 0.98 }}
+            onClick={action.onClick}
+            disabled={action.disabled || isLoading}
+            className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-xs font-medium text-zinc-400 transition-all hover:border-white/[0.14] hover:bg-white/[0.05] hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {isLoading ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Icon className="h-3.5 w-3.5" />
+            )}
+            {action.label}
+          </motion.button>
+        );
+      })}
+    </motion.div>
   );
 }

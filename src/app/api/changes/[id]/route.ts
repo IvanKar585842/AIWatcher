@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { apiErrorResponse } from "@/lib/errors";
+import { readStoredHtml } from "@/lib/monitoring/snapshot-store";
 import { withRateLimit } from "@/lib/rate-limit";
 
 export async function GET(
@@ -30,7 +31,18 @@ export async function GET(
           return NextResponse.json({ error: "Change not found" }, { status: 404 });
         }
 
-        return NextResponse.json({ change });
+        const [oldHtml, newHtml] = await Promise.all([
+          readStoredHtml(change.oldHtml),
+          readStoredHtml(change.newHtml),
+        ]);
+
+        return NextResponse.json({
+          change: {
+            ...change,
+            oldHtml,
+            newHtml,
+          },
+        });
       },
       user.id
     );

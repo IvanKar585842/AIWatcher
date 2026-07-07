@@ -3,7 +3,6 @@
 import dynamic from "next/dynamic";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { CreateMonitorDialog } from "@/components/dashboard/create-monitor-dialog";
 import { CommandCenterSkeleton } from "./dashboard-skeletons";
 import { MonitoringHealth } from "./monitoring-health";
 import { QuickActions } from "./quick-actions";
@@ -234,22 +233,11 @@ export function CommandCenter() {
 
       >
 
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-cyan-500/60">
-              Command Center
-            </p>
-            <h2 className="mt-1 text-xl font-semibold text-zinc-100">Intelligence Overview</h2>
-          </div>
-          <CreateMonitorDialog
-            variant="os"
-            triggerLabel="+ Create Monitor"
-            triggerClassName="h-11 px-6 text-sm font-medium shadow-[0_0_36px_-8px_rgba(34,211,238,0.6)]"
-            onCreated={() => {
-              load();
-              window.dispatchEvent(new CustomEvent("monitors-updated"));
-            }}
-          />
+        <div>
+          <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-cyan-500/60">
+            Command Center
+          </p>
+          <h2 className="mt-1 text-xl font-semibold text-zinc-100">Intelligence Overview</h2>
         </div>
 
 
