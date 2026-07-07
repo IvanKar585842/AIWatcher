@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { processMonitor } from "@/lib/monitoring/processor";
 import { withRateLimit } from "@/lib/rate-limit";
 
+export const maxDuration = 60;
 export async function POST(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

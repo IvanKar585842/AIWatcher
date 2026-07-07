@@ -3,6 +3,16 @@
   "buildCommand": "npm run build",
   "installCommand": "npm install",
   "env": {
-    "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD": "1"
+    "AWS_LAMBDA_JS_RUNTIME": "nodejs22.x"
+  },
+  "functions": {
+    "src/app/api/cron/monitoring/route.ts": {
+      "maxDuration": 60,
+      "memory": 1024
+    },
+    "src/app/api/monitors/[id]/check/route.ts": {
+      "maxDuration": 60,
+      "memory": 1024
+    }
   }
 }

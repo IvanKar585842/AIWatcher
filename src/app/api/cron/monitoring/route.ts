@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runMonitoringCycle } from "@/trigger/monitoring";
 
+export const maxDuration = 60;
+
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;

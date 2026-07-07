@@ -1,5 +1,6 @@
-import { chromium, type Browser, type Page } from "playwright";
+import { chromium as playwrightChromium, type Browser, type Page } from "playwright-core";
 import { MonitoringMode } from "@prisma/client";
+import path from "node:path";
 import {
   cleanHtml,
   extractTextFromHtml,
@@ -9,9 +10,33 @@ import {
 
 let browserInstance: Browser | null = null;
 
-async function getBrowser(): Promise<Browser> {
-  if (!browserInstance || !browserInstance.isConnected()) {
-    browserInstance = await chromium.launch({
+function isServerlessRuntime(): boolean {
+  return Boolean(
+    process.env.VERCEL ||
+      process.env.AWS_LAMBDA_FUNCTION_NAME ||
+      process.env.AWS_EXECUTION_ENV
+  );
+}
+
+async function launchBrowser(): Promise<Browser> {
+  if (isServerlessRuntime()) {
+    const chromium = (await import("@sparticuz/chromium")).default;
+    const executablePath = await chromium.executablePath();
+
+    if (executablePath) {
+      process.env.LD_LIBRARY_PATH = path.dirname(executablePath);
+    }
+
+    return playwrightChromium.launch({
+      args: chromium.args,
+      executablePath,
+      headless: true,
+    });
+  }
+
+  try {
+    const { chromium } = await import("playwright");
+    return chromium.launch({
       headless: true,
       args: [
         "--no-sandbox",
@@ -20,6 +45,21 @@ async function getBrowser(): Promise<Browser> {
         "--disable-gpu",
       ],
     });
+  } catch {
+    const chromium = (await import("@sparticuz/chromium")).default;
+    const executablePath = await chromium.executablePath();
+
+    return playwrightChromium.launch({
+      args: chromium.args,
+      executablePath,
+      headless: true,
+    });
+  }
+}
+
+async function getBrowser(): Promise<Browser> {
+  if (!browserInstance || !browserInstance.isConnected()) {
+    browserInstance = await launchBrowser();
   }
   return browserInstance;
 }
@@ -59,7 +99,7 @@ async function checkRobotsTxt(url: string): Promise<boolean> {
     if (!response.ok) return true;
 
     const text = await response.text();
-    const path = parsed.pathname;
+    const urlPath = parsed.pathname;
 
     let inUserAgentAll = false;
     for (const line of text.split("\n")) {
@@ -70,7 +110,7 @@ async function checkRobotsTxt(url: string): Promise<boolean> {
       }
       if (inUserAgentAll && trimmed.startsWith("disallow:")) {
         const disallowPath = trimmed.split(":")[1]?.trim() ?? "";
-        if (disallowPath && path.startsWith(disallowPath)) {
+        if (disallowPath && urlPath.startsWith(disallowPath)) {
           return false;
         }
       }
