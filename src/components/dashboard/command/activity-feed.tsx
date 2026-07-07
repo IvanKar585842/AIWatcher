@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { formatRelativeTime } from "@/lib/utils";
@@ -14,7 +14,7 @@ export interface ActivityEvent {
   monitor: { name: string; url: string };
 }
 
-export function ActivityFeed({ events }: { events: ActivityEvent[] }) {
+export const ActivityFeed = memo(function ActivityFeed({ events }: { events: ActivityEvent[] }) {
   const [visible, setVisible] = useState(events);
 
   useEffect(() => {
@@ -89,4 +89,4 @@ export function ActivityFeed({ events }: { events: ActivityEvent[] }) {
       </div>
     </div>
   );
-}
+});

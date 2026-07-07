@@ -111,6 +111,7 @@ model Subscription {
   updatedAt            DateTime  @updatedAt
 
   @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
 }
 
 model Monitor {
@@ -139,6 +140,8 @@ model Monitor {
   @@index([userId])
   @@index([status])
   @@index([nextCheckAt])
+  @@index([status, nextCheckAt])
+  @@unique([userId, url])
 }
 
 model Snapshot {
@@ -177,6 +180,7 @@ model Change {
 
   @@index([monitorId])
   @@index([createdAt])
+  @@index([monitorId, createdAt])
   @@index([category])
   @@index([importance])
 }
@@ -210,4 +214,21 @@ model MonitorQueue {
 
   @@index([scheduledAt])
   @@index([lockedAt])
+}
+
+model AnalyticsEvent {
+  id         String   @id @default(cuid())
+  type       String
+  userId     String?
+  metadata   Json?
+  durationMs Int?
+  createdAt  DateTime @default(now())
+
+  @@index([type, createdAt])
+  @@index([userId])
+}
+
+model ProcessedStripeEvent {
+  id        String   @id
+  createdAt DateTime @default(now())
 }

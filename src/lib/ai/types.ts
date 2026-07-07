@@ -1,25 +1,33 @@
 import { ChangeCategory, ChangeImportance } from "@prisma/client";
 import { z } from "zod";
 
-export const changeAnalysisSchema = z.object({
-  summary: z.string(),
-  importance: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]),
-  category: z.enum([
-    "PRICE",
-    "CONTENT",
-    "JOBS",
-    "POLICY",
-    "CONTACT_INFO",
-    "PRODUCT",
-    "DOCUMENTATION",
-    "FEATURES",
-    "OTHER",
-  ]),
-  old_value: z.string().nullable().optional(),
-  new_value: z.string().nullable().optional(),
-  bullet_points: z.array(z.string()),
-  emoji: z.string(),
-});
+export const changeAnalysisSchema = z
+  .object({
+    summary: z.string(),
+    importance: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]),
+    category: z.enum([
+      "PRICE",
+      "CONTENT",
+      "JOBS",
+      "POLICY",
+      "CONTACT_INFO",
+      "PRODUCT",
+      "DOCUMENTATION",
+      "FEATURES",
+      "OTHER",
+    ]),
+    changes: z.array(z.string()).default([]),
+    shouldNotify: z.boolean().default(true),
+    old_value: z.string().nullable().optional(),
+    new_value: z.string().nullable().optional(),
+    bullet_points: z.array(z.string()).optional(),
+    emoji: z.string().default("🔔"),
+  })
+  .transform((data) => ({
+    ...data,
+    changes: data.changes.length > 0 ? data.changes : (data.bullet_points ?? []),
+    bullet_points: data.bullet_points ?? data.changes,
+  }));
 
 export type ChangeAnalysis = z.infer<typeof changeAnalysisSchema>;
 
@@ -28,8 +36,9 @@ export interface AIProvider {
     url: string;
     monitorName: string;
     mode: string;
-    oldContent: string;
-    newContent: string;
+    oldHtml: string;
+    newHtml: string;
+    userPrompt?: string;
   }): Promise<ChangeAnalysis>;
 }
 
@@ -40,29 +49,32 @@ Analyze the changes between two versions of a monitored webpage and explain WHAT
 Monitor URL: {url}
 Monitor Name: {monitorName}
 Monitoring Mode: {mode}
+User Context: {userPrompt}
 
-OLD CONTENT:
-{oldContent}
+OLD HTML (cleaned):
+{oldHtml}
 
-NEW CONTENT:
-{newContent}
+NEW HTML (cleaned):
+{newHtml}
 
 Instructions:
 1. Summarize exactly what changed in clear, concise language
-2. Classify the change into one category: PRICE, CONTENT, JOBS, POLICY, CONTACT_INFO, PRODUCT, DOCUMENTATION, FEATURES, or OTHER
+2. Classify the change: PRICE, CONTENT, JOBS, POLICY, CONTACT_INFO, PRODUCT, DOCUMENTATION, FEATURES, or OTHER
 3. Rate importance: LOW, MEDIUM, HIGH, or CRITICAL
-4. Extract old_value and new_value for the primary change (if applicable)
-5. Provide 2-5 bullet points highlighting key changes
-6. Choose a relevant emoji
+4. List specific detected changes in the "changes" array (2-5 items)
+5. Set shouldNotify to true only if the change is meaningful enough to alert the user (false for noise, ads, timestamps, minor formatting)
+6. Extract old_value and new_value for the primary change (if applicable)
+7. Choose a relevant emoji
 
-Respond ONLY with valid JSON in this exact format:
+Respond ONLY with valid JSON:
 {
   "summary": "string",
   "importance": "LOW|MEDIUM|HIGH|CRITICAL",
   "category": "PRICE|CONTENT|JOBS|POLICY|CONTACT_INFO|PRODUCT|DOCUMENTATION|FEATURES|OTHER",
+  "changes": ["string"],
+  "shouldNotify": true,
   "old_value": "string or null",
   "new_value": "string or null",
-  "bullet_points": ["string"],
   "emoji": "string"
 }`;
 
@@ -86,4 +98,20 @@ export function toPrismaCategory(
   category: ChangeAnalysis["category"]
 ): ChangeCategory {
   return ChangeCategory[category];
+}
+
+export function buildAnalysisPrompt(params: {
+  url: string;
+  monitorName: string;
+  mode: string;
+  oldHtml: string;
+  newHtml: string;
+  userPrompt?: string;
+}): string {
+  return CHANGE_ANALYSIS_PROMPT.replace("{url}", params.url)
+    .replace("{monitorName}", params.monitorName)
+    .replace("{mode}", params.mode)
+    .replace("{userPrompt}", params.userPrompt?.trim() || "None")
+    .replace("{oldHtml}", params.oldHtml)
+    .replace("{newHtml}", params.newHtml);
 }

@@ -1,12 +1,22 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import dynamic from "next/dynamic";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Plus } from "lucide-react";
 import Link from "next/link";
 import { ActivityFeed } from "./activity-feed";
-import { NetworkMap, type NetworkMonitor } from "./network-map";
 import { StatReadouts } from "./stat-readouts";
+
+const NetworkMap = dynamic(
+  () => import("./network-map").then((m) => m.NetworkMap),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="min-h-[420px] animate-pulse rounded-2xl border border-white/[0.06] bg-white/[0.02]" />
+    ),
+  }
+);
 
 interface CommandStats {
   totalMonitors: number;
@@ -23,7 +33,14 @@ interface CommandStats {
     createdAt: string;
     monitor: { name: string; url: string };
   }>;
-  monitors: NetworkMonitor[];
+  monitors: Array<{
+    id: string;
+    name: string;
+    url: string;
+    status: string;
+    lastChangedAt: string | null;
+    _count?: { changes: number };
+  }>;
 }
 
 export function CommandCenter() {
@@ -72,12 +89,11 @@ export function CommandCenter() {
           <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-cyan-500/60">
             Command Center
           </p>
-          <h2 className="mt-1 text-xl font-semibold text-zinc-100">
-            Intelligence Overview
-          </h2>
+          <h2 className="mt-1 text-xl font-semibold text-zinc-100">Intelligence Overview</h2>
         </div>
         <Link
           href="/dashboard/monitors"
+          prefetch
           className="inline-flex items-center gap-2 rounded-full border border-cyan-400/25 bg-cyan-500/10 px-4 py-2 text-xs font-medium text-cyan-100 transition-colors hover:border-cyan-300/40 hover:bg-cyan-500/15"
         >
           <Plus className="h-3.5 w-3.5" />
@@ -100,7 +116,13 @@ export function CommandCenter() {
           transition={{ delay: 0.15 }}
           className="min-h-[420px]"
         >
-          <NetworkMap monitors={stats.monitors} />
+          <Suspense
+            fallback={
+              <div className="min-h-[420px] animate-pulse rounded-2xl border border-white/[0.06] bg-white/[0.02]" />
+            }
+          >
+            <NetworkMap monitors={stats.monitors} />
+          </Suspense>
         </motion.div>
 
         <motion.div

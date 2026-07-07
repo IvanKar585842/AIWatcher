@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getAnalyticsSummary, trackEvent } from "@/lib/analytics";
 import { MonitorStatus, ChangeImportance } from "@prisma/client";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -8,6 +9,7 @@ export async function GET() {
   return withRateLimit("dashboard-stats", async () => {
     try {
       const user = await requireUser();
+      await trackEvent({ type: "user.active", userId: user.id });
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
@@ -116,6 +118,8 @@ export async function GET() {
           ? 100
           : Math.min(99, Math.round((successfulChecks / activeMonitors) * 100));
 
+      const analytics = await getAnalyticsSummary(user.id);
+
       return NextResponse.json({
         stats: {
           totalMonitors,
@@ -128,6 +132,7 @@ export async function GET() {
           recentChanges,
           recentNotifications,
           monitors,
+          analytics,
         },
       });
     } catch {

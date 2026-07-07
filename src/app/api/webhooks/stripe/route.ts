@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import Stripe from "stripe";
+import { prisma } from "@/lib/db";
 import {
   getStripe,
   handleSubscriptionDeleted,
@@ -29,6 +30,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 400 });
   }
 
+  const existing = await prisma.processedStripeEvent.findUnique({
+    where: { id: event.id },
+  });
+
+  if (existing) {
+    return NextResponse.json({ received: true, duplicate: true });
+  }
+
   switch (event.type) {
     case "customer.subscription.created":
     case "customer.subscription.updated":
@@ -37,6 +46,16 @@ export async function POST(request: NextRequest) {
     case "customer.subscription.deleted":
       await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
       break;
+    case "invoice.payment_failed": {
+      const invoice = event.data.object as Stripe.Invoice;
+      if (invoice.subscription) {
+        const subscription = await getStripe().subscriptions.retrieve(
+          invoice.subscription as string
+        );
+        await handleSubscriptionUpdate(subscription);
+      }
+      break;
+    }
     case "checkout.session.completed": {
       const session = event.data.object as Stripe.Checkout.Session;
       if (session.subscription && session.metadata?.userId) {
@@ -48,6 +67,8 @@ export async function POST(request: NextRequest) {
       break;
     }
   }
+
+  await prisma.processedStripeEvent.create({ data: { id: event.id } });
 
   return NextResponse.json({ received: true });
 }

@@ -1,9 +1,10 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import {
   AIProvider,
-  CHANGE_ANALYSIS_PROMPT,
+  buildAnalysisPrompt,
   parseChangeAnalysis,
 } from "./types";
+import { truncateContent, withRetry } from "./utils";
 
 export class GeminiProvider implements AIProvider {
   private client: GoogleGenerativeAI;
@@ -20,31 +21,29 @@ export class GeminiProvider implements AIProvider {
     url: string;
     monitorName: string;
     mode: string;
-    oldContent: string;
-    newContent: string;
+    oldHtml: string;
+    newHtml: string;
+    userPrompt?: string;
   }) {
-    const prompt = CHANGE_ANALYSIS_PROMPT.replace("{url}", params.url)
-      .replace("{monitorName}", params.monitorName)
-      .replace("{mode}", params.mode)
-      .replace("{oldContent}", truncateContent(params.oldContent))
-      .replace("{newContent}", truncateContent(params.newContent));
-
-    const model = this.client.getGenerativeModel({
-      model: this.model,
-      generationConfig: {
-        temperature: 0.2,
-        responseMimeType: "application/json",
-      },
+    const prompt = buildAnalysisPrompt({
+      ...params,
+      oldHtml: truncateContent(params.oldHtml),
+      newHtml: truncateContent(params.newHtml),
     });
 
-    const result = await model.generateContent(prompt);
-    const content = result.response.text();
-    if (!content) throw new Error("Empty response from Gemini");
-    return parseChangeAnalysis(content);
-  }
-}
+    return withRetry(async () => {
+      const model = this.client.getGenerativeModel({
+        model: this.model,
+        generationConfig: {
+          temperature: 0.2,
+          responseMimeType: "application/json",
+        },
+      });
 
-function truncateContent(content: string, maxLength = 12000): string {
-  if (content.length <= maxLength) return content;
-  return content.slice(0, maxLength) + "\n...[truncated]";
+      const result = await model.generateContent(prompt);
+      const content = result.response.text();
+      if (!content) throw new Error("Empty response from Gemini");
+      return parseChangeAnalysis(content);
+    });
+  }
 }

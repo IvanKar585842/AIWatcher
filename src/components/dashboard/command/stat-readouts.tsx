@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { motion } from "framer-motion";
 import { Activity, AlertTriangle, Brain, HeartPulse, Radio } from "lucide-react";
 
@@ -12,7 +13,7 @@ interface StatItem {
   accent: string;
 }
 
-export function StatReadouts({
+export const StatReadouts = memo(function StatReadouts({
   activeMonitors,
   changesToday,
   importantAlerts,
@@ -92,4 +93,4 @@ export function StatReadouts({
       ))}
     </div>
   );
-}
+});

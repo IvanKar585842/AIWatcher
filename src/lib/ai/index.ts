@@ -9,11 +9,11 @@ let cachedProvider: AIProvider | null = null;
 let cachedType: AIProviderType | null = null;
 
 export function getAIProviderType(): AIProviderType {
-  const provider = (process.env.AI_PROVIDER ?? "openai").toLowerCase();
+  const provider = (process.env.AI_PROVIDER ?? "gemini").toLowerCase();
   if (provider === "claude" || provider === "gemini" || provider === "openai") {
     return provider;
   }
-  return "openai";
+  return "gemini";
 }
 
 export function createAIProvider(type?: AIProviderType): AIProvider {

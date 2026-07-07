@@ -1,9 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
-import {
-  AIProvider,
-  CHANGE_ANALYSIS_PROMPT,
-  parseChangeAnalysis,
-} from "./types";
+import { AIProvider, buildAnalysisPrompt, parseChangeAnalysis } from "./types";
+import { truncateContent, withRetry } from "./utils";
 
 export class ClaudeProvider implements AIProvider {
   private client: Anthropic;
@@ -20,31 +17,29 @@ export class ClaudeProvider implements AIProvider {
     url: string;
     monitorName: string;
     mode: string;
-    oldContent: string;
-    newContent: string;
+    oldHtml: string;
+    newHtml: string;
+    userPrompt?: string;
   }) {
-    const prompt = CHANGE_ANALYSIS_PROMPT.replace("{url}", params.url)
-      .replace("{monitorName}", params.monitorName)
-      .replace("{mode}", params.mode)
-      .replace("{oldContent}", truncateContent(params.oldContent))
-      .replace("{newContent}", truncateContent(params.newContent));
-
-    const response = await this.client.messages.create({
-      model: this.model,
-      max_tokens: 1024,
-      messages: [{ role: "user", content: prompt }],
+    const prompt = buildAnalysisPrompt({
+      ...params,
+      oldHtml: truncateContent(params.oldHtml),
+      newHtml: truncateContent(params.newHtml),
     });
 
-    const textBlock = response.content.find((block) => block.type === "text");
-    if (!textBlock || textBlock.type !== "text") {
-      throw new Error("Empty response from Claude");
-    }
+    return withRetry(async () => {
+      const response = await this.client.messages.create({
+        model: this.model,
+        max_tokens: 1024,
+        messages: [{ role: "user", content: prompt }],
+      });
 
-    return parseChangeAnalysis(textBlock.text);
+      const textBlock = response.content.find((block) => block.type === "text");
+      if (!textBlock || textBlock.type !== "text") {
+        throw new Error("Empty response from Claude");
+      }
+
+      return parseChangeAnalysis(textBlock.text);
+    });
   }
-}
-
-function truncateContent(content: string, maxLength = 12000): string {
-  if (content.length <= maxLength) return content;
-  return content.slice(0, maxLength) + "\n...[truncated]";
 }

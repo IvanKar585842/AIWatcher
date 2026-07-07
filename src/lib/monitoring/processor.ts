@@ -1,5 +1,4 @@
 import {
-  ChangeImportance,
   MonitorStatus,
   NotificationChannel,
   NotificationMethod,
@@ -8,17 +7,33 @@ import {
   type Prisma,
 } from "@prisma/client";
 import { getAIProvider, toPrismaCategory, toPrismaImportance } from "@/lib/ai";
+import { trackEvent } from "@/lib/analytics";
 import { INTERVAL_MINUTES } from "@/lib/constants";
 import { prisma } from "@/lib/db";
 import { sendChangeEmail } from "@/lib/notifications/email";
 import { sendTelegramChangeNotification } from "@/lib/notifications/telegram";
+import { compressHtml } from "./compress";
 import { hasMeaningfulChange } from "./content-cleaner";
 import { generateTextDiff } from "./diff";
-import { fetchPageContent } from "./fetcher";
+import { closeBrowser, fetchPageContent } from "./fetcher";
+import { acquireMonitorLock, releaseMonitorLock } from "./lock";
 
 const MAX_RETRIES = 3;
 
 export async function processMonitor(monitorId: string): Promise<void> {
+  if (!acquireMonitorLock(monitorId)) {
+    return;
+  }
+
+  try {
+    await processMonitorInternal(monitorId);
+  } finally {
+    releaseMonitorLock(monitorId);
+    await closeBrowser();
+  }
+}
+
+async function processMonitorInternal(monitorId: string): Promise<void> {
   const monitor = await prisma.monitor.findUnique({
     where: { id: monitorId },
     include: {
@@ -53,12 +68,14 @@ export async function processMonitor(monitorId: string): Promise<void> {
       now.getTime() + INTERVAL_MINUTES[monitor.interval] * 60 * 1000
     );
 
+    const compressedCleaned = await compressHtml(result.cleanedHtml);
+
     if (!previousSnapshot) {
       await prisma.snapshot.create({
         data: {
           monitorId: monitor.id,
-          rawHtml: result.rawHtml,
-          cleanedHtml: result.cleanedHtml,
+          rawHtml: "",
+          cleanedHtml: compressedCleaned,
           contentHash: result.contentHash,
           extractedText: result.extractedText,
           metadata: result.metadata as Prisma.InputJsonValue,
@@ -74,6 +91,8 @@ export async function processMonitor(monitorId: string): Promise<void> {
           errorMessage: null,
         },
       });
+
+      await trackEvent({ type: "monitor.check", userId: monitor.userId, metadata: { monitorId } });
       return;
     }
 
@@ -103,9 +122,13 @@ export async function processMonitor(monitorId: string): Promise<void> {
       return;
     }
 
-    let analysis;
-    const oldContent = previousSnapshot.extractedText ?? previousSnapshot.cleanedHtml;
+    const oldHtml = previousSnapshot.cleanedHtml;
+    const newHtml = result.cleanedHtml;
+    const oldContent = previousSnapshot.extractedText ?? oldHtml;
     const newContent = result.extractedText;
+
+    let analysis;
+    const userPrompt = monitor.keywords.length > 0 ? monitor.keywords.join(", ") : undefined;
 
     if (plan === Plan.FREE) {
       analysis = {
@@ -114,21 +137,51 @@ export async function processMonitor(monitorId: string): Promise<void> {
         category: "CONTENT" as const,
         old_value: null,
         new_value: null,
+        changes: ["Page content has been updated"],
         bullet_points: ["Page content has been updated"],
+        shouldNotify: true,
         emoji: "🔔",
       };
     } else {
       const ai = getAIProvider();
+      const started = Date.now();
       analysis = await ai.analyzeChange({
         url: monitor.url,
         monitorName: monitor.name,
         mode: monitor.mode,
-        oldContent,
-        newContent,
+        oldHtml: oldContent.slice(0, 12000),
+        newHtml: newContent.slice(0, 12000),
+        userPrompt,
+      });
+      await trackEvent({
+        type: "ai.analysis",
+        userId: monitor.userId,
+        durationMs: Date.now() - started,
+        metadata: { monitorId, importance: analysis.importance },
       });
     }
 
+    if (!analysis.shouldNotify) {
+      await prisma.snapshot.create({
+        data: {
+          monitorId: monitor.id,
+          rawHtml: "",
+          cleanedHtml: compressedCleaned,
+          contentHash: result.contentHash,
+          extractedText: result.extractedText,
+          metadata: result.metadata as Prisma.InputJsonValue,
+        },
+      });
+
+      await prisma.monitor.update({
+        where: { id: monitor.id },
+        data: { lastCheckedAt: now, nextCheckAt, errorCount: 0, errorMessage: null },
+      });
+      return;
+    }
+
     const diffHtml = generateTextDiff(oldContent.slice(0, 5000), newContent.slice(0, 5000));
+    const changes = analysis.changes ?? analysis.bullet_points ?? [];
 
     const change = await prisma.change.create({
       data: {
@@ -138,10 +191,10 @@ export async function processMonitor(monitorId: string): Promise<void> {
         category: toPrismaCategory(analysis.category),
         oldValue: analysis.old_value ?? null,
         newValue: analysis.new_value ?? null,
-        bulletPoints: analysis.bullet_points,
+        bulletPoints: changes,
         emoji: analysis.emoji,
-        oldHtml: previousSnapshot.cleanedHtml.slice(0, 50000),
-        newHtml: result.cleanedHtml.slice(0, 50000),
+        oldHtml: oldHtml.slice(0, 50000),
+        newHtml: newHtml.slice(0, 50000),
         diffHtml,
         aiRawResponse: analysis as Prisma.InputJsonValue,
       },
@@ -150,8 +203,8 @@ export async function processMonitor(monitorId: string): Promise<void> {
     await prisma.snapshot.create({
       data: {
         monitorId: monitor.id,
-        rawHtml: result.rawHtml,
-        cleanedHtml: result.cleanedHtml,
+        rawHtml: "",
+        cleanedHtml: compressedCleaned,
         contentHash: result.contentHash,
         extractedText: result.extractedText,
         metadata: result.metadata as Prisma.InputJsonValue,
@@ -169,7 +222,19 @@ export async function processMonitor(monitorId: string): Promise<void> {
       },
     });
 
-    await sendNotifications(monitor, change.id, analysis);
+    await trackEvent({
+      type: "change.detected",
+      userId: monitor.userId,
+      metadata: { monitorId, changeId: change.id, importance: analysis.importance },
+    });
+
+    await sendNotifications(monitor, change.id, {
+      summary: analysis.summary,
+      emoji: analysis.emoji,
+      changes,
+      importance: analysis.importance,
+      shouldNotify: analysis.shouldNotify,
+    });
     await cleanupOldHistory(monitor.id, plan);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
@@ -196,10 +261,13 @@ async function sendNotifications(
   analysis: {
     summary: string;
     emoji: string;
-    bullet_points: string[];
+    changes: string[];
     importance: string;
+    shouldNotify: boolean;
   }
 ) {
+  if (!analysis.shouldNotify) return;
+
   const tasks: Promise<void>[] = [];
 
   if (
@@ -224,7 +292,7 @@ async function sendNotifications(
             url: monitor.url,
             summary: analysis.summary,
             emoji: analysis.emoji,
-            bulletPoints: analysis.bullet_points,
+            changes: analysis.changes,
             importance: analysis.importance,
             changeId,
           });
@@ -233,6 +301,8 @@ async function sendNotifications(
             where: { id: notification.id },
             data: { status: "SENT", sentAt: new Date() },
           });
+
+          await trackEvent({ type: "email.sent", userId: monitor.userId, metadata: { changeId } });
         } catch (err) {
           await prisma.notification.update({
             where: { id: notification.id },
@@ -269,7 +339,7 @@ async function sendNotifications(
             url: monitor.url,
             summary: analysis.summary,
             emoji: analysis.emoji,
-            bulletPoints: analysis.bullet_points,
+            bulletPoints: analysis.changes,
             importance: analysis.importance,
           });
 
@@ -328,13 +398,25 @@ export async function processDueMonitors(batchSize = 10): Promise<number> {
       status: MonitorStatus.ACTIVE,
       OR: [{ nextCheckAt: null }, { nextCheckAt: { lte: now } }],
     },
-    take: batchSize,
-    orderBy: { nextCheckAt: "asc" },
+    include: {
+      user: { include: { subscription: true } },
+    },
+    take: batchSize * 2,
+    orderBy: [{ nextCheckAt: "asc" }],
   });
 
-  const results = await Promise.allSettled(
-    dueMonitors.map((m) => processMonitor(m.id))
-  );
+  const sorted = dueMonitors.sort((a, b) => {
+    const aPriority = a.user.subscription?.plan === Plan.BUSINESS ? 0 : 1;
+    const bPriority = b.user.subscription?.plan === Plan.BUSINESS ? 0 : 1;
+    if (aPriority !== bPriority) return aPriority - bPriority;
+    const aTime = a.nextCheckAt?.getTime() ?? 0;
+    const bTime = b.nextCheckAt?.getTime() ?? 0;
+    return aTime - bTime;
+  });
+
+  const batch = sorted.slice(0, batchSize);
+
+  const results = await Promise.allSettled(batch.map((m) => processMonitor(m.id)));
 
   return results.filter((r) => r.status === "fulfilled").length;
 }
