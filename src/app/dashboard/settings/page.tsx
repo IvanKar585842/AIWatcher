@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
+import { CommandPageHeader } from "@/components/dashboard/command/command-page-header";
+
 export default function SettingsPage() {
   const [telegram, setTelegram] = useState<{
     linked: boolean;
@@ -31,11 +33,12 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Settings</h1>
-        <p className="text-muted-foreground">Manage your account and integrations.</p>
-      </div>
+    <div className="space-y-6 p-4 lg:p-6">
+      <CommandPageHeader
+        label="System"
+        title="Settings"
+        description="Manage your account and integrations."
+      />
 
       <Card>
         <CardHeader>

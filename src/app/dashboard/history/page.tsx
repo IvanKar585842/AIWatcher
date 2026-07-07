@@ -1,14 +1,14 @@
 import { ChangeHistory } from "@/components/dashboard/change-history";
+import { CommandPageHeader } from "@/components/dashboard/command/command-page-header";
 
 export default function HistoryPage() {
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Change History</h1>
-        <p className="text-muted-foreground">
-          Timeline of all detected changes across your monitors.
-        </p>
-      </div>
+    <div className="p-4 lg:p-6">
+      <CommandPageHeader
+        label="Archive"
+        title="Change History"
+        description="Timeline of all detected changes across your monitors."
+      />
       <ChangeHistory />
     </div>
   );

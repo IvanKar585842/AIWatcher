@@ -8,6 +8,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
+import { CommandPageHeader } from "@/components/dashboard/command/command-page-header";
+
 export default function BillingPage() {
   const [loading, setLoading] = useState<string | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
@@ -46,12 +48,12 @@ export default function BillingPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Billing</h1>
-          <p className="text-muted-foreground">Manage your subscription and billing.</p>
-        </div>
+    <div className="space-y-6 p-4 lg:p-6">
+      <CommandPageHeader
+        label="Subscription"
+        title="Billing"
+        description="Manage your subscription and billing."
+      >
         <Button variant="outline" onClick={openPortal} disabled={portalLoading}>
           {portalLoading ? (
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -60,7 +62,7 @@ export default function BillingPage() {
           )}
           Billing Portal
         </Button>
-      </div>
+      </CommandPageHeader>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {PRICING_PLANS.map((plan) => (

@@ -1,12 +1,14 @@
 import { MonitorList } from "@/components/dashboard/monitor-list";
+import { CommandPageHeader } from "@/components/dashboard/command/command-page-header";
 
 export default function MonitorsPage() {
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Monitors</h1>
-        <p className="text-muted-foreground">Manage all your webpage monitors.</p>
-      </div>
+    <div className="p-4 lg:p-6">
+      <CommandPageHeader
+        label="Network"
+        title="Monitors"
+        description="Manage every website under active surveillance."
+      />
       <MonitorList />
     </div>
   );
