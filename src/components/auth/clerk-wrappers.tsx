@@ -17,12 +17,18 @@ const hasClerk =
     : !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
       !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY.includes("placeholder");
 
-export function AuthButtons({ signUpClassName }: { signUpClassName?: string }) {
+export function AuthButtons({
+  signUpClassName,
+  signInClassName,
+}: {
+  signUpClassName?: string;
+  signInClassName?: string;
+}) {
   if (!hasClerk) {
     return (
       <>
         <Link href="/sign-in">
-          <Button variant="ghost" size="sm">
+          <Button variant="ghost" size="sm" className={signInClassName}>
             Sign In
           </Button>
         </Link>
@@ -39,7 +45,7 @@ export function AuthButtons({ signUpClassName }: { signUpClassName?: string }) {
     <>
       <SignedOut>
         <SignInButton mode="modal">
-          <Button variant="ghost" size="sm">
+          <Button variant="ghost" size="sm" className={signInClassName}>
             Sign In
           </Button>
         </SignInButton>
@@ -51,7 +57,7 @@ export function AuthButtons({ signUpClassName }: { signUpClassName?: string }) {
       </SignedOut>
       <SignedIn>
         <Link href="/dashboard">
-          <Button variant="ghost" size="sm">
+          <Button variant="ghost" size="sm" className={signInClassName}>
             Dashboard
           </Button>
         </Link>
