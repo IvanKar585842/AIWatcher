@@ -1,4 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
 
 const isPublicRoute = createRouteMatcher([
   "/",
@@ -24,7 +25,7 @@ export default hasClerk
       }
     })
   : function middleware() {
-      // No-op when Clerk is not configured (local build without keys)
+      return NextResponse.next();
     };
 
 export const config = {
