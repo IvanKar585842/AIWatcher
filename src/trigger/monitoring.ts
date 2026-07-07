@@ -1,6 +1,12 @@
 import { processDueMonitors, runMonitoringEngine } from "@/lib/monitoring/processor";
+import { monitorLog } from "@/lib/monitoring/logger";
 
 export async function runMonitoringCycle() {
+  monitorLog({
+    step: "scheduler_started",
+    message: "Cron monitoring cycle started",
+  });
+
   let totalMonitors = 0;
   let analysesProcessed = 0;
   let batchMonitors = 0;
@@ -12,12 +18,13 @@ export async function runMonitoringCycle() {
     analysesProcessed += result.analysesProcessed;
   } while (batchMonitors > 0 && totalMonitors < 100);
 
+  monitorLog({
+    step: "scheduler_started",
+    message: "Cron monitoring cycle finished",
+    data: { processed: totalMonitors, analysesProcessed },
+  });
+
   return { processed: totalMonitors, analysesProcessed };
 }
 
 export { processDueMonitors, runMonitoringEngine };
-
-export async function triggerMonitorCheck(monitorId: string) {
-  const { tasks } = await import("@trigger.dev/sdk/v3");
-  await tasks.trigger("check-monitor", { monitorId });
-}

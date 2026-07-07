@@ -1,18 +1,61 @@
 import {
   AnalysisStatus,
-  MonitorStatus,
   NotificationChannel,
   NotificationMethod,
-  Plan,
   type Monitor,
   type Prisma,
 } from "@prisma/client";
-import { getAIProvider, toPrismaCategory, toPrismaImportance } from "@/lib/ai";
+import { getAIProvider, getAIProviderType, isAIConfigured, toPrismaCategory, toPrismaImportance } from "@/lib/ai";
+import type { ChangeAnalysis } from "@/lib/ai/types";
 import { trackEvent } from "@/lib/analytics";
 import { prisma } from "@/lib/db";
 import { sendChangeEmail } from "@/lib/notifications/email";
 import { sendTelegramChangeNotification } from "@/lib/notifications/telegram";
+import {
+  createInAppNotification,
+  recordAlertDelivery,
+} from "@/lib/notifications/deliver";
+import { buildFallbackAnalysis } from "./fallback-analysis";
+import { monitorLog, monitorLogError } from "./logger";
 import { readStoredHtml } from "./snapshot-store";
+
+type ChangeWithMonitor = {
+  id: string;
+  monitorId: string;
+  oldHtml: string | null;
+  newHtml: string | null;
+  analysisStatus: AnalysisStatus;
+  aiRawResponse: Prisma.JsonValue | null;
+  monitor: Monitor & {
+    user: {
+      email: string;
+      telegramChatId: string | null;
+    };
+  };
+};
+
+export async function analyzeChangeById(changeId: string): Promise<void> {
+  const change = await prisma.change.findUnique({
+    where: { id: changeId },
+    include: {
+      monitor: {
+        include: {
+          user: { include: { subscription: true } },
+        },
+      },
+    },
+  });
+
+  if (!change) {
+    throw new Error(`Change ${changeId} not found`);
+  }
+
+  if (change.analysisStatus !== AnalysisStatus.PENDING) {
+    return;
+  }
+
+  await analyzeChangeRecord(change);
+}
 
 export async function processPendingAnalyses(batchSize = 5): Promise<number> {
   const pending = await prisma.change.findMany({
@@ -35,13 +78,9 @@ export async function processPendingAnalyses(batchSize = 5): Promise<number> {
       await analyzeChangeRecord(change);
       processed++;
     } catch (error) {
-      console.error(`AI analysis failed for change ${change.id}:`, error);
-      await prisma.change.update({
-        where: { id: change.id },
-        data: {
-          analysisStatus: AnalysisStatus.FAILED,
-          summary: "Analysis failed — change was detected but could not be summarized.",
-        },
+      monitorLogError("error", "Change analysis failed", error, {
+        monitorId: change.monitorId,
+        data: { changeId: change.id },
       });
     }
   }
@@ -49,65 +88,139 @@ export async function processPendingAnalyses(batchSize = 5): Promise<number> {
   return processed;
 }
 
-async function analyzeChangeRecord(
-  change: {
-    id: string;
-    monitorId: string;
-    oldHtml: string | null;
-    newHtml: string | null;
-    monitor: Monitor & {
-      user: {
-        email: string;
-        telegramChatId: string | null;
-        subscription: { plan: Plan } | null;
-      };
-    };
-  }
-) {
+async function resolveAnalysis(
+  change: ChangeWithMonitor,
+  oldContent: string,
+  newContent: string
+): Promise<{ analysis: ChangeAnalysis; provider: string }> {
   const monitor = change.monitor;
-  const plan = monitor.user.subscription?.plan ?? Plan.FREE;
-
   const userPrompt =
     monitor.aiPrompt?.trim() ||
     (monitor.keywords.length > 0 ? monitor.keywords.join(", ") : undefined);
 
-  const oldContent = await readStoredHtml(change.oldHtml);
-  const newContent = await readStoredHtml(change.newHtml);
+  const fallbackParams = {
+    monitorName: monitor.name,
+    url: monitor.url,
+    mode: monitor.mode,
+    oldContent,
+    newContent,
+  };
 
-  let analysis;
-
-  if (plan === Plan.FREE) {
-    analysis = {
-      summary: "Content changed on the monitored page.",
-      importance: "MEDIUM" as const,
-      category: "CONTENT" as const,
-      old_value: null,
-      new_value: null,
-      changes: ["Page content has been updated"],
-      bullet_points: ["Page content has been updated"],
-      shouldNotify: true,
-      emoji: "🔔",
+  if (!isAIConfigured()) {
+    monitorLog({
+      step: "ai_analysis_start",
+      monitorId: monitor.id,
+      url: monitor.url,
+      mode: monitor.mode,
+      message: "AI not configured — using built-in change summary",
+      data: { changeId: change.id },
+    });
+    return {
+      analysis: buildFallbackAnalysis(fallbackParams),
+      provider: "fallback",
     };
-  } else {
+  }
+
+  monitorLog({
+    step: "ai_analysis_start",
+    monitorId: monitor.id,
+    url: monitor.url,
+    mode: monitor.mode,
+    message: "Sending snapshots to AI for analysis",
+    data: {
+      changeId: change.id,
+      hasUserPrompt: Boolean(userPrompt),
+    },
+  });
+
+  try {
     const ai = getAIProvider();
     const started = Date.now();
-    analysis = await ai.analyzeChange({
+    const analysis = await ai.analyzeChange({
       url: monitor.url,
       monitorName: monitor.name,
       mode: monitor.mode,
-      oldHtml: oldContent.slice(0, 12000),
-      newHtml: newContent.slice(0, 12000),
+      oldHtml: oldContent,
+      newHtml: newContent,
       userPrompt,
     });
+
+    const provider = getAIProviderType();
+
     await trackEvent({
       type: "ai.analysis",
       userId: monitor.userId,
       durationMs: Date.now() - started,
-      metadata: { monitorId: monitor.id, changeId: change.id, importance: analysis.importance },
+      metadata: {
+        monitorId: monitor.id,
+        changeId: change.id,
+        importance: analysis.importance,
+        shouldNotify: analysis.shouldNotify,
+        provider,
+      },
     });
+
+    return { analysis, provider };
+  } catch (error) {
+    monitorLogError("error", "AI analysis failed — using built-in summary", error, {
+      monitorId: monitor.id,
+      data: { changeId: change.id },
+    });
+    return {
+      analysis: buildFallbackAnalysis(fallbackParams),
+      provider: "fallback",
+    };
+  }
+}
+
+async function analyzeChangeRecord(change: ChangeWithMonitor): Promise<void> {
+  const monitor = change.monitor;
+
+  if (!change.oldHtml || !change.newHtml) {
+    throw new Error("Missing snapshot content for analysis");
   }
 
+  const oldContent = await readStoredHtml(change.oldHtml);
+  const newContent = await readStoredHtml(change.newHtml);
+
+  if (!oldContent.trim() || !newContent.trim()) {
+    throw new Error("Empty snapshot content for analysis");
+  }
+
+  if (oldContent === newContent) {
+    await prisma.change.update({
+      where: { id: change.id },
+      data: {
+        summary: "No meaningful content difference",
+        analysisStatus: AnalysisStatus.SKIPPED,
+      },
+    });
+    return;
+  }
+
+  const { analysis, provider } = await resolveAnalysis(change, oldContent, newContent);
   const changes = analysis.changes ?? analysis.bullet_points ?? [];
+
+  const priorMeta =
+    change.aiRawResponse &&
+    typeof change.aiRawResponse === "object" &&
+    !Array.isArray(change.aiRawResponse)
+      ? (change.aiRawResponse as Record<string, unknown>)
+      : {};
+
+  const storedResponse: Prisma.InputJsonValue = {
+    ...priorMeta,
+    provider,
+    analyzedAt: new Date().toISOString(),
+    summary: analysis.summary,
+    importance: analysis.importance,
+    category: analysis.category,
+    shouldNotify: analysis.shouldNotify,
+    changes,
+    old_value: analysis.old_value ?? null,
+    new_value: analysis.new_value ?? null,
+    emoji: analysis.emoji,
+  };
 
   if (!analysis.shouldNotify) {
     await prisma.change.update({
@@ -118,9 +231,16 @@ async function analyzeChangeRecord(
         category: toPrismaCategory(analysis.category),
         bulletPoints: changes,
         emoji: analysis.emoji,
-        aiRawResponse: analysis as Prisma.InputJsonValue,
+        aiRawResponse: storedResponse,
         analysisStatus: AnalysisStatus.SKIPPED,
       },
+    });
+
+    monitorLog({
+      step: "ai_analysis_complete",
+      monitorId: monitor.id,
+      message: "Analysis complete — notification suppressed",
+      data: { changeId: change.id, provider, shouldNotify: false },
     });
     return;
   }
@@ -135,8 +255,20 @@ async function analyzeChangeRecord(
       newValue: analysis.new_value ?? null,
       bulletPoints: changes,
       emoji: analysis.emoji,
-      aiRawResponse: analysis as Prisma.InputJsonValue,
+      aiRawResponse: storedResponse,
       analysisStatus: AnalysisStatus.COMPLETED,
+    },
+  });
+
+  monitorLog({
+    step: "ai_analysis_complete",
+    monitorId: monitor.id,
+    message: "Analysis stored and alerts dispatched",
+    data: {
+      changeId: change.id,
+      provider,
+      importance: analysis.importance,
+      shouldNotify: true,
     },
   });
 
@@ -162,22 +294,21 @@ async function sendNotifications(
 ) {
   if (!analysis.shouldNotify) return;
 
-  const tasks: Promise<void>[] = [];
+  await createInAppNotification(monitor.userId, changeId);
 
-  if (
+  const tasks: Promise<void>[] = [];
+  const wantsEmail =
     monitor.notificationMethod === NotificationMethod.EMAIL ||
-    monitor.notificationMethod === NotificationMethod.BOTH
-  ) {
+    monitor.notificationMethod === NotificationMethod.BOTH;
+  const wantsTelegram =
+    (monitor.notificationMethod === NotificationMethod.TELEGRAM ||
+      monitor.notificationMethod === NotificationMethod.BOTH) &&
+    monitor.user.telegramChatId;
+
+  if (wantsEmail) {
     tasks.push(
       (async () => {
-        const notification = await prisma.notification.create({
-          data: {
-            userId: monitor.userId,
-            changeId,
-            channel: NotificationChannel.EMAIL,
-            status: "PENDING",
-          },
-        });
+        await recordAlertDelivery(monitor.userId, changeId, NotificationChannel.EMAIL, "PENDING");
 
         try {
           await sendChangeEmail({
@@ -191,40 +322,36 @@ async function sendNotifications(
             changeId,
           });
 
-          await prisma.notification.update({
-            where: { id: notification.id },
-            data: { status: "SENT", sentAt: new Date() },
-          });
-
+          await recordAlertDelivery(monitor.userId, changeId, NotificationChannel.EMAIL, "SENT");
           await trackEvent({ type: "email.sent", userId: monitor.userId, metadata: { changeId } });
+
+          monitorLog({
+            step: "database_updated",
+            monitorId: monitor.id,
+            message: "Email notification sent",
+            data: { changeId },
+          });
         } catch (err) {
-          await prisma.notification.update({
-            where: { id: notification.id },
-            data: {
-              status: "FAILED",
-              error: err instanceof Error ? err.message : "Send failed",
-            },
+          await recordAlertDelivery(
+            monitor.userId,
+            changeId,
+            NotificationChannel.EMAIL,
+            "FAILED",
+            err instanceof Error ? err.message : "Send failed"
+          );
+          monitorLogError("error", "Email notification failed", err, {
+            monitorId: monitor.id,
+            data: { changeId },
           });
         }
       })()
     );
   }
 
-  if (
-    (monitor.notificationMethod === NotificationMethod.TELEGRAM ||
-      monitor.notificationMethod === NotificationMethod.BOTH) &&
-    monitor.user.telegramChatId
-  ) {
+  if (wantsTelegram) {
     tasks.push(
       (async () => {
-        const notification = await prisma.notification.create({
-          data: {
-            userId: monitor.userId,
-            changeId,
-            channel: NotificationChannel.TELEGRAM,
-            status: "PENDING",
-          },
-        });
+        await recordAlertDelivery(monitor.userId, changeId, NotificationChannel.TELEGRAM, "PENDING");
 
         try {
           await sendTelegramChangeNotification({
@@ -237,18 +364,15 @@ async function sendNotifications(
             importance: analysis.importance,
           });
 
-          await prisma.notification.update({
-            where: { id: notification.id },
-            data: { status: "SENT", sentAt: new Date() },
-          });
+          await recordAlertDelivery(monitor.userId, changeId, NotificationChannel.TELEGRAM, "SENT");
         } catch (err) {
-          await prisma.notification.update({
-            where: { id: notification.id },
-            data: {
-              status: "FAILED",
-              error: err instanceof Error ? err.message : "Send failed",
-            },
-          });
+          await recordAlertDelivery(
+            monitor.userId,
+            changeId,
+            NotificationChannel.TELEGRAM,
+            "FAILED",
+            err instanceof Error ? err.message : "Send failed"
+          );
         }
       })()
     );

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BarChart3,
@@ -11,27 +12,43 @@ import {
   Clock,
   CreditCard,
   LayoutDashboard,
+  MessageSquare,
   Radio,
   Settings,
+  Shield,
   User,
 } from "lucide-react";
 import { DashboardUserButton } from "@/components/auth/clerk-wrappers";
 import { cn } from "@/lib/utils";
 import { useCommand } from "./command-context";
 
-const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { href: "/dashboard/monitors", label: "Monitors", icon: Radio },
-  { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
-  { href: "/dashboard/history", label: "History", icon: Clock },
-  { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/dashboard/settings", label: "Settings", icon: Settings },
-  { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
-];
-
 export function CommandSidebar() {
   const pathname = usePathname();
   const { collapsed, setCollapsed, mobileOpen, setMobileOpen } = useCommand();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/user/context")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.isAdmin) setIsAdmin(true);
+      })
+      .catch(() => {});
+  }, []);
+
+  const navItems = [
+    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
+    { href: "/dashboard/monitors", label: "Monitors", icon: Radio },
+    { href: "/dashboard/assistant", label: "AI Assistant", icon: MessageSquare },
+    { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
+    { href: "/dashboard/history", label: "History", icon: Clock },
+    { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
+    { href: "/dashboard/settings", label: "Settings", icon: Settings },
+    { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
+    ...(isAdmin
+      ? [{ href: "/dashboard/admin", label: "Admin", icon: Shield, exact: false }]
+      : []),
+  ];
 
   const width = collapsed ? 72 : 220;
 

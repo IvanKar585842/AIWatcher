@@ -3,10 +3,11 @@ import { Prisma } from "@prisma/client";
 import { requireUser } from "@/lib/auth";
 import { trackEvent } from "@/lib/analytics";
 import {
-  getAllowedIntervals,
-  getPlanLimits,
-  isIntervalAllowed,
-} from "@/lib/constants";
+  getEffectivePlan,
+  getUserAllowedIntervals,
+  getUserPlanLimits,
+  isIntervalAllowedForUser,
+} from "@/lib/admin";
 import { prisma } from "@/lib/db";
 import { ApiError, parseJsonBody } from "@/lib/errors";
 import { apiFailure, apiFailureFromError } from "@/lib/api-response";
@@ -84,8 +85,8 @@ export async function POST(request: NextRequest) {
             );
           }
 
-          const plan = user.subscription?.plan ?? "FREE";
-          const limits = getPlanLimits(plan);
+          const plan = getEffectivePlan(user);
+          const limits = getUserPlanLimits(user);
 
           const monitorCount = await prisma.monitor.count({
             where: { userId: user.id },
@@ -101,11 +102,11 @@ export async function POST(request: NextRequest) {
             );
           }
 
-          if (!isIntervalAllowed(plan, parsed.data.interval)) {
+          if (!isIntervalAllowedForUser(user, parsed.data.interval)) {
             return NextResponse.json(
               {
                 success: false,
-                error: `Interval not allowed on ${plan} plan. Allowed: ${getAllowedIntervals(plan).join(", ")}`,
+                error: `Interval not allowed on ${plan} plan. Allowed: ${getUserAllowedIntervals(user).join(", ")}`,
               },
               { status: 403 }
             );
@@ -115,7 +116,7 @@ export async function POST(request: NextRequest) {
             parsed.data.notificationMethod === "TELEGRAM" ||
             parsed.data.notificationMethod === "BOTH"
           ) {
-            assertNotificationAllowed(plan, parsed.data.notificationMethod);
+            assertNotificationAllowed(user, parsed.data.notificationMethod);
           }
 
           const existing = await prisma.monitor.findFirst({

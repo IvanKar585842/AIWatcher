@@ -1,5 +1,5 @@
 import { requireUser } from "@/lib/auth";
-import { getPlanLimits } from "@/lib/constants";
+import { getUserPlanLimits, isAdminUser, getEffectivePlan } from "@/lib/admin";
 import { prisma } from "@/lib/db";
 import { apiFailureFromError, apiSuccess } from "@/lib/api-response";
 import { getAnalyticsSummary } from "@/lib/analytics";
@@ -9,8 +9,9 @@ export async function GET() {
   try {
     const user = await requireUser();
     return withRateLimit("billing-overview", async () => {
-      const plan = user.subscription?.plan ?? "FREE";
-      const limits = getPlanLimits(plan);
+      const plan = getEffectivePlan(user);
+      const limits = getUserPlanLimits(user);
+      const admin = isAdminUser(user);
 
       const since = new Date();
       since.setDate(since.getDate() - 30);
@@ -31,10 +32,11 @@ export async function GET() {
       });
 
       const storageMb = Math.round(changeCount * 0.12 * 10) / 10;
-      const storageLimitMb = plan === "FREE" ? 50 : plan === "PRO" ? 5000 : null;
+      const storageLimitMb = admin ? null : plan === "FREE" ? 50 : plan === "PRO" ? 5000 : null;
 
       return apiSuccess({
         plan,
+        isAdmin: admin,
         limits: {
           maxMonitors: limits.maxMonitors === Infinity ? null : limits.maxMonitors,
           aiSummaries: limits.aiSummaries,
@@ -47,8 +49,8 @@ export async function GET() {
           storageMb,
         },
         storageLimitMb,
-        aiLimit: plan === "FREE" ? 50 : plan === "PRO" ? 5000 : null,
-        notificationLimit: plan === "FREE" ? 100 : plan === "PRO" ? 10000 : null,
+        aiLimit: admin ? null : plan === "FREE" ? 50 : plan === "PRO" ? 5000 : null,
+        notificationLimit: admin ? null : plan === "FREE" ? 100 : plan === "PRO" ? 10000 : null,
       });
     }, user.id);
   } catch (error) {

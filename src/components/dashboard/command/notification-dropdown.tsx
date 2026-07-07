@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Bell } from "lucide-react";
+import { useToast } from "@/components/ui/os-toast";
 import { formatRelativeTime } from "@/lib/utils";
 
 interface NotificationItem {
@@ -38,27 +39,47 @@ function markRead(id: string) {
 
 export function NotificationDropdown() {
   const router = useRouter();
+  const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const knownIdsRef = useRef<Set<string>>(new Set());
+  const initializedRef = useRef(false);
 
   const loadNotifications = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/dashboard/stats");
+      const res = await fetch("/api/notifications");
       if (!res.ok) return;
       const data = await res.json();
-      setNotifications(data.stats?.recentNotifications ?? []);
+      const items: NotificationItem[] = data.notifications ?? [];
+
+      if (initializedRef.current) {
+        const read = getReadIds();
+        for (const item of items) {
+          if (!knownIdsRef.current.has(item.id) && !read.has(item.id)) {
+            toast(`${item.change.emoji} ${item.change.monitor.name}: ${item.change.summary}`, "success");
+          }
+        }
+      } else {
+        initializedRef.current = true;
+      }
+
+      knownIdsRef.current = new Set(items.map((n) => n.id));
+      setNotifications(items);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     setReadIds(getReadIds());
-  }, []);
+    loadNotifications();
+    const interval = setInterval(loadNotifications, 15_000);
+    return () => clearInterval(interval);
+  }, [loadNotifications]);
 
   useEffect(() => {
     if (open) loadNotifications();
@@ -123,46 +144,54 @@ export function NotificationDropdown() {
           </div>
 
           <div className="max-h-80 overflow-y-auto">
-            {loading && (
+            {loading && notifications.length === 0 && (
               <p className="px-4 py-6 text-center text-xs text-zinc-600">Loading...</p>
             )}
 
             {!loading && notifications.length === 0 && (
-              <p className="px-4 py-6 text-center text-xs text-zinc-600">No notifications yet</p>
+              <p className="px-4 py-6 text-center text-xs text-zinc-600">
+                No alerts yet — changes on monitored sites will appear here
+              </p>
             )}
 
-            {!loading &&
-              notifications.map((item) => {
-                const isUnread = !readIds.has(item.id);
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => handleNotificationClick(item)}
-                    className={`flex w-full gap-3 border-b border-white/[0.04] px-4 py-3 text-left transition-colors hover:bg-white/[0.03] ${
-                      isUnread ? "bg-cyan-500/[0.04]" : ""
-                    }`}
-                  >
-                    <span className="text-lg">{item.change.emoji}</span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="truncate text-sm font-medium text-zinc-200">
-                          {item.change.monitor.name}
-                        </p>
-                        {isUnread && (
-                          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-400" />
-                        )}
-                      </div>
-                      <p className="mt-0.5 line-clamp-2 text-xs text-zinc-500">
-                        {item.change.summary}
+            {notifications.map((item) => {
+              const isUnread = !readIds.has(item.id);
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => handleNotificationClick(item)}
+                  className={`flex w-full gap-3 border-b border-white/[0.04] px-4 py-3 text-left transition-colors hover:bg-white/[0.03] ${
+                    isUnread ? "bg-cyan-500/[0.04]" : ""
+                  }`}
+                >
+                  <span className="text-lg">{item.change.emoji}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-sm font-medium text-zinc-200">
+                        {item.change.monitor.name}
                       </p>
-                      <p className="mt-1 text-[10px] text-zinc-600">
-                        {item.channel} · {formatRelativeTime(item.createdAt)}
-                      </p>
+                      {isUnread && (
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-400" />
+                      )}
                     </div>
-                  </button>
-                );
-              })}
+                    <p className="mt-0.5 line-clamp-2 text-xs text-zinc-500">
+                      {item.change.summary}
+                    </p>
+                    <p className="mt-1 text-[10px] text-zinc-600">
+                      {item.channel === "IN_APP"
+                        ? "On site"
+                        : item.channel === "EMAIL"
+                          ? "Email"
+                          : item.channel === "TELEGRAM"
+                            ? "Telegram"
+                            : item.channel}{" "}
+                      · {formatRelativeTime(item.createdAt)}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
           </div>
 
           <div className="border-t border-white/[0.06] px-4 py-2">

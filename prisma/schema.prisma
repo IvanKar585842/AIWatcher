@@ -84,6 +84,7 @@ enum ChangeImportance {
 enum NotificationChannel {
   TELEGRAM
   EMAIL
+  IN_APP
 }
 
 enum NotificationStatus {
@@ -92,12 +93,18 @@ enum NotificationStatus {
   FAILED
 }
 
+enum UserRole {
+  USER
+  ADMIN
+}
+
 model User {
   id               String         @id @default(cuid())
   clerkId          String         @unique
   email            String         @unique
   name             String?
   imageUrl         String?
+  role             UserRole       @default(USER)
   telegramChatId   String?
   telegramUsername String?
   createdAt        DateTime       @default(now())
@@ -105,9 +112,11 @@ model User {
   subscription     Subscription?
   monitors         Monitor[]
   notifications    Notification[]
+  chatConversations ChatConversation[]
 
   @@index([clerkId])
   @@index([email])
+  @@index([role])
 }
 
 model Subscription {
@@ -253,4 +262,60 @@ model AnalyticsEvent {
 model ProcessedStripeEvent {
   id        String   @id
   createdAt DateTime @default(now())
+}
+
+enum ChatMessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+model ChatConversation {
+  id               String        @id @default(cuid())
+  userId           String
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title            String        @default("New conversation")
+  summary          String?       @db.Text
+  summaryUpdatedAt DateTime?
+  totalTokens      Int           @default(0)
+  totalCostUsd     Float         @default(0)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  messages         ChatMessage[]
+
+  @@index([userId])
+  @@index([userId, updatedAt])
+  @@index([createdAt])
+}
+
+model ChatMessage {
+  id               String           @id @default(cuid())
+  conversationId   String
+  conversation     ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role             ChatMessageRole
+  content          String           @db.Text
+  promptTokens     Int?
+  completionTokens Int?
+  totalTokens      Int?
+  costUsd          Float?
+  model            String?
+  cached           Boolean          @default(false)
+  createdAt        DateTime         @default(now())
+
+  @@index([conversationId])
+  @@index([conversationId, createdAt])
+  @@index([createdAt])
+  @@index([role, createdAt])
+}
+
+model ChatAnswerCache {
+  id                 String   @id @default(cuid())
+  normalizedQuestion String   @unique
+  questionHash       String   @unique
+  answer             String   @db.Text
+  hitCount           Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([hitCount])
 }

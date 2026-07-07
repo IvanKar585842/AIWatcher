@@ -42,29 +42,29 @@ export interface AIProvider {
   }): Promise<ChangeAnalysis>;
 }
 
-export const CHANGE_ANALYSIS_PROMPT = `You are an expert web change analyst for WatchFlow AI.
-
-Analyze the changes between two versions of a monitored webpage and explain WHAT changed and WHY it matters.
+export const CHANGE_ANALYSIS_PROMPT = `Analyze the difference between two snapshots of a monitored webpage.
 
 Monitor URL: {url}
 Monitor Name: {monitorName}
 Monitoring Mode: {mode}
-User Context: {userPrompt}
 
-OLD HTML (cleaned):
+User monitoring prompt (what the user cares about):
+{userPrompt}
+
+OLD SNAPSHOT:
 {oldHtml}
 
-NEW HTML (cleaned):
+NEW SNAPSHOT:
 {newHtml}
 
-Instructions:
-1. Summarize exactly what changed in clear, concise language
-2. Classify the change: PRICE, CONTENT, JOBS, POLICY, CONTACT_INFO, PRODUCT, DOCUMENTATION, FEATURES, or OTHER
+Tasks:
+1. Explain what changed in plain language (summary)
+2. Classify: PRICE, CONTENT, JOBS, POLICY, CONTACT_INFO, PRODUCT, DOCUMENTATION, FEATURES, or OTHER
 3. Rate importance: LOW, MEDIUM, HIGH, or CRITICAL
-4. List specific detected changes in the "changes" array (2-5 items)
-5. Set shouldNotify to true only if the change is meaningful enough to alert the user (false for noise, ads, timestamps, minor formatting)
-6. Extract old_value and new_value for the primary change (if applicable)
-7. Choose a relevant emoji
+4. List 2-5 specific changes in "changes"
+5. Set shouldNotify=true only if the user should be alerted (false for noise, ads, timestamps, minor formatting)
+6. Extract old_value and new_value for the primary change when applicable
+7. Pick a relevant emoji
 
 Respond ONLY with valid JSON:
 {

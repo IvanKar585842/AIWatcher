@@ -25,16 +25,10 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/dashboard/stats")
+    fetch("/api/notifications")
       .then((r) => r.json())
       .then((data) => {
-        const notifs = (data.stats?.recentNotifications ?? []).map(
-          (n: NotificationItem & { change: NotificationItem["change"] }) => ({
-            ...n,
-            change: n.change,
-          })
-        );
-        setItems(notifs);
+        setItems(data.notifications ?? []);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -95,10 +89,20 @@ export default function NotificationsPage() {
                 <div className="mt-2 flex items-center gap-3 text-xs text-zinc-600">
                   {item.channel === "EMAIL" ? (
                     <Mail className="h-3 w-3" />
-                  ) : (
+                  ) : item.channel === "TELEGRAM" ? (
                     <MessageCircle className="h-3 w-3" />
+                  ) : (
+                    <Bell className="h-3 w-3" />
                   )}
-                  <span>{item.channel}</span>
+                  <span>
+                    {item.channel === "IN_APP"
+                      ? "In-app"
+                      : item.channel === "EMAIL"
+                        ? "Email"
+                        : item.channel === "TELEGRAM"
+                          ? "Telegram"
+                          : item.channel}
+                  </span>
                   <span>·</span>
                   <span>{formatRelativeTime(item.createdAt)}</span>
                 </div>

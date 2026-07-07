@@ -125,6 +125,30 @@ export function stripTrackingParamsFromUrls(html: string): string {
   );
 }
 
+export function cleanText(text: string, options: CleanOptions = {}): string {
+  const {
+    ignoreTimestamps = true,
+    ignoreRandomIds = true,
+    ignoreDynamicContent = true,
+  } = options;
+
+  let cleaned = text;
+
+  if (ignoreTimestamps || ignoreDynamicContent) {
+    for (const pattern of DYNAMIC_PATTERNS) {
+      cleaned = cleaned.replace(pattern, "[TIMESTAMP]");
+    }
+  }
+
+  if (ignoreRandomIds) {
+    for (const pattern of RANDOM_ID_PATTERNS) {
+      cleaned = cleaned.replace(pattern, "");
+    }
+  }
+
+  return cleaned.replace(/\s+/g, " ").trim();
+}
+
 export function cleanHtml(html: string, options: CleanOptions = {}): string {
   const {
     ignoreTimestamps = true,

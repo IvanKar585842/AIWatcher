@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { apiErrorResponse } from "@/lib/errors";
 import { prisma } from "@/lib/db";
 import { processMonitor } from "@/lib/monitoring/processor";
+import { processPendingAnalyses } from "@/lib/monitoring/ai-processor";
 import { withRateLimit } from "@/lib/rate-limit";
 
 export const maxDuration = 60;
@@ -26,8 +27,20 @@ export async function POST(
           return NextResponse.json({ error: "Monitor not found" }, { status: 404 });
         }
 
-        await processMonitor(id);
-        return NextResponse.json({ success: true, message: "Check completed" });
+        try {
+          const result = await processMonitor(id);
+          if (result.status === "change_detected") {
+            await processPendingAnalyses(1);
+          }
+          return NextResponse.json({
+            success: true,
+            message: "Check completed",
+            result,
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Check failed";
+          return NextResponse.json({ success: false, error: message }, { status: 500 });
+        }
       },
       user.id
     );

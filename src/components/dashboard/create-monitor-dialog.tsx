@@ -203,7 +203,15 @@ export function CreateMonitorDialog({
     const typeDef = getMonitorTypeById(typeId);
     if (!typeDef) return;
     setSelectedTypeId(typeId);
-    setForm((prev) => ({ ...prev, mode: typeDef.mode }));
+    setForm((prev) => ({
+      ...prev,
+      mode: typeDef.mode,
+      respectRobots:
+        typeDef.mode === MonitoringMode.VISUAL_CHANGES ||
+        typeDef.mode === MonitoringMode.SCREENSHOT_DIFF
+          ? false
+          : prev.respectRobots,
+    }));
   }
 
   async function handleCreate() {
@@ -591,9 +599,17 @@ export function CreateMonitorDialog({
                 </div>
 
                 <div className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-black/30 px-4 py-3">
-                  <Label htmlFor="robots" className="text-sm text-zinc-300">
-                    Respect robots.txt
-                  </Label>
+                  <div>
+                    <Label htmlFor="robots" className="text-sm text-zinc-300">
+                      Respect robots.txt
+                    </Label>
+                    {(form.mode === MonitoringMode.VISUAL_CHANGES ||
+                      form.mode === MonitoringMode.SCREENSHOT_DIFF) && (
+                      <p className="mt-0.5 text-[11px] text-zinc-500">
+                        Off by default for visual monitoring (e.g. Facebook, Instagram)
+                      </p>
+                    )}
+                  </div>
                   <Switch
                     id="robots"
                     checked={form.respectRobots}

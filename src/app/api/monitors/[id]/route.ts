@@ -169,9 +169,7 @@ export async function PATCH(
 
 
         if (parsed.data.notificationMethod) {
-
-          assertNotificationAllowed(plan, parsed.data.notificationMethod);
-
+          assertNotificationAllowed(user, parsed.data.notificationMethod);
         }
 
 

@@ -80,6 +80,21 @@ export const checkoutSchema = z.object({
   plan: z.enum(["PRO", "BUSINESS"]),
 });
 
+export const chatMessageSchema = z.object({
+  content: z
+    .string()
+    .min(1, "Message cannot be empty")
+    .max(2000, "Message is too long (max 2000 characters)"),
+});
+
+export const chatRenameSchema = z.object({
+  title: z.string().min(1).max(120),
+});
+
+export const chatDeleteAllSchema = z.object({
+  confirm: z.literal("DELETE_ALL"),
+});
+
 export type CreateMonitorInput = z.infer<typeof createMonitorSchema>;
 export type UpdateMonitorInput = z.infer<typeof updateMonitorSchema>;
 export type SearchChangesInput = z.infer<typeof searchChangesSchema>;

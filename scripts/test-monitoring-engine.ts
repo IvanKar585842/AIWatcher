@@ -13,7 +13,8 @@ async function main() {
 
   if (monitorId) {
     console.log(`Processing monitor ${monitorId}...`);
-    await processMonitor(monitorId);
+    const result = await processMonitor(monitorId);
+    console.log("Result:", result);
   } else {
     const monitor = await prisma.monitor.findFirst({
       where: { status: "ACTIVE" },
@@ -26,7 +27,8 @@ async function main() {
     }
 
     console.log(`Processing monitor ${monitor.name} (${monitor.id})...`);
-    await processMonitor(monitor.id);
+    const result = await processMonitor(monitor.id);
+    console.log("Result:", result);
   }
 
   const analyses = await processPendingAnalyses(5);

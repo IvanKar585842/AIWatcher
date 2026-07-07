@@ -70,6 +70,7 @@ interface MonitorData {
   keywords: string[];
   interval: MonitoringInterval;
   notificationMethod: NotificationMethod;
+  respectRobots: boolean;
   status: string;
   lastCheckedAt: string | null;
   lastChangedAt: string | null;
@@ -227,6 +228,7 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
     aiPrompt: "",
     interval: "TWELVE_HOURS" as MonitoringInterval,
     notificationMethod: "EMAIL" as NotificationMethod,
+    respectRobots: true,
     config: { ...DEFAULT_MONITOR_CONFIG } as MonitorConfig,
   });
 
@@ -259,6 +261,7 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
           aiPrompt: m.aiPrompt ?? "",
           interval: m.interval,
           notificationMethod: m.notificationMethod,
+          respectRobots: m.respectRobots,
           config: cfg,
         });
       })
@@ -305,6 +308,7 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
       aiPrompt: form.aiPrompt || null,
       interval: form.interval,
       notificationMethod: form.notificationMethod,
+      respectRobots: form.respectRobots,
       status: form.enabled ? "ACTIVE" : "PAUSED",
       config: form.config,
     };
@@ -718,6 +722,16 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
               description="Normalize volatile content like counters"
               checked={form.config.ignoreDynamicContent ?? true}
               onCheckedChange={(v) => updateConfig({ ignoreDynamicContent: v })}
+            />
+            <ToggleRow
+              label="Respect robots.txt"
+              description={
+                form.mode === "VISUAL_CHANGES" || form.mode === "SCREENSHOT_DIFF"
+                  ? "Not enforced for visual monitoring modes"
+                  : "Follow the site's crawler rules before fetching"
+              }
+              checked={form.respectRobots}
+              onCheckedChange={(v) => setForm((prev) => ({ ...prev, respectRobots: v }))}
             />
           </div>
         </SettingsSection>

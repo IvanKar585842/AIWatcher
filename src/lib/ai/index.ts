@@ -40,4 +40,18 @@ export function getAIProvider(): AIProvider {
   return cachedProvider;
 }
 
+export function isAIConfigured(): boolean {
+  const type = getAIProviderType();
+  switch (type) {
+    case "gemini":
+      return Boolean(process.env.GEMINI_API_KEY?.trim());
+    case "claude":
+      return Boolean(process.env.ANTHROPIC_API_KEY?.trim());
+    case "openai":
+      return Boolean(process.env.OPENAI_API_KEY?.trim());
+    default:
+      return false;
+  }
+}
+
 export * from "./types";

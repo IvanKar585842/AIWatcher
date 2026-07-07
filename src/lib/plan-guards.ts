@@ -1,12 +1,14 @@
 import { Plan, type NotificationMethod } from "@prisma/client";
-import { getPlanLimits } from "@/lib/constants";
+import { getUserPlanLimits, isAdminUser, type AdminUserLike } from "@/lib/admin";
 import { ApiError } from "@/lib/errors";
 
 export function assertNotificationAllowed(
-  plan: Plan,
+  user: AdminUserLike,
   notificationMethod: NotificationMethod
 ): void {
-  const limits = getPlanLimits(plan);
+  if (isAdminUser(user)) return;
+
+  const limits = getUserPlanLimits(user);
   if (
     (notificationMethod === "TELEGRAM" || notificationMethod === "BOTH") &&
     !limits.telegram

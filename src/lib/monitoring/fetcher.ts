@@ -3,12 +3,18 @@ import { MonitoringMode } from "@prisma/client";
 import path from "node:path";
 import {
   cleanHtml,
+  cleanText,
   extractTextFromHtml,
-  getAdSelectors,
-  getCookieBannerSelectors,
-  hashContent,
   type CleanOptions,
 } from "./content-cleaner";
+import { computeContentHash, hashScreenshotBuffer } from "./compare";
+import { monitorLog, monitorLogError } from "./logger";
+import { removeDynamicElements, waitForPageReady } from "./page-utils";
+import {
+  isUrlAllowedByRobotsTxt,
+  robotsTxtBlockedMessage,
+  shouldEnforceRobotsTxt,
+} from "./robots";
 
 const FETCH_RETRY_BASE_MS = 1000;
 
@@ -57,7 +63,7 @@ async function launchWithSparticuz(): Promise<Browser> {
   return playwrightChromium.launch({
     args: chromium.args,
     executablePath,
-    headless: chromium.headless ?? true,
+    headless: true,
   });
 }
 
@@ -132,6 +138,7 @@ export interface FetchResult {
 export interface FetchOptions {
   url: string;
   mode: MonitoringMode;
+  monitorId?: string;
   selector?: string | null;
   keywords?: string[];
   respectRobots?: boolean;
@@ -143,39 +150,37 @@ export interface FetchOptions {
 
 export async function fetchPageContent(options: FetchOptions): Promise<FetchResult> {
   const maxRetries = options.maxRetries ?? 3;
-  return withFetchRetry(() => fetchPageContentOnce(options), maxRetries);
+  let attempt = 0;
+
+  return withFetchRetry(async () => {
+    attempt++;
+    if (attempt > 1) {
+      monitorLog({
+        step: "fetch_start",
+        monitorId: options.monitorId,
+        url: options.url,
+        mode: options.mode,
+        message: `Retrying fetch (attempt ${attempt}/${maxRetries})`,
+      });
+    }
+    return fetchPageContentOnce(options);
+  }, maxRetries);
 }
 
-async function checkRobotsTxt(url: string): Promise<boolean> {
-  try {
-    const parsed = new URL(url);
-    const robotsUrl = `${parsed.origin}/robots.txt`;
-    const response = await fetch(robotsUrl, {
-      signal: AbortSignal.timeout(5000),
+async function checkRobotsTxt(url: string, mode: MonitoringMode, respectRobots: boolean): Promise<void> {
+  if (!shouldEnforceRobotsTxt(mode, respectRobots)) {
+    monitorLog({
+      step: "fetch_start",
+      url,
+      mode,
+      message: "robots.txt check skipped for this monitoring mode",
     });
+    return;
+  }
 
-    if (!response.ok) return true;
-
-    const text = await response.text();
-    const urlPath = parsed.pathname;
-
-    let inUserAgentAll = false;
-    for (const line of text.split("\n")) {
-      const trimmed = line.trim().toLowerCase();
-      if (trimmed.startsWith("user-agent:")) {
-        const agent = trimmed.split(":")[1]?.trim();
-        inUserAgentAll = agent === "*";
-      }
-      if (inUserAgentAll && trimmed.startsWith("disallow:")) {
-        const disallowPath = trimmed.split(":")[1]?.trim() ?? "";
-        if (disallowPath && urlPath.startsWith(disallowPath)) {
-          return false;
-        }
-      }
-    }
-    return true;
-  } catch {
-    return true;
+  const allowed = await isUrlAllowedByRobotsTxt(url);
+  if (!allowed) {
+    throw new Error(robotsTxtBlockedMessage(url));
   }
 }
 
@@ -183,6 +188,7 @@ async function fetchPageContentOnce(options: FetchOptions): Promise<FetchResult>
   const {
     url,
     mode,
+    monitorId,
     selector,
     keywords,
     respectRobots = true,
@@ -191,14 +197,38 @@ async function fetchPageContentOnce(options: FetchOptions): Promise<FetchResult>
     cleanOptions,
   } = options;
 
+  monitorLog({
+    step: "fetch_start",
+    monitorId,
+    url,
+    mode,
+    message: "Opening website with Playwright",
+    data: { timeout, respectRobots },
+  });
+
   if (mode === MonitoringMode.API_RESPONSE || mode === MonitoringMode.RSS_FEED) {
-    return fetchStaticContent(url, mode, timeout, cleanOptions);
+    const result = await fetchStaticContent(url, mode, timeout, cleanOptions, monitorId);
+    monitorLog({
+      step: "fetch_success",
+      monitorId,
+      url,
+      mode,
+      message: "Static content fetched",
+      data: { hash: result.contentHash.slice(0, 16), textLength: result.extractedText.length },
+    });
+    return result;
   }
 
   if (respectRobots) {
-    const allowed = await checkRobotsTxt(url);
-    if (!allowed) {
-      throw new Error("Access denied by robots.txt");
+    try {
+      await checkRobotsTxt(url, mode, respectRobots);
+    } catch (error) {
+      monitorLogError("fetch_failed", "Robots.txt blocked request", error, {
+        monitorId,
+        url,
+        mode,
+      });
+      throw error;
     }
   }
 
@@ -214,32 +244,38 @@ async function fetchPageContentOnce(options: FetchOptions): Promise<FetchResult>
 
   try {
     page = await context.newPage();
-    await page.goto(url, {
+
+    const response = await page.goto(url, {
       waitUntil: "domcontentloaded",
       timeout,
     });
 
-    await page.waitForTimeout(2000);
-
-    if (ignoreAds) {
-      for (const adSelector of getAdSelectors()) {
-        await page.evaluate((sel) => {
-          document.querySelectorAll(sel).forEach((el) => el.remove());
-        }, adSelector);
-      }
+    if (!response) {
+      throw new Error("Navigation returned no response");
     }
 
-    const ignoreCookies = cleanOptions?.ignoreCookies !== false;
-    if (ignoreCookies) {
-      for (const cookieSelector of getCookieBannerSelectors()) {
-        await page.evaluate((sel) => {
-          document.querySelectorAll(sel).forEach((el) => el.remove());
-        }, cookieSelector);
-      }
+    if (response.status() >= 400) {
+      throw new Error(`HTTP ${response.status()} loading page`);
     }
+
+    await waitForPageReady(page, timeout);
+
+    const removed = await removeDynamicElements(page, {
+      ignoreAds,
+      ignoreCookies: cleanOptions?.ignoreCookies !== false,
+    });
+
+    monitorLog({
+      step: "page_cleaned",
+      monitorId,
+      url,
+      mode,
+      message: "Dynamic elements removed from DOM",
+      data: removed,
+    });
 
     let rawHtml: string;
-    let metadata: Record<string, unknown> = {};
+    let metadata: Record<string, unknown> = { finalUrl: page.url() };
 
     switch (mode) {
       case MonitoringMode.CSS_SELECTOR: {
@@ -247,6 +283,7 @@ async function fetchPageContentOnce(options: FetchOptions): Promise<FetchResult>
         const element = await page.$(selector);
         if (!element) throw new Error(`CSS selector not found: ${selector}`);
         rawHtml = await element.innerHTML();
+        metadata = { ...metadata, selector };
         break;
       }
 
@@ -265,93 +302,143 @@ async function fetchPageContentOnce(options: FetchOptions): Promise<FetchResult>
           const el = node as Element;
           return el.innerHTML ?? el.textContent ?? "";
         }, selector);
+        metadata = { ...metadata, xpath: selector };
         break;
       }
 
       case MonitoringMode.PRICE_DETECTION: {
         rawHtml = await extractPriceContent(page);
-        metadata = { mode: "price_detection" };
+        metadata = { ...metadata, captureType: "price" };
         break;
       }
 
       case MonitoringMode.KEYWORD_DETECTION: {
-        rawHtml = await page.content();
-        const text = extractTextFromHtml(rawHtml);
+        const pageText = await page.evaluate(() => document.body.innerText);
         const foundKeywords = (keywords ?? []).filter((kw) =>
-          text.toLowerCase().includes(kw.toLowerCase())
+          pageText.toLowerCase().includes(kw.toLowerCase())
         );
-        rawHtml = foundKeywords.join("\n") + "\n" + extractKeywordContext(text, keywords ?? []);
-        metadata = { keywords: foundKeywords };
+        rawHtml =
+          foundKeywords.join("\n") + "\n" + extractKeywordContext(pageText, keywords ?? []);
+        metadata = { ...metadata, captureType: "keywords", keywords: foundKeywords };
         break;
       }
 
       case MonitoringMode.TABLE_DETECTION: {
         rawHtml = await extractTableContent(page);
-        metadata = { mode: "table_detection" };
+        metadata = { ...metadata, captureType: "table" };
         break;
       }
 
       case MonitoringMode.JOB_LISTINGS: {
         rawHtml = await extractJobListings(page);
-        metadata = { mode: "job_listings" };
+        metadata = { ...metadata, captureType: "job_listings" };
         break;
       }
 
       case MonitoringMode.VISUAL_CHANGES:
+      case MonitoringMode.SCREENSHOT_DIFF: {
+        const buffer = await page.screenshot({ fullPage: true, type: "png" });
+        const screenshotHash = hashScreenshotBuffer(buffer);
+        rawHtml = `[visual-screenshot:${screenshotHash}]`;
+        metadata = {
+          ...metadata,
+          captureType: "screenshot",
+          screenshotHash,
+          screenshotBytes: buffer.length,
+        };
+        break;
+      }
+
       case MonitoringMode.HTML_DIFF: {
         rawHtml = await page.content();
-        metadata = { mode: mode === MonitoringMode.VISUAL_CHANGES ? "visual" : "html_diff" };
+        metadata = { ...metadata, captureType: "html_diff" };
         break;
       }
 
       case MonitoringMode.TEXT_CHANGES: {
         rawHtml = await page.evaluate(() => document.body.innerText);
-        metadata = { mode: "text_changes" };
-        break;
-      }
-
-      case MonitoringMode.SCREENSHOT_DIFF: {
-        rawHtml = await page.content();
-        metadata = { mode: "screenshot_diff" };
+        metadata = { ...metadata, captureType: "visible_text" };
         break;
       }
 
       case MonitoringMode.PRODUCT_AVAILABILITY: {
         rawHtml = await extractProductAvailability(page);
-        metadata = { mode: "product_availability" };
+        metadata = { ...metadata, captureType: "product_availability" };
         break;
       }
 
       case MonitoringMode.DOCUMENTATION_CHANGES: {
         rawHtml = await extractDocumentationContent(page);
-        metadata = { mode: "documentation" };
+        metadata = { ...metadata, captureType: "documentation" };
         break;
       }
 
       case MonitoringMode.AI_SMART: {
         rawHtml = await extractSmartContent(page);
-        metadata = { mode: "ai_smart" };
+        metadata = { ...metadata, captureType: "ai_smart" };
         break;
       }
 
       case MonitoringMode.ENTIRE_PAGE:
       default: {
         rawHtml = await page.content();
+        metadata = { ...metadata, captureType: "entire_page_html" };
         break;
       }
     }
 
-    const cleanedHtml = cleanHtml(rawHtml, cleanOptions);
-    const extractedText = extractTextFromHtml(cleanedHtml);
-    const contentHash = hashContent(cleanedHtml);
+    const isPlainText =
+      mode === MonitoringMode.TEXT_CHANGES ||
+      mode === MonitoringMode.PRICE_DETECTION ||
+      mode === MonitoringMode.KEYWORD_DETECTION;
 
-    return {
+    const isVisual =
+      mode === MonitoringMode.VISUAL_CHANGES || mode === MonitoringMode.SCREENSHOT_DIFF;
+
+    const cleanedHtml = isVisual
+      ? rawHtml
+      : isPlainText
+        ? cleanText(rawHtml, cleanOptions)
+        : cleanHtml(rawHtml, cleanOptions);
+
+    const extractedText = isPlainText
+      ? cleanedHtml
+      : isVisual
+        ? String(metadata.screenshotHash ?? "")
+        : extractTextFromHtml(cleanedHtml);
+
+    const partial: FetchResult = {
       rawHtml,
       cleanedHtml,
       extractedText,
-      contentHash,
+      contentHash: "",
       metadata,
     };
+
+    const contentHash = computeContentHash(mode, partial);
+
+    monitorLog({
+      step: "fetch_success",
+      monitorId,
+      url,
+      mode,
+      message: "Page content ready for comparison",
+      data: {
+        captureType: metadata.captureType,
+        hash: contentHash.slice(0, 16),
+        textLength: extractedText.length,
+        htmlLength: cleanedHtml.length,
+      },
+    });
+
+    return { ...partial, contentHash };
+  } catch (error) {
+    monitorLogError("fetch_failed", "Failed to fetch website", error, {
+      monitorId,
+      url,
+      mode,
+    });
+    throw error;
   } finally {
     if (page) await page.close();
     await context.close();
@@ -362,7 +449,8 @@ async function fetchStaticContent(
   url: string,
   mode: MonitoringMode,
   timeout: number,
-  cleanOptions?: CleanOptions
+  cleanOptions?: CleanOptions,
+  monitorId?: string
 ): Promise<FetchResult> {
   const response = await fetch(url, {
     signal: AbortSignal.timeout(timeout),
@@ -373,21 +461,23 @@ async function fetchStaticContent(
   });
 
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    const err = new Error(`HTTP ${response.status}: ${response.statusText}`);
+    monitorLogError("fetch_failed", "Static fetch failed", err, { monitorId, url, mode });
+    throw err;
   }
 
   const rawHtml = await response.text();
   const cleanedHtml = cleanHtml(rawHtml, cleanOptions);
   const extractedText = extractTextFromHtml(cleanedHtml);
-  const contentHash = hashContent(cleanedHtml);
-
-  return {
+  const partial: FetchResult = {
     rawHtml,
     cleanedHtml,
     extractedText,
-    contentHash,
-    metadata: { mode: mode === MonitoringMode.RSS_FEED ? "rss_feed" : "api_response" },
+    contentHash: "",
+    metadata: { captureType: mode === MonitoringMode.RSS_FEED ? "rss_feed" : "api_response" },
   };
+
+  return { ...partial, contentHash: computeContentHash(mode, partial) };
 }
 
 async function extractProductAvailability(page: Page): Promise<string> {
