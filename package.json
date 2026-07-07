@@ -10,6 +10,10 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:cleanup": "npx tsx scripts/cleanup-database.ts",
+    "db:sync": "npm run db:cleanup && npx prisma migrate deploy",
+    "db:verify": "npx tsx scripts/verify-monitor-crud.ts",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate",
     "trigger:dev": "npx trigger.dev@latest dev",
@@ -72,7 +76,8 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "^15.2.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "tsx": "^4.19.3"
   },
   "engines": {
     "node": ">=20"

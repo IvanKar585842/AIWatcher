@@ -6,6 +6,7 @@ import {
   extractTextFromHtml,
   getAdSelectors,
   hashContent,
+  type CleanOptions,
 } from "./content-cleaner";
 
 let browserInstance: Browser | null = null;
@@ -86,6 +87,8 @@ export interface FetchOptions {
   keywords?: string[];
   respectRobots?: boolean;
   timeout?: number;
+  ignoreAds?: boolean;
+  cleanOptions?: CleanOptions;
 }
 
 async function checkRobotsTxt(url: string): Promise<boolean> {
@@ -122,7 +125,20 @@ async function checkRobotsTxt(url: string): Promise<boolean> {
 }
 
 export async function fetchPageContent(options: FetchOptions): Promise<FetchResult> {
-  const { url, mode, selector, keywords, respectRobots = true, timeout = 30000 } = options;
+  const {
+    url,
+    mode,
+    selector,
+    keywords,
+    respectRobots = true,
+    timeout = 30000,
+    ignoreAds = true,
+    cleanOptions,
+  } = options;
+
+  if (mode === MonitoringMode.API_RESPONSE || mode === MonitoringMode.RSS_FEED) {
+    return fetchStaticContent(url, mode, timeout, cleanOptions);
+  }
 
   if (respectRobots) {
     const allowed = await checkRobotsTxt(url);
@@ -150,10 +166,12 @@ export async function fetchPageContent(options: FetchOptions): Promise<FetchResu
 
     await page.waitForTimeout(2000);
 
-    for (const adSelector of getAdSelectors()) {
-      await page.evaluate((sel) => {
-        document.querySelectorAll(sel).forEach((el) => el.remove());
-      }, adSelector);
+    if (ignoreAds) {
+      for (const adSelector of getAdSelectors()) {
+        await page.evaluate((sel) => {
+          document.querySelectorAll(sel).forEach((el) => el.remove());
+        }, adSelector);
+      }
     }
 
     let rawHtml: string;
@@ -215,6 +233,37 @@ export async function fetchPageContent(options: FetchOptions): Promise<FetchResu
         break;
       }
 
+      case MonitoringMode.VISUAL_CHANGES:
+      case MonitoringMode.HTML_DIFF: {
+        rawHtml = await page.content();
+        metadata = { mode: mode === MonitoringMode.VISUAL_CHANGES ? "visual" : "html_diff" };
+        break;
+      }
+
+      case MonitoringMode.TEXT_CHANGES: {
+        rawHtml = await page.evaluate(() => document.body.innerText);
+        metadata = { mode: "text_changes" };
+        break;
+      }
+
+      case MonitoringMode.SCREENSHOT_DIFF: {
+        rawHtml = await page.content();
+        metadata = { mode: "screenshot_diff" };
+        break;
+      }
+
+      case MonitoringMode.PRODUCT_AVAILABILITY: {
+        rawHtml = await extractProductAvailability(page);
+        metadata = { mode: "product_availability" };
+        break;
+      }
+
+      case MonitoringMode.DOCUMENTATION_CHANGES: {
+        rawHtml = await extractDocumentationContent(page);
+        metadata = { mode: "documentation" };
+        break;
+      }
+
       case MonitoringMode.AI_SMART: {
         rawHtml = await extractSmartContent(page);
         metadata = { mode: "ai_smart" };
@@ -228,7 +277,7 @@ export async function fetchPageContent(options: FetchOptions): Promise<FetchResu
       }
     }
 
-    const cleanedHtml = cleanHtml(rawHtml);
+    const cleanedHtml = cleanHtml(rawHtml, cleanOptions);
     const extractedText = extractTextFromHtml(cleanedHtml);
     const contentHash = hashContent(cleanedHtml);
 
@@ -243,6 +292,103 @@ export async function fetchPageContent(options: FetchOptions): Promise<FetchResu
     if (page) await page.close();
     await context.close();
   }
+}
+
+async function fetchStaticContent(
+  url: string,
+  mode: MonitoringMode,
+  timeout: number,
+  cleanOptions?: CleanOptions
+): Promise<FetchResult> {
+  const response = await fetch(url, {
+    signal: AbortSignal.timeout(timeout),
+    headers: {
+      "User-Agent": "WatchFlowAI/1.0 (+https://watchflow.ai/bot; monitoring service)",
+      Accept: mode === MonitoringMode.RSS_FEED ? "application/rss+xml, application/xml, text/xml" : "*/*",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  }
+
+  const rawHtml = await response.text();
+  const cleanedHtml = cleanHtml(rawHtml, cleanOptions);
+  const extractedText = extractTextFromHtml(cleanedHtml);
+  const contentHash = hashContent(cleanedHtml);
+
+  return {
+    rawHtml,
+    cleanedHtml,
+    extractedText,
+    contentHash,
+    metadata: { mode: mode === MonitoringMode.RSS_FEED ? "rss_feed" : "api_response" },
+  };
+}
+
+async function extractProductAvailability(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const availabilitySelectors = [
+      '[class*="stock"]',
+      '[class*="availability"]',
+      '[class*="in-stock"]',
+      '[class*="out-of-stock"]',
+      '[itemprop="availability"]',
+      'button[class*="add-to-cart"]',
+      'button[class*="buy"]',
+      '[data-availability]',
+    ];
+
+    const signals: string[] = [];
+    for (const sel of availabilitySelectors) {
+      document.querySelectorAll(sel).forEach((el) => {
+        const text = el.textContent?.trim();
+        if (text && text.length < 200) signals.push(text);
+      });
+    }
+
+    const body = document.body.innerText;
+    const patterns = [
+      /in\s*stock/gi,
+      /out\s*of\s*stock/gi,
+      /available\s*now/gi,
+      /sold\s*out/gi,
+      /add\s*to\s*cart/gi,
+      /pre-?order/gi,
+    ];
+
+    for (const pattern of patterns) {
+      const match = body.match(pattern);
+      if (match) signals.push(...match);
+    }
+
+    return signals.length > 0 ? [...new Set(signals)].join("\n") : body.slice(0, 5000);
+  });
+}
+
+async function extractDocumentationContent(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const docSelectors = [
+      "article",
+      "main",
+      '[role="main"]',
+      ".docs-content",
+      ".documentation",
+      ".markdown-body",
+      "#readme",
+      ".changelog",
+      ".release-notes",
+    ];
+
+    for (const sel of docSelectors) {
+      const el = document.querySelector(sel);
+      if (el && el.textContent && el.textContent.trim().length > 80) {
+        return el.innerHTML;
+      }
+    }
+
+    return document.body.innerText.slice(0, 10000);
+  });
 }
 
 async function extractPriceContent(page: Page): Promise<string> {

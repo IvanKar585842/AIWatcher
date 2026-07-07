@@ -27,7 +27,7 @@ export function CommandPageHeader({
         )}
         <h1 className="mt-1 text-xl font-semibold text-zinc-100">{title}</h1>
         {description && (
-          <p className="mt-1 text-sm text-zinc-600">{description}</p>
+          <p className="mt-1 text-sm text-zinc-500">{description}</p>
         )}
       </div>
       {children}

@@ -69,14 +69,22 @@ export const INTERVAL_ORDER: MonitoringInterval[] = [
 ];
 
 export const MODE_LABELS: Record<MonitoringMode, string> = {
-  ENTIRE_PAGE: "Entire Page",
+  ENTIRE_PAGE: "Entire Website",
+  VISUAL_CHANGES: "Visual Changes",
+  TEXT_CHANGES: "Text Changes",
   CSS_SELECTOR: "CSS Selector",
-  XPATH: "XPath",
-  PRICE_DETECTION: "Price Detection",
-  KEYWORD_DETECTION: "Keyword Detection",
-  TABLE_DETECTION: "Table Detection",
+  XPATH: "XPath Selector",
+  PRICE_DETECTION: "Price Tracking",
+  KEYWORD_DETECTION: "Keyword Tracking",
+  TABLE_DETECTION: "Table Monitoring",
+  PRODUCT_AVAILABILITY: "Product Availability",
   JOB_LISTINGS: "Job Listings",
-  AI_SMART: "AI Smart Mode",
+  DOCUMENTATION_CHANGES: "Documentation Changes",
+  API_RESPONSE: "API Response",
+  RSS_FEED: "RSS Feed",
+  HTML_DIFF: "HTML Diff",
+  SCREENSHOT_DIFF: "Screenshot Diff",
+  AI_SMART: "AI Smart Monitoring",
 };
 
 export const NOTIFICATION_LABELS: Record<NotificationMethod, string> = {

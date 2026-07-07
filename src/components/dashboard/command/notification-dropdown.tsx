@@ -1,0 +1,181 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Bell } from "lucide-react";
+import { formatRelativeTime } from "@/lib/utils";
+
+interface NotificationItem {
+  id: string;
+  channel: string;
+  status: string;
+  createdAt: string;
+  change: {
+    id: string;
+    summary: string;
+    emoji: string;
+    monitor: { name: string };
+  };
+}
+
+const READ_KEY = "watchflow-read-notifications";
+
+function getReadIds(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    return new Set(JSON.parse(localStorage.getItem(READ_KEY) || "[]") as string[]);
+  } catch {
+    return new Set();
+  }
+}
+
+function markRead(id: string) {
+  const ids = getReadIds();
+  ids.add(id);
+  localStorage.setItem(READ_KEY, JSON.stringify([...ids]));
+}
+
+export function NotificationDropdown() {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [readIds, setReadIds] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const loadNotifications = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/dashboard/stats");
+      if (!res.ok) return;
+      const data = await res.json();
+      setNotifications(data.stats?.recentNotifications ?? []);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    setReadIds(getReadIds());
+  }, []);
+
+  useEffect(() => {
+    if (open) loadNotifications();
+  }, [open, loadNotifications]);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    if (open) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [open]);
+
+  const unreadCount = notifications.filter((n) => !readIds.has(n.id)).length;
+
+  function handleNotificationClick(item: NotificationItem) {
+    markRead(item.id);
+    setReadIds(getReadIds());
+    setOpen(false);
+    router.push(`/dashboard/changes/${item.change.id}`);
+  }
+
+  function markAllRead() {
+    notifications.forEach((n) => markRead(n.id));
+    setReadIds(getReadIds());
+  }
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="relative rounded-full border border-white/[0.06] p-2 text-zinc-400 transition-colors hover:border-cyan-400/20 hover:text-cyan-300"
+        aria-label="Notifications"
+        aria-expanded={open}
+      >
+        <Bell className="h-4 w-4" />
+        {unreadCount > 0 && (
+          <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-cyan-500 text-[9px] font-bold text-black">
+            {unreadCount > 9 ? "9+" : unreadCount}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-xl border border-white/[0.08] bg-[#111111] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8)]">
+          <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
+            <p className="text-sm font-medium text-zinc-200">Notifications</p>
+            {unreadCount > 0 && (
+              <button
+                type="button"
+                onClick={markAllRead}
+                className="text-[11px] text-cyan-400/80 hover:text-cyan-300"
+              >
+                Mark all read
+              </button>
+            )}
+          </div>
+
+          <div className="max-h-80 overflow-y-auto">
+            {loading && (
+              <p className="px-4 py-6 text-center text-xs text-zinc-600">Loading...</p>
+            )}
+
+            {!loading && notifications.length === 0 && (
+              <p className="px-4 py-6 text-center text-xs text-zinc-600">No notifications yet</p>
+            )}
+
+            {!loading &&
+              notifications.map((item) => {
+                const isUnread = !readIds.has(item.id);
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => handleNotificationClick(item)}
+                    className={`flex w-full gap-3 border-b border-white/[0.04] px-4 py-3 text-left transition-colors hover:bg-white/[0.03] ${
+                      isUnread ? "bg-cyan-500/[0.04]" : ""
+                    }`}
+                  >
+                    <span className="text-lg">{item.change.emoji}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-sm font-medium text-zinc-200">
+                          {item.change.monitor.name}
+                        </p>
+                        {isUnread && (
+                          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-400" />
+                        )}
+                      </div>
+                      <p className="mt-0.5 line-clamp-2 text-xs text-zinc-500">
+                        {item.change.summary}
+                      </p>
+                      <p className="mt-1 text-[10px] text-zinc-600">
+                        {item.channel} · {formatRelativeTime(item.createdAt)}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+          </div>
+
+          <div className="border-t border-white/[0.06] px-4 py-2">
+            <Link
+              href="/dashboard/notifications"
+              onClick={() => setOpen(false)}
+              className="block py-1 text-center text-[11px] text-cyan-400/80 hover:text-cyan-300"
+            >
+              View all notifications
+            </Link>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

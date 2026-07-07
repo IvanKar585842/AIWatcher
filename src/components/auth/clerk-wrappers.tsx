@@ -97,11 +97,22 @@ export function SignUpCTA({
   }
 
   return (
-    <SignUpButton mode="modal">
-      <Button size="lg" className={className}>
-        {children}
-      </Button>
-    </SignUpButton>
+    <>
+      <SignedIn>
+        <Link href="/dashboard">
+          <Button size="lg" className={className}>
+            {children}
+          </Button>
+        </Link>
+      </SignedIn>
+      <SignedOut>
+        <Link href="/sign-up">
+          <Button size="lg" className={className}>
+            {children}
+          </Button>
+        </Link>
+      </SignedOut>
+    </>
   );
 }
 

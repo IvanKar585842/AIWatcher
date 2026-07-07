@@ -1,12 +1,45 @@
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import Stripe from "stripe";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import {
   getStripe,
   handleSubscriptionDeleted,
   handleSubscriptionUpdate,
 } from "@/lib/stripe";
+
+async function processStripeEvent(event: Stripe.Event): Promise<void> {
+  switch (event.type) {
+    case "customer.subscription.created":
+    case "customer.subscription.updated":
+      await handleSubscriptionUpdate(event.data.object as Stripe.Subscription);
+      break;
+    case "customer.subscription.deleted":
+      await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
+      break;
+    case "invoice.payment_failed": {
+      const invoice = event.data.object as Stripe.Invoice;
+      if (invoice.subscription) {
+        const subscription = await getStripe().subscriptions.retrieve(
+          invoice.subscription as string
+        );
+        await handleSubscriptionUpdate(subscription);
+      }
+      break;
+    }
+    case "checkout.session.completed": {
+      const session = event.data.object as Stripe.Checkout.Session;
+      if (session.subscription && session.metadata?.userId) {
+        const subscription = await getStripe().subscriptions.retrieve(
+          session.subscription as string
+        );
+        await handleSubscriptionUpdate(subscription);
+      }
+      break;
+    }
+  }
+}
 
 export async function POST(request: NextRequest) {
   const body = await request.text();
@@ -38,37 +71,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true, duplicate: true });
   }
 
-  switch (event.type) {
-    case "customer.subscription.created":
-    case "customer.subscription.updated":
-      await handleSubscriptionUpdate(event.data.object as Stripe.Subscription);
-      break;
-    case "customer.subscription.deleted":
-      await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
-      break;
-    case "invoice.payment_failed": {
-      const invoice = event.data.object as Stripe.Invoice;
-      if (invoice.subscription) {
-        const subscription = await getStripe().subscriptions.retrieve(
-          invoice.subscription as string
-        );
-        await handleSubscriptionUpdate(subscription);
-      }
-      break;
+  try {
+    await processStripeEvent(event);
+    await prisma.processedStripeEvent.create({ data: { id: event.id } });
+    return NextResponse.json({ received: true });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return NextResponse.json({ received: true, duplicate: true });
     }
-    case "checkout.session.completed": {
-      const session = event.data.object as Stripe.Checkout.Session;
-      if (session.subscription && session.metadata?.userId) {
-        const subscription = await getStripe().subscriptions.retrieve(
-          session.subscription as string
-        );
-        await handleSubscriptionUpdate(subscription);
-      }
-      break;
-    }
+    console.error("Stripe webhook processing error:", error);
+    return NextResponse.json({ error: "Webhook processing failed" }, { status: 500 });
   }
-
-  await prisma.processedStripeEvent.create({ data: { id: event.id } });
-
-  return NextResponse.json({ received: true });
 }

@@ -41,3 +41,20 @@ export function getDomainFromUrl(url: string): string {
     return url;
   }
 }
+
+export function getFaviconUrl(url: string, size = 64): string {
+  const domain = getDomainFromUrl(url);
+  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=${size}`;
+}
+
+export function formatUpcomingTime(date: Date | string | null): string {
+  if (!date) return "—";
+  const diff = new Date(date).getTime() - Date.now();
+  if (diff <= 0) return "due now";
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  if (minutes < 60) return `in ${minutes}m`;
+  if (hours < 24) return `in ${hours}h`;
+  const days = Math.floor(diff / 86400000);
+  return `in ${days}d`;
+}

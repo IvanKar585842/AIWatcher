@@ -10,6 +10,7 @@ import { getAIProvider, toPrismaCategory, toPrismaImportance } from "@/lib/ai";
 import { trackEvent } from "@/lib/analytics";
 import { INTERVAL_MINUTES } from "@/lib/constants";
 import { prisma } from "@/lib/db";
+import { parseMonitorConfig } from "@/lib/monitor-config";
 import { sendChangeEmail } from "@/lib/notifications/email";
 import { sendTelegramChangeNotification } from "@/lib/notifications/telegram";
 import { compressHtml } from "./compress";
@@ -18,7 +19,7 @@ import { generateTextDiff } from "./diff";
 import { closeBrowser, fetchPageContent } from "./fetcher";
 import { acquireMonitorLock, releaseMonitorLock } from "./lock";
 
-const MAX_RETRIES = 3;
+const DEFAULT_MAX_RETRIES = 3;
 
 export async function processMonitor(monitorId: string): Promise<void> {
   if (!acquireMonitorLock(monitorId)) {
@@ -52,6 +53,8 @@ async function processMonitorInternal(monitorId: string): Promise<void> {
   }
 
   const plan = monitor.user.subscription?.plan ?? Plan.FREE;
+  const config = parseMonitorConfig(monitor.config);
+  const maxRetries = config.retryAttempts ?? DEFAULT_MAX_RETRIES;
 
   try {
     const result = await fetchPageContent({
@@ -60,6 +63,13 @@ async function processMonitorInternal(monitorId: string): Promise<void> {
       selector: monitor.selector,
       keywords: monitor.keywords,
       respectRobots: monitor.respectRobots,
+      timeout: config.timeout,
+      ignoreAds: config.ignoreAds,
+      cleanOptions: {
+        ignoreTimestamps: config.ignoreTimestamps,
+        ignoreRandomIds: config.ignoreRandomIds,
+        ignoreDynamicContent: config.ignoreDynamicContent,
+      },
     });
 
     const previousSnapshot = monitor.snapshots[0];
@@ -128,7 +138,9 @@ async function processMonitorInternal(monitorId: string): Promise<void> {
     const newContent = result.extractedText;
 
     let analysis;
-    const userPrompt = monitor.keywords.length > 0 ? monitor.keywords.join(", ") : undefined;
+    const userPrompt =
+      monitor.aiPrompt?.trim() ||
+      (monitor.keywords.length > 0 ? monitor.keywords.join(", ") : undefined);
 
     if (plan === Plan.FREE) {
       analysis = {
@@ -245,7 +257,7 @@ async function processMonitorInternal(monitorId: string): Promise<void> {
       data: {
         errorCount,
         errorMessage,
-        status: errorCount >= MAX_RETRIES ? MonitorStatus.ERROR : monitor.status,
+        status: errorCount >= maxRetries ? MonitorStatus.ERROR : monitor.status,
         lastCheckedAt: new Date(),
         nextCheckAt: new Date(Date.now() + INTERVAL_MINUTES[monitor.interval] * 60 * 1000),
       },

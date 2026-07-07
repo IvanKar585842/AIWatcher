@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { SignUpCTA } from "@/components/auth/clerk-wrappers";
 import { MagneticButton } from "@/components/landing/os/magnetic-button";
@@ -60,6 +60,7 @@ export function HeroDashboard() {
   const [activeLine, setActiveLine] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<LiveEvent[]>([]);
   const [feedIndex, setFeedIndex] = useState(0);
+  const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const triggerEvent = useCallback(() => {
     const site = SITES[Math.floor(Math.random() * SITES.length)];
@@ -70,16 +71,23 @@ export function HeroDashboard() {
     setActiveLine(site.id);
     setNotifications((prev) => [...prev.slice(-4), { id, siteId: site.id, ...evt }]);
 
-    setTimeout(() => setActiveLine(null), 1400);
-    setTimeout(() => setActiveSite(null), 2200);
-    setTimeout(() => {
-      setNotifications((prev) => prev.filter((n) => n.id !== id));
-    }, 4500);
+    timeoutsRef.current.push(
+      setTimeout(() => setActiveLine(null), 1400),
+      setTimeout(() => setActiveSite(null), 2200),
+      setTimeout(() => {
+        setNotifications((prev) => prev.filter((n) => n.id !== id));
+      }, 4500)
+    );
   }, []);
 
   useEffect(() => {
+    triggerEvent();
     const interval = setInterval(triggerEvent, 2800);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      timeoutsRef.current.forEach(clearTimeout);
+      timeoutsRef.current = [];
+    };
   }, [triggerEvent]);
 
   useEffect(() => {

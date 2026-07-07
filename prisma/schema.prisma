@@ -22,12 +22,20 @@ enum MonitorStatus {
 
 enum MonitoringMode {
   ENTIRE_PAGE
+  VISUAL_CHANGES
+  TEXT_CHANGES
   CSS_SELECTOR
   XPATH
   PRICE_DETECTION
   KEYWORD_DETECTION
   TABLE_DETECTION
+  PRODUCT_AVAILABILITY
   JOB_LISTINGS
+  DOCUMENTATION_CHANGES
+  API_RESPONSE
+  RSS_FEED
+  HTML_DIFF
+  SCREENSHOT_DIFF
   AI_SMART
 }
 
@@ -120,6 +128,11 @@ model Monitor {
   user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   name               String
   url                String
+  description        String?            @db.Text
+  category           String?
+  tags               String[]           @default([])
+  aiPrompt           String?            @db.Text
+  config             Json?
   mode               MonitoringMode     @default(ENTIRE_PAGE)
   selector           String?
   keywords           String[]           @default([])

@@ -3,10 +3,8 @@ import { NextResponse } from "next/server";
 
 const isPublicRoute = createRouteMatcher([
   "/",
-  "/pricing",
-  "/features",
   "/api/webhooks(.*)",
-  "/api/telegram(.*)",
+  "/api/telegram/webhook",
   "/api/cron(.*)",
   "/sign-in(.*)",
   "/sign-up(.*)",
@@ -25,6 +23,12 @@ export default hasClerk
       }
     })
   : function middleware() {
+      if (process.env.NODE_ENV === "production") {
+        return NextResponse.json(
+          { error: "Authentication is not configured" },
+          { status: 503 }
+        );
+      }
       return NextResponse.next();
     };
 

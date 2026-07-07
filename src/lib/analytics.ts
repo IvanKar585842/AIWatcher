@@ -31,6 +31,7 @@ export async function trackEvent(params: TrackEventParams): Promise<void> {
 }
 
 export async function getAnalyticsSummary(userId?: string) {
+  try {
   const since = new Date();
   since.setDate(since.getDate() - 30);
 
@@ -63,4 +64,17 @@ export async function getAnalyticsSummary(userId?: string) {
   });
 
   return { activeUsers, activeMonitors, changesDetected: changes, emailsSent: emails, avgAiResponseMs: avgAiMs };
+  } catch {
+    const activeMonitors = await prisma.monitor
+      .count({ where: { status: "ACTIVE", ...(userId ? { userId } : {}) } })
+      .catch(() => 0);
+
+    return {
+      activeUsers: 0,
+      activeMonitors,
+      changesDetected: 0,
+      emailsSent: 0,
+      avgAiResponseMs: 0,
+    };
+  }
 }

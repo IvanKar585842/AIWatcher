@@ -37,14 +37,18 @@ export function ChangeHistory() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  const fetchChanges = useCallback(async () => {
+  const fetchChanges = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     const params = new URLSearchParams({ page: String(page), limit: "20" });
     if (query) params.set("query", query);
     if (category !== "all") params.set("category", category);
     if (importance !== "all") params.set("importance", importance);
 
-    const res = await fetch(`/api/changes?${params}`);
+    const res = await fetch(`/api/changes?${params}`, { signal });
+    if (!res.ok) {
+      setLoading(false);
+      return;
+    }
     const data = await res.json();
     setChanges(data.changes ?? []);
     setTotalPages(data.pagination?.totalPages ?? 1);
@@ -52,8 +56,12 @@ export function ChangeHistory() {
   }, [query, category, importance, page]);
 
   useEffect(() => {
-    const debounce = setTimeout(fetchChanges, 300);
-    return () => clearTimeout(debounce);
+    const controller = new AbortController();
+    const debounce = setTimeout(() => fetchChanges(controller.signal), 300);
+    return () => {
+      clearTimeout(debounce);
+      controller.abort();
+    };
   }, [fetchChanges]);
 
   const importanceVariant = (imp: string) => {

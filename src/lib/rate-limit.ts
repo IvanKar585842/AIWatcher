@@ -56,7 +56,7 @@ export async function withRateLimit(
   if (!success) {
     const retryAfter = Math.max(1, Math.ceil((reset - Date.now()) / 1000));
     return NextResponse.json(
-      { error: "Too many requests. Please try again later." },
+      { success: false, error: "Too many requests. Please try again later." },
       {
         status: 429,
         headers: {
@@ -67,7 +67,12 @@ export async function withRateLimit(
     );
   }
 
-  const response = await handler();
-  response.headers.set("X-RateLimit-Remaining", String(remaining));
-  return response;
+  try {
+    const response = await handler();
+    response.headers.set("X-RateLimit-Remaining", String(remaining));
+    return response;
+  } catch (error) {
+    const { apiFailureFromError } = await import("@/lib/api-response");
+    return apiFailureFromError(error);
+  }
 }

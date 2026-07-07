@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { sendTelegramMessage } from "@/lib/notifications/telegram";
 import { INTERVAL_LABELS, MODE_LABELS } from "@/lib/constants";
 import { formatRelativeTime } from "@/lib/utils";
+import { verifyTelegramLinkCode } from "@/lib/telegram/link-token";
 
 interface TelegramUpdate {
   message?: {
@@ -28,21 +29,40 @@ export async function handleTelegramUpdate(update: TelegramUpdate) {
     case "/start": {
       const linkCode = args[0];
       if (linkCode?.startsWith("link_")) {
-        const userId = linkCode.replace("link_", "");
-        const linkUser = await prisma.user.findUnique({ where: { id: userId } });
-        if (linkUser) {
-          await prisma.user.update({
-            where: { id: userId },
-            data: {
-              telegramChatId: chatId,
-              telegramUsername: message.from?.username ?? null,
-            },
-          });
-          await sendTelegramMessage(
-            chatId,
-            "✅ <b>Account linked!</b>\n\nYou'll now receive change notifications here.\n\nUse /list to see your monitors."
-          );
-          return;
+        const userId = verifyTelegramLinkCode(linkCode);
+        if (userId) {
+          const linkUser = await prisma.user.findUnique({ where: { id: userId } });
+          if (linkUser) {
+            if (linkUser.telegramChatId && linkUser.telegramChatId !== chatId) {
+              await sendTelegramMessage(
+                chatId,
+                "⚠️ This account is already linked to another Telegram user. Unlink it in dashboard settings first."
+              );
+              return;
+            }
+            const existing = await prisma.user.findFirst({
+              where: { telegramChatId: chatId, NOT: { id: userId } },
+            });
+            if (existing) {
+              await sendTelegramMessage(
+                chatId,
+                "⚠️ This Telegram account is already linked to another WatchFlow user."
+              );
+              return;
+            }
+            await prisma.user.update({
+              where: { id: userId },
+              data: {
+                telegramChatId: chatId,
+                telegramUsername: message.from?.username ?? null,
+              },
+            });
+            await sendTelegramMessage(
+              chatId,
+              "✅ <b>Account linked!</b>\n\nYou'll now receive change notifications here.\n\nUse /list to see your monitors."
+            );
+            return;
+          }
         }
       }
 

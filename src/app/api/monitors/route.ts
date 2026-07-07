@@ -8,8 +8,23 @@ import {
   isIntervalAllowed,
 } from "@/lib/constants";
 import { prisma } from "@/lib/db";
+import { ApiError, parseJsonBody } from "@/lib/errors";
+import { apiFailure, apiFailureFromError } from "@/lib/api-response";
+import { assertNotificationAllowed } from "@/lib/plan-guards";
 import { withRateLimit } from "@/lib/rate-limit";
 import { createMonitorSchema } from "@/lib/validations";
+
+function isSchemaMismatch(error: unknown): boolean {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    return error.code === "P2021" || error.code === "P2010" || error.code === "P2022";
+  }
+  return (
+    error instanceof Error &&
+    (error.message.includes("column") ||
+      error.message.includes("Invalid") ||
+      error.message.includes("enum"))
+  );
+}
 
 export async function GET() {
   try {
@@ -17,21 +32,35 @@ export async function GET() {
     return withRateLimit(
       "monitors-list",
       async () => {
-        await trackEvent({ type: "user.active", userId: user.id });
-        const monitors = await prisma.monitor.findMany({
-          where: { userId: user.id },
-          orderBy: { createdAt: "desc" },
-          include: {
-            _count: { select: { changes: true } },
-          },
-        });
+        try {
+          await trackEvent({ type: "user.active", userId: user.id });
+          const monitors = await prisma.monitor.findMany({
+            where: { userId: user.id },
+            orderBy: { createdAt: "desc" },
+            include: {
+              _count: { select: { changes: true } },
+            },
+          });
 
-        return NextResponse.json({ monitors });
+          return NextResponse.json({ success: true, monitors });
+        } catch (error) {
+          if (isSchemaMismatch(error)) {
+            console.error("Database schema mismatch on GET /api/monitors:", error);
+            return NextResponse.json(
+              {
+                success: false,
+                error: "Database schema is out of sync. Run: npm run db:sync",
+              },
+              { status: 503 }
+            );
+          }
+          throw error;
+        }
       },
       user.id
     );
-  } catch {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  } catch (error) {
+    return apiFailureFromError(error);
   }
 }
 
@@ -41,70 +70,77 @@ export async function POST(request: NextRequest) {
     return withRateLimit(
       "monitors-create",
       async () => {
-        const body = await request.json();
-        const parsed = createMonitorSchema.safeParse(body);
-
-        if (!parsed.success) {
-          return NextResponse.json(
-            { error: "Validation failed", details: parsed.error.flatten() },
-            { status: 400 }
-          );
-        }
-
-        const plan = user.subscription?.plan ?? "FREE";
-        const limits = getPlanLimits(plan);
-
-        const monitorCount = await prisma.monitor.count({
-          where: { userId: user.id },
-        });
-
-        if (monitorCount >= limits.maxMonitors) {
-          return NextResponse.json(
-            { error: `Monitor limit reached (${limits.maxMonitors}). Upgrade your plan.` },
-            { status: 403 }
-          );
-        }
-
-        if (!isIntervalAllowed(plan, parsed.data.interval)) {
-          return NextResponse.json(
-            {
-              error: `Interval not allowed on ${plan} plan. Allowed: ${getAllowedIntervals(plan).join(", ")}`,
-            },
-            { status: 403 }
-          );
-        }
-
-        if (
-          (parsed.data.notificationMethod === "TELEGRAM" ||
-            parsed.data.notificationMethod === "BOTH") &&
-          !limits.telegram
-        ) {
-          return NextResponse.json(
-            { error: "Telegram notifications require Pro plan or higher." },
-            { status: 403 }
-          );
-        }
-
-        const existing = await prisma.monitor.findFirst({
-          where: { userId: user.id, url: parsed.data.url },
-          select: { id: true },
-        });
-
-        if (existing) {
-          return NextResponse.json(
-            { error: "You are already monitoring this URL." },
-            { status: 409 }
-          );
-        }
-
         try {
+          const body = await parseJsonBody(request);
+          const parsed = createMonitorSchema.safeParse(body);
+
+          if (!parsed.success) {
+            const message =
+              parsed.error.errors[0]?.message ?? "Validation failed";
+            return NextResponse.json(
+              { success: false, error: message, details: parsed.error.flatten() },
+              { status: 400 }
+            );
+          }
+
+          const plan = user.subscription?.plan ?? "FREE";
+          const limits = getPlanLimits(plan);
+
+          const monitorCount = await prisma.monitor.count({
+            where: { userId: user.id },
+          });
+
+          if (monitorCount >= limits.maxMonitors) {
+            return NextResponse.json(
+              {
+                success: false,
+                error: `Monitor limit reached (${limits.maxMonitors}). Upgrade your plan.`,
+              },
+              { status: 403 }
+            );
+          }
+
+          if (!isIntervalAllowed(plan, parsed.data.interval)) {
+            return NextResponse.json(
+              {
+                success: false,
+                error: `Interval not allowed on ${plan} plan. Allowed: ${getAllowedIntervals(plan).join(", ")}`,
+              },
+              { status: 403 }
+            );
+          }
+
+          if (
+            parsed.data.notificationMethod === "TELEGRAM" ||
+            parsed.data.notificationMethod === "BOTH"
+          ) {
+            assertNotificationAllowed(plan, parsed.data.notificationMethod);
+          }
+
+          const existing = await prisma.monitor.findFirst({
+            where: { userId: user.id, url: parsed.data.url },
+            select: { id: true },
+          });
+
+          if (existing) {
+            return NextResponse.json(
+              { success: false, error: "You are already monitoring this URL." },
+              { status: 409 }
+            );
+          }
+
           const monitor = await prisma.monitor.create({
             data: {
               userId: user.id,
               name: parsed.data.name,
               url: parsed.data.url,
+              description: parsed.data.description ?? null,
+              category: parsed.data.category ?? null,
+              tags: parsed.data.tags ?? [],
+              aiPrompt: parsed.data.aiPrompt ?? null,
+              config: parsed.data.config ?? undefined,
               mode: parsed.data.mode,
-              selector: parsed.data.selector,
+              selector: parsed.data.selector ?? null,
               keywords: parsed.data.keywords ?? [],
               interval: parsed.data.interval,
               notificationMethod: parsed.data.notificationMethod,
@@ -113,23 +149,41 @@ export async function POST(request: NextRequest) {
             },
           });
 
-          return NextResponse.json({ monitor }, { status: 201 });
+          return NextResponse.json({ success: true, monitor }, { status: 201 });
         } catch (error) {
-          if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+          if (error instanceof Prisma.PrismaClientKnownRequestError) {
+            if (error.code === "P2002") {
+              return NextResponse.json(
+                { success: false, error: "You are already monitoring this URL." },
+                { status: 409 }
+              );
+            }
+            if (isSchemaMismatch(error)) {
+              console.error("Database schema mismatch on POST /api/monitors:", error);
+              return NextResponse.json(
+                {
+                  success: false,
+                  error: "Database schema is out of sync. Run: npm run db:sync",
+                },
+                { status: 503 }
+              );
+            }
+          }
+          if (error instanceof ApiError) {
             return NextResponse.json(
-              { error: "You are already monitoring this URL." },
-              { status: 409 }
+              { success: false, error: error.message },
+              { status: error.status }
             );
           }
-          throw error;
+          console.error("Create monitor error:", error);
+          const message =
+            error instanceof Error ? error.message : "Failed to create monitor";
+          return NextResponse.json({ success: false, error: message }, { status: 500 });
         }
       },
       user.id
     );
   } catch (error) {
-    if (error instanceof Error && error.message === "Unauthorized") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return apiFailureFromError(error);
   }
 }

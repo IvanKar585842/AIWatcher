@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, Menu, Search } from "lucide-react";
+import { Menu, Search } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { DashboardUserButton } from "@/components/auth/clerk-wrappers";
+import { useGreeting } from "@/hooks/use-client-time";
+import { NotificationDropdown } from "./notification-dropdown";
 import { useCommand } from "./command-context";
 
 function LiveClock() {
@@ -29,16 +31,10 @@ function LiveClock() {
   );
 }
 
-export function CommandTopbar({ alertCount = 0 }: { alertCount?: number }) {
+export function CommandTopbar() {
   const { user } = useUser();
-  const { collapsed, setMobileOpen } = useCommand();
-
-  const greeting = (() => {
-    const h = new Date().getHours();
-    if (h < 12) return "Good morning";
-    if (h < 18) return "Good afternoon";
-    return "Good evening";
-  })();
+  const { setMobileOpen } = useCommand();
+  const greeting = useGreeting();
 
   const name = user?.firstName ?? user?.username ?? "Operator";
 
@@ -78,22 +74,14 @@ export function CommandTopbar({ alertCount = 0 }: { alertCount?: number }) {
           <input
             type="search"
             placeholder="Search monitors, changes..."
-            className="h-9 w-48 rounded-full border border-white/[0.06] bg-white/[0.03] pl-9 pr-4 text-xs text-zinc-300 placeholder:text-zinc-600 outline-none transition-colors focus:border-cyan-400/30 focus:ring-1 focus:ring-cyan-400/20 lg:w-64"
+            aria-label="Search monitors and changes"
+            disabled
+            title="Search coming soon"
+            className="h-9 w-48 rounded-full border border-white/[0.06] bg-white/[0.03] pl-9 pr-4 text-xs text-zinc-300 placeholder:text-zinc-600 outline-none transition-colors focus:border-cyan-400/30 focus:ring-1 focus:ring-cyan-400/20 lg:w-64 disabled:cursor-not-allowed disabled:opacity-50"
           />
         </div>
 
-        <button
-          type="button"
-          className="relative rounded-full border border-white/[0.06] p-2 text-zinc-400 transition-colors hover:border-cyan-400/20 hover:text-cyan-300"
-          aria-label="Notifications"
-        >
-          <Bell className="h-4 w-4" />
-          {alertCount > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-cyan-500 text-[9px] font-bold text-black">
-              {alertCount > 9 ? "9+" : alertCount}
-            </span>
-          )}
-        </button>
+        <NotificationDropdown />
 
         <div className="hidden sm:block">
           <DashboardUserButton />

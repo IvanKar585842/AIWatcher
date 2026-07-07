@@ -1,43 +1,68 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
-import {
-  ExternalLink,
-  MoreHorizontal,
-  Pause,
-  Play,
-  RefreshCw,
-  Trash2,
-} from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { CreateMonitorDialog } from "@/components/dashboard/create-monitor-dialog";
-import { INTERVAL_LABELS, MODE_LABELS } from "@/lib/constants";
-import { formatRelativeTime, getDomainFromUrl } from "@/lib/utils";
-import type { Monitor } from "@prisma/client";
+import { useAuth } from "@clerk/nextjs";
+import { motion } from "framer-motion";
+import { Radar } from "lucide-react";
+import { MonitorCard, type MonitorWithCount } from "@/components/dashboard/monitor-card";
+import { CreateMonitorDialog, type MonitorPrefill } from "@/components/dashboard/create-monitor-dialog";
+import { MonitorsEmptyState } from "@/components/dashboard/monitors-empty-state";
+import { MonitorGridSkeleton } from "@/components/dashboard/command/dashboard-skeletons";
+import { fetchApi } from "@/lib/fetch-api";
 
-interface MonitorWithCount extends Monitor {
-  _count: { changes: number };
+function isRealFailure(status: number): boolean {
+  return status === 0 || status >= 500;
 }
 
-export function MonitorList() {
+export function MonitorList({ embedded }: { embedded?: boolean }) {
+  const { isLoaded, isSignedIn } = useAuth();
   const [monitors, setMonitors] = useState<MonitorWithCount[]>([]);
   const [loading, setLoading] = useState(true);
-  const [checking, setChecking] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+  const [duplicatePrefill, setDuplicatePrefill] = useState<MonitorPrefill | null>(null);
 
   const fetchMonitors = useCallback(async () => {
-    const res = await fetch("/api/monitors");
-    const data = await res.json();
-    setMonitors(data.monitors ?? []);
+    setError(false);
+    const result = await fetchApi<{ monitors: MonitorWithCount[] }>("/api/monitors");
+
+    if (!result.success) {
+      // Only show error for genuine server/network failures — never for empty lists or client errors
+      setError(isRealFailure(result.status));
+      setMonitors([]);
+      setLoading(false);
+      return;
+    }
+
+    setMonitors(Array.isArray(result.data.monitors) ? result.data.monitors : []);
+    setError(false);
     setLoading(false);
   }, []);
 
   useEffect(() => {
+    if (!isLoaded) return;
+
+    if (!isSignedIn) {
+      setMonitors([]);
+      setLoading(false);
+      setError(false);
+      return;
+    }
+
+    setLoading(true);
     fetchMonitors();
-  }, [fetchMonitors]);
+  }, [isLoaded, isSignedIn, fetchMonitors]);
+
+  useEffect(() => {
+    if (!isSignedIn) return;
+    const onUpdate = () => fetchMonitors();
+    window.addEventListener("monitors-updated", onUpdate);
+    return () => window.removeEventListener("monitors-updated", onUpdate);
+  }, [isSignedIn, fetchMonitors]);
+
+  function handleCreated(_monitorId: string) {
+    fetchMonitors();
+    window.dispatchEvent(new CustomEvent("monitors-updated"));
+  }
 
   async function togglePause(id: string, currentStatus: string) {
     await fetch(`/api/monitors/${id}`, {
@@ -56,124 +81,93 @@ export function MonitorList() {
     fetchMonitors();
   }
 
-  async function checkNow(id: string) {
-    setChecking(id);
-    try {
-      await fetch(`/api/monitors/${id}/check`, { method: "POST" });
-      fetchMonitors();
-    } finally {
-      setChecking(null);
-    }
+  function handleDuplicate(monitor: MonitorWithCount) {
+    setDuplicatePrefill({
+      name: `${monitor.name} (copy)`,
+      url: "",
+      mode: monitor.mode,
+      selector: monitor.selector ?? "",
+      keywords: monitor.keywords.join(", "),
+      interval: monitor.interval,
+      notificationMethod: monitor.notificationMethod,
+      respectRobots: monitor.respectRobots,
+    });
   }
 
-  if (loading) {
+  if (!isLoaded || loading) {
     return (
-      <div className="space-y-4">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="h-24 w-full" />
-        ))}
+      <div className={embedded ? "space-y-6" : "space-y-6 px-4 pb-8 lg:px-6"}>
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 animate-pulse rounded-lg bg-white/[0.04]" />
+          <div className="space-y-2">
+            <div className="h-2 w-24 animate-pulse rounded bg-white/[0.04]" />
+            <div className="h-3 w-32 animate-pulse rounded bg-white/[0.04]" />
+          </div>
+        </div>
+        <MonitorGridSkeleton />
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">
-          {monitors.length} Monitor{monitors.length !== 1 ? "s" : ""}
-        </h2>
-        <CreateMonitorDialog onCreated={fetchMonitors} />
+    <div className={embedded ? "space-y-6" : "space-y-6 px-4 pb-8 lg:px-6"}>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-cyan-400/20 bg-cyan-500/10">
+            <Radar className="h-4 w-4 text-cyan-400" />
+          </div>
+          <div>
+            <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-cyan-500/60">
+              Surveillance Grid
+            </p>
+            <p className="text-sm text-zinc-400">
+              <span className="font-medium text-zinc-200">{monitors.length}</span> monitor
+              {monitors.length !== 1 ? "s" : ""} deployed
+            </p>
+          </div>
+        </div>
+        <CreateMonitorDialog
+          onCreated={handleCreated}
+          variant="os"
+          prefillRequest={duplicatePrefill}
+          onPrefillConsumed={() => setDuplicatePrefill(null)}
+          triggerLabel="+ Create Monitor"
+          triggerClassName="h-11 px-6 text-sm font-medium shadow-[0_0_32px_-8px_rgba(34,211,238,0.55)]"
+        />
       </div>
 
-      {monitors.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <p className="text-muted-foreground mb-4">No monitors yet. Create your first one!</p>
-            <CreateMonitorDialog onCreated={fetchMonitors} />
-          </CardContent>
-        </Card>
+      {error ? (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-2xl border border-red-500/20 bg-red-500/5 px-6 py-12 text-center"
+        >
+          <p className="text-sm font-medium text-red-300">Failed to load monitors</p>
+          <p className="mt-1 text-xs text-zinc-600">Check your connection and try again.</p>
+          <button
+            type="button"
+            onClick={() => {
+              setLoading(true);
+              fetchMonitors();
+            }}
+            className="mt-4 rounded-full border border-white/[0.08] px-4 py-2 text-xs text-zinc-400 transition-colors hover:text-cyan-300"
+          >
+            Retry
+          </button>
+        </motion.div>
+      ) : monitors.length === 0 ? (
+        <MonitorsEmptyState onCreated={handleCreated} />
       ) : (
-        <div className="space-y-3">
-          {monitors.map((monitor) => (
-            <Card key={monitor.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="flex items-center justify-between p-4">
-                <div className="flex items-start gap-4 min-w-0 flex-1">
-                  <div
-                    className={`mt-1 h-2.5 w-2.5 rounded-full shrink-0 ${
-                      monitor.status === "ACTIVE"
-                        ? "bg-green-500"
-                        : monitor.status === "PAUSED"
-                          ? "bg-amber-500"
-                          : "bg-red-500"
-                    }`}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Link
-                        href={`/dashboard/monitors/${monitor.id}`}
-                        className="font-medium hover:underline truncate"
-                      >
-                        {monitor.name}
-                      </Link>
-                      <Badge variant="outline" className="text-xs">
-                        {MODE_LABELS[monitor.mode]}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground truncate mt-0.5">
-                      {getDomainFromUrl(monitor.url)} · {INTERVAL_LABELS[monitor.interval]}
-                    </p>
-                    <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                      <span>{monitor._count.changes} changes</span>
-                      {monitor.lastCheckedAt && (
-                        <span>Checked {formatRelativeTime(monitor.lastCheckedAt)}</span>
-                      )}
-                      {monitor.errorMessage && (
-                        <span className="text-destructive truncate">{monitor.errorMessage}</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1 shrink-0 ml-4">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => checkNow(monitor.id)}
-                    disabled={checking === monitor.id}
-                    title="Check now"
-                  >
-                    <RefreshCw
-                      className={`h-4 w-4 ${checking === monitor.id ? "animate-spin" : ""}`}
-                    />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => togglePause(monitor.id, monitor.status)}
-                    title={monitor.status === "ACTIVE" ? "Pause" : "Resume"}
-                  >
-                    {monitor.status === "ACTIVE" ? (
-                      <Pause className="h-4 w-4" />
-                    ) : (
-                      <Play className="h-4 w-4" />
-                    )}
-                  </Button>
-                  <a href={monitor.url} target="_blank" rel="noopener noreferrer">
-                    <Button variant="ghost" size="icon" title="Open website">
-                      <ExternalLink className="h-4 w-4" />
-                    </Button>
-                  </a>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => deleteMonitor(monitor.id)}
-                    title="Delete"
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {monitors.map((monitor, i) => (
+            <MonitorCard
+              key={monitor.id}
+              monitor={monitor}
+              index={i}
+              onPause={() => togglePause(monitor.id, monitor.status)}
+              onDelete={() => deleteMonitor(monitor.id)}
+              onDuplicate={() => handleDuplicate(monitor)}
+            />
           ))}
         </div>
       )}

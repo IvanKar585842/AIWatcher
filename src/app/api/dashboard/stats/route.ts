@@ -4,11 +4,10 @@ import { MonitorStatus, ChangeImportance } from "@prisma/client";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { withRateLimit } from "@/lib/rate-limit";
-
 export async function GET() {
-  return withRateLimit("dashboard-stats", async () => {
-    try {
-      const user = await requireUser();
+  try {
+    const user = await requireUser();
+    return withRateLimit("dashboard-stats", async () => {
       await trackEvent({ type: "user.active", userId: user.id });
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -16,6 +15,7 @@ export async function GET() {
       const [
         totalMonitors,
         activeMonitors,
+        pausedMonitors,
         errorMonitors,
         changesToday,
         importantAlerts,
@@ -28,6 +28,9 @@ export async function GET() {
         prisma.monitor.count({ where: { userId: user.id } }),
         prisma.monitor.count({
           where: { userId: user.id, status: MonitorStatus.ACTIVE },
+        }),
+        prisma.monitor.count({
+          where: { userId: user.id, status: MonitorStatus.PAUSED },
         }),
         prisma.monitor.count({
           where: { userId: user.id, status: MonitorStatus.ERROR },
@@ -118,12 +121,20 @@ export async function GET() {
           ? 100
           : Math.min(99, Math.round((successfulChecks / activeMonitors) * 100));
 
-      const analytics = await getAnalyticsSummary(user.id);
+      const analytics = await getAnalyticsSummary(user.id).catch(() => ({
+        activeUsers: 1,
+        activeMonitors,
+        changesDetected: changesToday,
+        emailsSent: 0,
+        avgAiResponseMs: 0,
+      }));
 
       return NextResponse.json({
         stats: {
           totalMonitors,
           activeMonitors,
+          pausedMonitors,
+          errorMonitors,
           changesToday,
           importantAlerts,
           aiAccuracy,
@@ -133,10 +144,15 @@ export async function GET() {
           recentNotifications,
           monitors,
           analytics,
+          avgResponseTime: analytics.avgAiResponseMs,
         },
       });
-    } catch {
+    }, user.id);
+  } catch (error) {
+    if (error instanceof Error && error.message === "Unauthorized") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-  });
+    console.error("Dashboard stats error:", error);
+    return NextResponse.json({ error: "Failed to load dashboard stats" }, { status: 500 });
+  }
 }

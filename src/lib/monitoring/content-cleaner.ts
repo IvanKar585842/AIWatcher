@@ -44,19 +44,35 @@ const RANDOM_ID_PATTERNS = [
   /\buuid["\s:=]+[a-f0-9-]{36}/gi,
 ];
 
-export function cleanHtml(html: string): string {
+export interface CleanOptions {
+  ignoreTimestamps?: boolean;
+  ignoreRandomIds?: boolean;
+  ignoreDynamicContent?: boolean;
+}
+
+export function cleanHtml(html: string, options: CleanOptions = {}): string {
+  const {
+    ignoreTimestamps = true,
+    ignoreRandomIds = true,
+    ignoreDynamicContent = true,
+  } = options;
+
   let cleaned = html;
 
   for (const pattern of TRACKING_PATTERNS) {
     cleaned = cleaned.replace(pattern, "");
   }
 
-  for (const pattern of DYNAMIC_PATTERNS) {
-    cleaned = cleaned.replace(pattern, "[TIMESTAMP]");
+  if (ignoreTimestamps || ignoreDynamicContent) {
+    for (const pattern of DYNAMIC_PATTERNS) {
+      cleaned = cleaned.replace(pattern, "[TIMESTAMP]");
+    }
   }
 
-  for (const pattern of RANDOM_ID_PATTERNS) {
-    cleaned = cleaned.replace(pattern, "");
+  if (ignoreRandomIds) {
+    for (const pattern of RANDOM_ID_PATTERNS) {
+      cleaned = cleaned.replace(pattern, "");
+    }
   }
 
   cleaned = cleaned

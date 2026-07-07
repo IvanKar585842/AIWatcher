@@ -1,6 +1,7 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { Plan } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { UnauthorizedError } from "@/lib/errors";
 
 export async function getOrCreateUser() {
   const { userId } = await auth();
@@ -40,7 +41,7 @@ export async function getOrCreateUser() {
 export async function requireUser() {
   const user = await getOrCreateUser();
   if (!user) {
-    throw new Error("Unauthorized");
+    throw new UnauthorizedError();
   }
   return user;
 }
