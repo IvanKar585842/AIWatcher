@@ -4,10 +4,6 @@
   "installCommand": "npm install",
   "crons": [
     {
-      "path": "/api/cron/monitoring",
-      "schedule": "*/5 * * * *"
-    },
-    {
       "path": "/api/cron/chat-cleanup",
       "schedule": "0 3 * * *"
     }
