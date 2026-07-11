@@ -76,22 +76,68 @@ function isServerlessRuntime(): boolean {
   );
 }
 
+function applyChromiumLdPath(executablePath: string): void {
+  const execDir = path.dirname(executablePath);
+  const al2023Lib = path.join("/tmp", "al2023", "lib");
+  process.env.LD_LIBRARY_PATH = [execDir, al2023Lib, process.env.LD_LIBRARY_PATH]
+    .filter(Boolean)
+    .join(":");
+}
+
+async function launchPlaywrightWithExecutable(
+  args: string[],
+  executablePath: string
+): Promise<Browser> {
+  applyChromiumLdPath(executablePath);
+  return playwrightChromium.launch({
+    args,
+    executablePath,
+    headless: true,
+  });
+}
+
+/**
+ * Vercel: try bundled @sparticuz/chromium first (via NFT includes),
+ * then chromium-min + remote pack (GitHub / CHROMIUM_PACK_URL).
+ */
 async function launchWithSparticuz(): Promise<Browser> {
   // Must be set BEFORE importing chromium so the correct AL2023 libs are selected
   process.env.AWS_LAMBDA_JS_RUNTIME = resolveLambdaJsRuntime();
 
-  // chromium-min has no local bin/ — the pack URL is required
-  const chromium = (await import("@sparticuz/chromium-min")).default;
-  chromium.setGraphicsMode = false;
+  const runtimeInfo = `${process.env.AWS_LAMBDA_JS_RUNTIME}, ${process.arch}, node ${process.versions.node}`;
+
+  // 1) Full package — binary ships with the function when file tracing includes bin/
+  try {
+    const chromium = (await import("@sparticuz/chromium")).default;
+    chromium.setGraphicsMode = false;
+    const executablePath = await chromium.executablePath();
+    if (executablePath) {
+      monitorLog({
+        step: "fetch_start",
+        message: `Chromium ready via @sparticuz/chromium (${runtimeInfo})`,
+      });
+      return launchPlaywrightWithExecutable(chromium.args, executablePath);
+    }
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    monitorLog({
+      step: "fetch_start",
+      message: `Bundled Chromium unavailable, trying remote pack: ${detail}`,
+    });
+  }
+
+  // 2) Min package — download arch-specific pack at runtime
+  const chromiumMin = (await import("@sparticuz/chromium-min")).default;
+  chromiumMin.setGraphicsMode = false;
 
   let executablePath: string;
   try {
-    executablePath = await chromium.executablePath(CHROMIUM_PACK_URL);
+    executablePath = await chromiumMin.executablePath(CHROMIUM_PACK_URL);
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     throw new Error(
       `Failed to download Chromium pack (${CHROMIUM_PACK_URL}). ` +
-        `Set CHROMIUM_PACK_URL to a valid pack.x64/arm64.tar. Cause: ${detail}`,
+        `Host the pack on a fast HTTPS URL (Blob/S3) and set CHROMIUM_PACK_URL. Cause: ${detail}`,
       { cause: error }
     );
   }
@@ -102,22 +148,12 @@ async function launchWithSparticuz(): Promise<Browser> {
     );
   }
 
-  const execDir = path.dirname(executablePath);
-  const al2023Lib = path.join("/tmp", "al2023", "lib");
-  process.env.LD_LIBRARY_PATH = [execDir, al2023Lib, process.env.LD_LIBRARY_PATH]
-    .filter(Boolean)
-    .join(":");
-
   monitorLog({
     step: "fetch_start",
-    message: `Chromium ready (${process.env.AWS_LAMBDA_JS_RUNTIME}, ${process.arch}, node ${process.versions.node})`,
+    message: `Chromium ready via remote pack (${runtimeInfo})`,
   });
 
-  return playwrightChromium.launch({
-    args: chromium.args,
-    executablePath,
-    headless: true,
-  });
+  return launchPlaywrightWithExecutable(chromiumMin.args, executablePath);
 }
 
 function isMissingBrowserError(error: unknown): boolean {

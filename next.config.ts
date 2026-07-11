@@ -1,5 +1,10 @@
 import type { NextConfig } from "next";
 
+const chromiumIncludes = [
+  "./node_modules/@sparticuz/chromium/**/*",
+  "./node_modules/@sparticuz/chromium-min/**/*",
+];
+
 const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
@@ -19,8 +24,15 @@ const nextConfig: NextConfig = {
   serverExternalPackages: [
     "playwright",
     "playwright-core",
+    "@sparticuz/chromium",
     "@sparticuz/chromium-min",
   ],
+  // Ensure Chromium brotli binaries are included in the Vercel serverless trace
+  outputFileTracingIncludes: {
+    "/api/monitors/[id]/check": chromiumIncludes,
+    "/api/cron/monitoring": chromiumIncludes,
+    "/*": chromiumIncludes,
+  },
   poweredByHeader: false,
   compress: true,
 };

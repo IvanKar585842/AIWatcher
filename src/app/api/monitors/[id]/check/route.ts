@@ -7,7 +7,7 @@ import { withRateLimit } from "@/lib/rate-limit";
 import { assertMonitorOwnedBy } from "@/lib/security/ownership";
 import { securityLog } from "@/lib/security/log";
 
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 export async function POST(
   _request: NextRequest,
