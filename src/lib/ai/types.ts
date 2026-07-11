@@ -22,14 +22,48 @@ export const changeAnalysisSchema = z
     new_value: z.string().nullable().optional(),
     bullet_points: z.array(z.string()).optional(),
     emoji: z.string().default("🔔"),
+    recommendedAction: z.string().optional().default(""),
+    recommended_action: z.string().optional(),
   })
-  .transform((data) => ({
-    ...data,
-    changes: data.changes.length > 0 ? data.changes : (data.bullet_points ?? []),
-    bullet_points: data.bullet_points ?? data.changes,
-  }));
+  .transform((data) => {
+    const changes = data.changes.length > 0 ? data.changes : (data.bullet_points ?? []);
+    const recommendedAction =
+      (data.recommendedAction || data.recommended_action || "").trim() ||
+      defaultRecommendedAction(data.importance, data.category);
+    return {
+      ...data,
+      changes,
+      bullet_points: data.bullet_points ?? data.changes,
+      recommendedAction,
+    };
+  });
 
 export type ChangeAnalysis = z.infer<typeof changeAnalysisSchema>;
+
+export function defaultRecommendedAction(
+  importance: string,
+  category?: string
+): string {
+  if (importance === "LOW") {
+    return "No action needed — this looks like routine page noise.";
+  }
+  if (importance === "MEDIUM") {
+    return "Review when convenient — confirm the update is expected.";
+  }
+  if (category === "PRICE") {
+    return "Review pricing immediately and update your strategy if needed.";
+  }
+  if (category === "POLICY") {
+    return "Read the updated policy and check compliance impact.";
+  }
+  if (category === "JOBS") {
+    return "Review the listing and decide if you should apply or notify your team.";
+  }
+  if (importance === "CRITICAL") {
+    return "Investigate immediately — this may require urgent business action.";
+  }
+  return "Open the full analysis and decide next steps.";
+}
 
 export interface AIProvider {
   analyzeChange(params: {
@@ -42,40 +76,49 @@ export interface AIProvider {
   }): Promise<ChangeAnalysis>;
 }
 
-export const CHANGE_ANALYSIS_PROMPT = `Analyze the difference between two snapshots of a monitored webpage.
+export const CHANGE_ANALYSIS_PROMPT = `You analyze website monitoring changes for WatchFlow.
+
+You receive a compact CHANGE PACKAGE (not full page HTML). Decide importance carefully.
 
 Monitor URL: {url}
 Monitor Name: {monitorName}
 Monitoring Mode: {mode}
 
-User monitoring prompt (what the user cares about):
+User instructions (follow these when present):
 {userPrompt}
 
-OLD SNAPSHOT:
+CHANGE PACKAGE:
 {oldHtml}
 
-NEW SNAPSHOT:
+ADDITIONAL CONTEXT:
 {newHtml}
 
-Tasks:
-1. Explain what changed in plain language (summary)
-2. Classify: PRICE, CONTENT, JOBS, POLICY, CONTACT_INFO, PRODUCT, DOCUMENTATION, FEATURES, or OTHER
-3. Rate importance: LOW, MEDIUM, HIGH, or CRITICAL
-4. List 2-5 specific changes in "changes"
-5. Set shouldNotify=true only if the user should be alerted (false for noise, ads, timestamps, minor formatting)
-6. Extract old_value and new_value for the primary change when applicable
-7. Pick a relevant emoji
+Classification rules:
+- LOW: noise — cookie banners, ads, timestamps, counters, loading states, minor formatting. Ignore for alerts.
+- MEDIUM: real change worth keeping in history, but not urgent (small copy edits, non-critical UI tweaks).
+- HIGH: important user-facing change (pricing, availability, key content, CTAs, policy).
+- CRITICAL: urgent business impact (major outage/error page, large price change, security/legal).
+
+Notification rules:
+- shouldNotify=true ONLY for HIGH or CRITICAL (unless user instructions say otherwise)
+- shouldNotify=false for LOW and MEDIUM
+
+Always include recommendedAction:
+- LOW: "No action needed."
+- MEDIUM: what the user should review
+- HIGH/CRITICAL: concrete next step (e.g. "Review pricing strategy.")
 
 Respond ONLY with valid JSON:
 {
-  "summary": "string",
+  "summary": "string — clear explanation of what changed",
   "importance": "LOW|MEDIUM|HIGH|CRITICAL",
   "category": "PRICE|CONTENT|JOBS|POLICY|CONTACT_INFO|PRODUCT|DOCUMENTATION|FEATURES|OTHER",
   "changes": ["string"],
   "shouldNotify": true,
   "old_value": "string or null",
   "new_value": "string or null",
-  "emoji": "string"
+  "emoji": "string",
+  "recommendedAction": "string — short actionable recommendation"
 }`;
 
 export function parseChangeAnalysis(raw: string): ChangeAnalysis {

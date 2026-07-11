@@ -39,27 +39,29 @@ export function CommandTopbar() {
   const name = user?.firstName ?? user?.username ?? "Operator";
 
   return (
-    <header className="command-topbar sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b border-white/[0.06] bg-[#090909]/80 px-4 backdrop-blur-xl lg:px-6">
-      <div className="flex items-center gap-4">
+    <header className="command-topbar sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-white/[0.06] bg-[#090909]/80 px-3 backdrop-blur-xl sm:h-16 sm:gap-4 sm:px-4 lg:px-6">
+      <div className="flex min-w-0 items-center gap-3">
         <button
           type="button"
-          className="rounded-lg border border-white/[0.06] p-2 text-zinc-400 lg:hidden"
+          className="flex min-h-10 min-w-10 shrink-0 items-center justify-center rounded-lg border border-white/[0.06] text-zinc-400 lg:hidden"
           onClick={() => setMobileOpen(true)}
           aria-label="Open navigation"
         >
-          <Menu className="h-4 w-4" />
+          <Menu className="h-5 w-5" />
         </button>
 
-        <div>
-          <h1 className="text-sm font-medium text-zinc-200">
+        <div className="min-w-0">
+          <h1 className="truncate text-sm font-medium text-zinc-200">
             {greeting}, <span className="text-cyan-300">{name}</span>
           </h1>
-          <LiveClock />
+          <div className="hidden sm:block">
+            <LiveClock />
+          </div>
         </div>
       </div>
 
-      <div className="flex items-center gap-2 sm:gap-4">
-        <div className="hidden items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/[0.06] px-3 py-1.5 sm:flex">
+      <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+        <div className="hidden items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/[0.06] px-3 py-1.5 md:flex">
           <span className="relative flex h-2 w-2">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
@@ -69,7 +71,7 @@ export function CommandTopbar() {
           </span>
         </div>
 
-        <div className="relative hidden md:block">
+        <div className="relative hidden lg:block">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-600" />
           <input
             type="search"

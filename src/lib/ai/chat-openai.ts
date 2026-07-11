@@ -19,10 +19,16 @@ export interface ChatCompletionResult {
   costUsd: number;
 }
 
+export function isChatOpenAIConfigured(): boolean {
+  return Boolean(process.env.OPENAI_API_KEY?.trim());
+}
+
 function getOpenAIClient(): OpenAI {
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) {
-    throw new Error("OpenAI is not configured. Set OPENAI_API_KEY in environment.");
+    throw new Error(
+      "OpenAI is not configured. Add OPENAI_API_KEY to .env.local (it overrides .env) and restart the dev server."
+    );
   }
   return new OpenAI({ apiKey });
 }
@@ -38,9 +44,16 @@ export async function streamChatCompletion(
   const model = getChatModelId(tier);
   const maxTokens = getMaxResponseTokens(tier);
 
+  // Ensure the current user turn is included for the model
+  const turns = [...history];
+  const last = turns[turns.length - 1];
+  if (!(last?.role === "user" && last.content === userMessage)) {
+    turns.push({ role: "user", content: userMessage });
+  }
+
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     { role: "system", content: systemPrompt },
-    ...history.map((m) => ({
+    ...turns.map((m) => ({
       role: m.role as "user" | "assistant" | "system",
       content: m.content,
     })),

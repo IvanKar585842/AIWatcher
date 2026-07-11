@@ -1,8 +1,8 @@
 import { Plan, type User } from "@prisma/client";
-import { getEffectivePlan, isAdminUser } from "@/lib/admin";
-import { CHAT_DAILY_LIMITS } from "@/lib/ai/chat-config";
+import { getEffectivePlan, getUserPlanEntitlements, isAdminUser } from "@/lib/admin";
 import { prisma } from "@/lib/db";
 import { ApiError } from "@/lib/errors";
+import { getUpgradeCopy } from "@/lib/plan-features";
 
 type ChatLimitUser = Pick<User, "id" | "email" | "role"> & {
   subscription?: { plan: Plan } | null;
@@ -16,8 +16,7 @@ function startOfUtcDay(): Date {
 
 export function getChatDailyLimit(user: ChatLimitUser): number {
   if (isAdminUser(user)) return Infinity;
-  const plan = getEffectivePlan(user);
-  return CHAT_DAILY_LIMITS[plan] ?? CHAT_DAILY_LIMITS.FREE;
+  return getUserPlanEntitlements(user).chatDailyMessages;
 }
 
 export async function getChatDailyUsage(userId: string): Promise<number> {
@@ -36,16 +35,12 @@ export async function assertChatDailyLimit(user: ChatLimitUser): Promise<void> {
 
   const used = await getChatDailyUsage(user.id);
   if (used >= limit) {
+    const copy = getUpgradeCopy("AI_ANALYSIS");
     const plan = getEffectivePlan(user);
-    const upgradeHint =
-      plan === Plan.FREE
-        ? " Upgrade to Pro for a higher daily limit."
-        : plan === Plan.PRO
-          ? " Upgrade to Business for a higher daily limit."
-          : "";
-
     throw new ApiError(
-      `Daily AI message limit reached (${limit}/day).${upgradeHint}`,
+      plan === Plan.BUSINESS
+        ? `Daily AI assistant limit reached (${limit}/day).`
+        : `${copy.title} You've used today's ${limit} assistant messages. ${copy.description}`,
       429
     );
   }

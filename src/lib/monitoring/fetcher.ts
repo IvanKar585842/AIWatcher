@@ -11,10 +11,14 @@ import { computeContentHash, hashScreenshotBuffer } from "./compare";
 import { monitorLog, monitorLogError } from "./logger";
 import { removeDynamicElements, waitForPageReady } from "./page-utils";
 import {
+  VISUAL_VIEWPORT,
+} from "./visual-compare";
+import {
   isUrlAllowedByRobotsTxt,
   robotsTxtBlockedMessage,
   shouldEnforceRobotsTxt,
 } from "./robots";
+import { assertSafeFetchUrl } from "@/lib/security/url";
 
 const FETCH_RETRY_BASE_MS = 1000;
 
@@ -197,6 +201,9 @@ async function fetchPageContentOnce(options: FetchOptions): Promise<FetchResult>
     cleanOptions,
   } = options;
 
+  // Re-validate at fetch time (SSRF / private IP / DNS) — never trust stored URLs alone
+  await assertSafeFetchUrl(url);
+
   monitorLog({
     step: "fetch_start",
     monitorId,
@@ -236,7 +243,8 @@ async function fetchPageContentOnce(options: FetchOptions): Promise<FetchResult>
   const context = await browser.newContext({
     userAgent:
       "WatchFlowAI/1.0 (+https://watchflow.ai/bot; monitoring service)",
-    viewport: { width: 1280, height: 720 },
+    viewport: { width: VISUAL_VIEWPORT.width, height: VISUAL_VIEWPORT.height },
+    deviceScaleFactor: 1,
     ignoreHTTPSErrors: true,
   });
 
@@ -263,6 +271,7 @@ async function fetchPageContentOnce(options: FetchOptions): Promise<FetchResult>
     const removed = await removeDynamicElements(page, {
       ignoreAds,
       ignoreCookies: cleanOptions?.ignoreCookies !== false,
+      ignoreSelectors: cleanOptions?.ignoreSelectors,
     });
 
     monitorLog({
@@ -337,14 +346,51 @@ async function fetchPageContentOnce(options: FetchOptions): Promise<FetchResult>
 
       case MonitoringMode.VISUAL_CHANGES:
       case MonitoringMode.SCREENSHOT_DIFF: {
-        const buffer = await page.screenshot({ fullPage: true, type: "png" });
+        // Fixed viewport screenshot for stable comparisons (avoids fullPage height noise)
+        const buffer = await page.screenshot({
+          fullPage: false,
+          type: "jpeg",
+          quality: 55,
+        });
         const screenshotHash = hashScreenshotBuffer(buffer);
+        const previewBase64 = buffer.toString("base64");
+        const fingerprint = (await page.evaluate(
+          async ({ b64, size }) => {
+            const img = new Image();
+            img.src = `data:image/jpeg;base64,${b64}`;
+            await img.decode();
+            const canvas = document.createElement("canvas");
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) return [] as number[];
+            ctx.drawImage(img, 0, 0, size, size);
+            const data = ctx.getImageData(0, 0, size, size).data;
+            const out: number[] = [];
+            for (let i = 0; i < data.length; i += 4) {
+              out.push(Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]));
+            }
+            return out;
+          },
+          { b64: previewBase64, size: 48 }
+        )) as number[];
+
+        // Cap preview stored for history UI
+        const storedPreview =
+          previewBase64.length > 120_000
+            ? previewBase64.slice(0, 120_000)
+            : previewBase64;
+
         rawHtml = `[visual-screenshot:${screenshotHash}]`;
         metadata = {
           ...metadata,
           captureType: "screenshot",
           screenshotHash,
           screenshotBytes: buffer.length,
+          visualFingerprint: fingerprint,
+          screenshotPreview: storedPreview,
+          screenshotMime: "image/jpeg",
+          viewport: VISUAL_VIEWPORT,
         };
         break;
       }

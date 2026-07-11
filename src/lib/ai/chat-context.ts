@@ -3,6 +3,9 @@ import { ChatMessageRole } from "@prisma/client";
 import { CHAT_LIMITS, getChatModelId } from "./chat-config";
 import { buildSystemPrompt } from "./chat-knowledge";
 import {
+  buildUserMonitoringContext,
+} from "./chat-user-context";
+import {
   calculateCostUsd,
   estimateTokens,
   truncateToChars,
@@ -17,7 +20,9 @@ export interface ChatTurn {
 function getOpenAIClient(): OpenAI {
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) {
-    throw new Error("OpenAI is not configured. Set OPENAI_API_KEY in environment.");
+    throw new Error(
+      "OpenAI is not configured. Add OPENAI_API_KEY to .env.local (it overrides .env) and restart the dev server."
+    );
   }
   return new OpenAI({ apiKey });
 }
@@ -68,6 +73,9 @@ export async function summarizeConversationMessages(
 }
 
 export async function maybeCompressConversation(conversationId: string): Promise<void> {
+  // Summarization needs OpenAI — skip quietly if the key is missing
+  if (!process.env.OPENAI_API_KEY?.trim()) return;
+
   const conversation = await prisma.chatConversation.findUnique({
     where: { id: conversationId },
     include: {
@@ -113,8 +121,9 @@ export async function maybeCompressConversation(conversationId: string): Promise
 
 export async function buildOptimizedContext(
   conversationId: string,
-  userMessage: string
-): Promise<{ turns: ChatTurn[]; systemPrompt: string }> {
+  userMessage: string,
+  userId?: string
+): Promise<{ turns: ChatTurn[]; systemPrompt: string; usedAccountContext: boolean }> {
   await maybeCompressConversation(conversationId);
 
   const conversation = await prisma.chatConversation.findUnique({
@@ -128,7 +137,25 @@ export async function buildOptimizedContext(
     throw new Error("Conversation not found");
   }
 
-  const systemPrompt = buildSystemPrompt(userMessage);
+  // Verify ownership when userId is provided (defense in depth)
+  if (userId && conversation.userId !== userId) {
+    throw new Error("Conversation not found");
+  }
+
+  const ownerId = userId ?? conversation.userId;
+  let userSnapshot = "";
+  let usedAccountContext = false;
+
+  if (ownerId) {
+    try {
+      userSnapshot = await buildUserMonitoringContext(ownerId);
+      usedAccountContext = Boolean(userSnapshot);
+    } catch {
+      userSnapshot = "";
+    }
+  }
+
+  const systemPrompt = buildSystemPrompt(userMessage, userSnapshot || undefined);
   const turns: ChatTurn[] = [];
 
   if (conversation.summary) {
@@ -163,7 +190,7 @@ export async function buildOptimizedContext(
       systemPrompt.length + turns.reduce((sum, t) => sum + t.content.length, 0);
   }
 
-  return { turns, systemPrompt };
+  return { turns, systemPrompt, usedAccountContext };
 }
 
 export function buildConversationTitle(firstUserMessage: string): string {

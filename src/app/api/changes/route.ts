@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { MonitoringMode, type Prisma } from "@prisma/client";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { apiErrorResponse } from "@/lib/errors";
+import { apiErrorResponse } from "@/lib/api-response";
 import { withRateLimit } from "@/lib/rate-limit";
 import { searchChangesSchema } from "@/lib/validations";
-import type { Prisma } from "@prisma/client";
+
+function isVisualMode(mode?: string | null): boolean {
+  return mode === MonitoringMode.VISUAL_CHANGES || mode === MonitoringMode.SCREENSHOT_DIFF;
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -41,21 +45,48 @@ export async function GET(request: NextRequest) {
           ];
         }
 
+        // Avoid selecting aiRawResponse (can include large screenshot previews)
         const [changes, total] = await Promise.all([
           prisma.change.findMany({
             where,
             orderBy: { createdAt: "desc" },
             skip,
             take: limit,
-            include: {
-              monitor: { select: { id: true, name: true, url: true } },
+            select: {
+              id: true,
+              summary: true,
+              emoji: true,
+              importance: true,
+              category: true,
+              oldValue: true,
+              newValue: true,
+              bulletPoints: true,
+              analysisStatus: true,
+              createdAt: true,
+              monitor: { select: { id: true, name: true, url: true, mode: true } },
             },
           }),
           prisma.change.count({ where }),
         ]);
 
+        const lightweight = changes.map((c) => ({
+          id: c.id,
+          summary: c.summary,
+          emoji: c.emoji,
+          importance: c.importance,
+          category: c.category,
+          oldValue: c.oldValue,
+          newValue: c.newValue,
+          bulletPoints: c.bulletPoints.slice(0, 4),
+          analysisStatus: c.analysisStatus,
+          createdAt: c.createdAt,
+          monitor: c.monitor,
+          changeType: c.category,
+          hasScreenshots: isVisualMode(c.monitor.mode),
+        }));
+
         return NextResponse.json({
-          changes,
+          changes: lightweight,
           pagination: {
             page,
             limit,

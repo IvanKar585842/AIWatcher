@@ -11,6 +11,7 @@ import {
   Bell,
   ChevronDown,
   ExternalLink,
+  HelpCircle,
   Mail,
   MessageCircle,
   Pause,
@@ -40,13 +41,15 @@ import {
 } from "@/lib/constants";
 import {
   AI_PROMPT_EXAMPLES,
+  ADVANCED_MONITORING_MODES,
   DEFAULT_MONITOR_CONFIG,
   MONITOR_CATEGORIES,
+  PRIMARY_MONITORING_MODES,
   MONITORING_MODES,
   parseMonitorConfig,
   type MonitorConfig,
 } from "@/lib/monitor-config";
-import { formatRelativeTime, getDomainFromUrl, getFaviconUrl } from "@/lib/utils";
+import { cn, formatRelativeTime, getDomainFromUrl, getFaviconUrl } from "@/lib/utils";
 
 interface MonitorChange {
   id: string;
@@ -207,6 +210,7 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
     notifications: true,
     danger: false,
   });
+  const [showAdvancedModes, setShowAdvancedModes] = useState(false);
   const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -465,19 +469,56 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
         <SettingsSection
           id="general"
           title="General"
-          subtitle="Basic monitor identity and status"
+          subtitle="Name, URL, monitoring type, frequency, and status"
           icon={<span className="text-lg">⚙</span>}
           open={openSections.general}
           onToggle={() => toggleSection("general")}
         >
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
+              <FieldLabel>Monitor Name</FieldLabel>
+              <OsInput value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            </div>
+            <div className="sm:col-span-2">
               <FieldLabel>Website URL</FieldLabel>
               <OsInput value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} />
             </div>
             <div>
-              <FieldLabel>Friendly Name</FieldLabel>
-              <OsInput value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              <FieldLabel>Monitoring Type</FieldLabel>
+              <Select
+                value={form.mode}
+                onValueChange={(v) => setForm({ ...form, mode: v as MonitoringMode })}
+              >
+                <SelectTrigger className="border-white/[0.08] bg-black/40 text-zinc-100">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {MONITORING_MODES.map((modeDef) => (
+                    <SelectItem key={modeDef.mode} value={modeDef.mode}>
+                      {modeDef.label}
+                      {modeDef.recommended ? " · Recommended" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <FieldLabel>Check Frequency</FieldLabel>
+              <Select
+                value={form.interval}
+                onValueChange={(v) => setForm({ ...form, interval: v as MonitoringInterval })}
+              >
+                <SelectTrigger className="border-white/[0.08] bg-black/40 text-zinc-100">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {allowedIntervals.map((interval) => (
+                    <SelectItem key={interval} value={interval}>
+                      {INTERVAL_LABELS[interval]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <FieldLabel>Category</FieldLabel>
@@ -513,7 +554,7 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
             </div>
             <div className="sm:col-span-2">
               <ToggleRow
-                label="Enable Monitor"
+                label="Active Status"
                 description="When disabled, checks are paused"
                 checked={form.enabled}
                 onCheckedChange={(enabled) => setForm({ ...form, enabled })}
@@ -532,34 +573,48 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
           onToggle={() => toggleSection("modes")}
           accent="from-violet-500/10 to-cyan-500/5"
         >
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {MONITORING_MODES.map((modeDef) => {
+          <div className="grid gap-2 sm:grid-cols-2">
+            {PRIMARY_MONITORING_MODES.map((modeDef) => {
               const Icon = modeDef.icon;
               const active = form.mode === modeDef.mode;
               return (
                 <motion.button
                   key={modeDef.mode}
                   type="button"
+                  title={modeDef.tooltip ?? modeDef.description}
                   whileHover={{ scale: 1.01 }}
                   whileTap={{ scale: 0.99 }}
                   onClick={() => setForm({ ...form, mode: modeDef.mode })}
-                  className={`flex items-start gap-3 rounded-lg border p-3 text-left transition-all ${
+                  className={cn(
+                    "relative flex items-start gap-3 rounded-lg border p-3 text-left transition-all",
                     active
                       ? "border-cyan-500/50 bg-cyan-500/10 shadow-[0_0_20px_-8px_rgba(34,211,238,0.5)]"
                       : "border-white/[0.06] bg-black/20 hover:border-white/[0.12] hover:bg-white/[0.03]"
-                  }`}
+                  )}
                 >
                   <div
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md ${
+                    className={cn(
+                      "flex h-9 w-9 shrink-0 items-center justify-center rounded-md",
                       active ? "bg-cyan-500/20 text-cyan-300" : "bg-white/[0.04] text-zinc-400"
-                    }`}
+                    )}
                   >
                     <Icon className="h-4 w-4" />
                   </div>
-                  <div className="min-w-0">
-                    <p className={`text-sm font-medium ${active ? "text-cyan-100" : "text-zinc-200"}`}>
-                      {modeDef.label}
-                    </p>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className={cn("text-sm font-medium", active ? "text-cyan-100" : "text-zinc-200")}>
+                        {modeDef.label}
+                      </p>
+                      {modeDef.recommended && (
+                        <span className="rounded-full border border-cyan-400/30 bg-cyan-500/15 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-cyan-200">
+                          Recommended
+                        </span>
+                      )}
+                      <HelpCircle
+                        className="h-3.5 w-3.5 text-zinc-600"
+                        aria-label={modeDef.tooltip ?? modeDef.description}
+                      />
+                    </div>
                     <p className="mt-0.5 line-clamp-2 text-xs text-zinc-500">{modeDef.description}</p>
                   </div>
                 </motion.button>
@@ -567,13 +622,71 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
             })}
           </div>
 
+          <button
+            type="button"
+            onClick={() => setShowAdvancedModes((v) => !v)}
+            className="mt-3 flex w-full items-center justify-between rounded-lg border border-white/[0.06] bg-black/20 px-3 py-2.5 text-left text-xs text-zinc-400 transition-colors hover:border-cyan-500/20 hover:text-zinc-200"
+          >
+            <span>{showAdvancedModes ? "Hide advanced modes" : "Show advanced modes"}</span>
+            <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-600">
+              {ADVANCED_MONITORING_MODES.length} more
+            </span>
+          </button>
+
+          <AnimatePresence initial={false}>
+            {showAdvancedModes && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {ADVANCED_MONITORING_MODES.map((modeDef) => {
+                    const Icon = modeDef.icon;
+                    const active = form.mode === modeDef.mode;
+                    return (
+                      <button
+                        key={modeDef.mode}
+                        type="button"
+                        title={modeDef.description}
+                        onClick={() => setForm({ ...form, mode: modeDef.mode })}
+                        className={cn(
+                          "flex items-start gap-3 rounded-lg border p-3 text-left transition-all",
+                          active
+                            ? "border-cyan-500/50 bg-cyan-500/10"
+                            : "border-white/[0.06] bg-black/20 hover:bg-white/[0.03]"
+                        )}
+                      >
+                        <div
+                          className={cn(
+                            "flex h-8 w-8 shrink-0 items-center justify-center rounded-md",
+                            active ? "bg-cyan-500/20 text-cyan-300" : "bg-white/[0.04] text-zinc-400"
+                          )}
+                        >
+                          <Icon className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className={cn("text-sm font-medium", active ? "text-cyan-100" : "text-zinc-200")}>
+                            {modeDef.label}
+                          </p>
+                          <p className="mt-0.5 line-clamp-2 text-xs text-zinc-500">{modeDef.description}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {selectedMode?.requiresSelector && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               className="mt-4"
             >
-              <FieldLabel>{form.mode === "XPATH" ? "XPath Selector" : "CSS Selector"}</FieldLabel>
+              <FieldLabel>{form.mode === "XPATH" ? "Page section path" : "Page section"}</FieldLabel>
               <OsInput
                 value={form.selector}
                 onChange={(e) => setForm({ ...form, selector: e.target.value })}
@@ -607,7 +720,7 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
               <div className="mb-3 flex items-center gap-2">
                 <span className="text-lg">🧠</span>
                 <div>
-                  <p className="font-medium text-cyan-100">AI Smart Monitoring</p>
+                  <p className="font-medium text-cyan-100">AI Monitoring</p>
                   <p className="text-xs text-zinc-500">
                     Describe what should trigger a notification in natural language
                   </p>
@@ -645,31 +758,13 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
         <SettingsSection
           id="advanced"
           title="Advanced Settings"
-          subtitle="Fine-tune detection behavior"
+          subtitle="Noise filters, selectors, and fetch behavior"
           icon={<span className="text-lg">⬡</span>}
           open={openSections.advanced}
           onToggle={() => toggleSection("advanced")}
           accent="from-zinc-500/10 to-zinc-600/5"
         >
           <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <FieldLabel>Monitoring Interval</FieldLabel>
-              <Select
-                value={form.interval}
-                onValueChange={(v) => setForm({ ...form, interval: v as MonitoringInterval })}
-              >
-                <SelectTrigger className="border-white/[0.08] bg-black/40 text-zinc-100">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {allowedIntervals.map((interval) => (
-                    <SelectItem key={interval} value={interval}>
-                      {INTERVAL_LABELS[interval]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
             <div>
               <FieldLabel>Retry Attempts</FieldLabel>
               <OsInput
@@ -691,13 +786,36 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
                 onChange={(e) => updateConfig({ timeout: Number(e.target.value) })}
               />
             </div>
+            <div className="sm:col-span-2">
+              <FieldLabel>Ignore Specific Selectors</FieldLabel>
+              <OsInput
+                value={form.config.ignoreSelectors ?? ""}
+                onChange={(e) => updateConfig({ ignoreSelectors: e.target.value })}
+                placeholder=".cookie-banner, #promo-popup, .live-chat"
+                className="font-mono text-sm"
+              />
+              <p className="mt-1.5 text-xs text-zinc-600">
+                Comma-separated CSS selectors removed before comparison.
+              </p>
+            </div>
+            {(form.mode === "CSS_SELECTOR" || form.mode === "XPATH" || form.selector) && (
+              <div className="sm:col-span-2">
+                <FieldLabel>{form.mode === "XPATH" ? "Page section path" : "Page section"}</FieldLabel>
+                <OsInput
+                  value={form.selector}
+                  onChange={(e) => setForm({ ...form, selector: e.target.value })}
+                  placeholder={form.mode === "XPATH" ? "//div[@class='price']" : ".product-price"}
+                  className="font-mono text-sm"
+                />
+              </div>
+            )}
           </div>
           <div className="mt-4 space-y-2">
             <ToggleRow
-              label="Ignore Cookies"
-              description="Strip cookie banners from comparison"
-              checked={form.config.ignoreCookies ?? true}
-              onCheckedChange={(v) => updateConfig({ ignoreCookies: v })}
+              label="Ignore Dynamic Content"
+              description="Normalize volatile content like counters"
+              checked={form.config.ignoreDynamicContent ?? true}
+              onCheckedChange={(v) => updateConfig({ ignoreDynamicContent: v })}
             />
             <ToggleRow
               label="Ignore Timestamps"
@@ -712,23 +830,23 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
               onCheckedChange={(v) => updateConfig({ ignoreAds: v })}
             />
             <ToggleRow
+              label="Ignore Cookies"
+              description="Strip cookie banners from comparison"
+              checked={form.config.ignoreCookies ?? true}
+              onCheckedChange={(v) => updateConfig({ ignoreCookies: v })}
+            />
+            <ToggleRow
               label="Ignore Random IDs"
               description="Filter dynamic element IDs and UUIDs"
               checked={form.config.ignoreRandomIds ?? true}
               onCheckedChange={(v) => updateConfig({ ignoreRandomIds: v })}
             />
             <ToggleRow
-              label="Ignore Dynamic Content"
-              description="Normalize volatile content like counters"
-              checked={form.config.ignoreDynamicContent ?? true}
-              onCheckedChange={(v) => updateConfig({ ignoreDynamicContent: v })}
-            />
-            <ToggleRow
-              label="Respect robots.txt"
+              label="Follow website access rules"
               description={
                 form.mode === "VISUAL_CHANGES" || form.mode === "SCREENSHOT_DIFF"
-                  ? "Not enforced for visual monitoring modes"
-                  : "Follow the site's crawler rules before fetching"
+                  ? "Usually leave off for visual checks on social sites"
+                  : "Leave on unless the site blocks monitoring"
               }
               checked={form.respectRobots}
               onCheckedChange={(v) => setForm((prev) => ({ ...prev, respectRobots: v }))}
@@ -740,7 +858,7 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
         <SettingsSection
           id="notifications"
           title="Notifications"
-          subtitle="Choose how you receive alerts"
+          subtitle="Email alerts, frequency, and importance"
           icon={<Bell className="h-5 w-5" />}
           open={openSections.notifications}
           onToggle={() => toggleSection("notifications")}
@@ -749,9 +867,9 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
           <div className="grid gap-2 sm:grid-cols-2">
             {(
               [
-                { id: "EMAIL", label: "Email", icon: Mail, active: true },
-                { id: "TELEGRAM", label: "Telegram", icon: Send, active: true },
-                { id: "BOTH", label: "Email & Telegram", icon: MessageCircle, active: true },
+                { id: "EMAIL", label: "Email notifications", icon: Mail },
+                { id: "TELEGRAM", label: "Telegram", icon: Send },
+                { id: "BOTH", label: "Email & Telegram", icon: MessageCircle },
               ] as const
             ).map((channel) => {
               const Icon = channel.icon;
@@ -761,34 +879,62 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
                   key={channel.id}
                   type="button"
                   onClick={() => setForm({ ...form, notificationMethod: channel.id })}
-                  className={`flex items-center gap-3 rounded-lg border p-4 text-left transition-all ${
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg border p-4 text-left transition-all",
                     selected
                       ? "border-emerald-500/40 bg-emerald-500/10"
                       : "border-white/[0.06] bg-black/20 hover:bg-white/[0.03]"
-                  }`}
+                  )}
                 >
-                  <Icon className={`h-5 w-5 ${selected ? "text-emerald-400" : "text-zinc-500"}`} />
-                  <span className={`text-sm font-medium ${selected ? "text-emerald-100" : "text-zinc-300"}`}>
-                    {NOTIFICATION_LABELS[channel.id]}
+                  <Icon className={cn("h-5 w-5", selected ? "text-emerald-400" : "text-zinc-500")} />
+                  <span className={cn("text-sm font-medium", selected ? "text-emerald-100" : "text-zinc-300")}>
+                    {channel.label}
                   </span>
                 </button>
               );
             })}
-            {[
-              { label: "Discord", soon: true },
-              { label: "Slack", soon: true },
-              { label: "Push Notifications", soon: true },
-            ].map((channel) => (
-              <div
-                key={channel.label}
-                className="flex items-center justify-between rounded-lg border border-white/[0.04] bg-black/10 p-4 opacity-50"
+          </div>
+
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <div>
+              <FieldLabel>Notification Frequency</FieldLabel>
+              <Select
+                value={form.config.notificationFrequency ?? "INSTANT"}
+                onValueChange={(v) =>
+                  updateConfig({
+                    notificationFrequency: v as MonitorConfig["notificationFrequency"],
+                  })
+                }
               >
-                <span className="text-sm text-zinc-500">{channel.label}</span>
-                <span className="rounded-full bg-white/[0.06] px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-zinc-500">
-                  Coming soon
-                </span>
-              </div>
-            ))}
+                <SelectTrigger className="border-white/[0.08] bg-black/40 text-zinc-100">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="INSTANT">Instant — every qualifying change</SelectItem>
+                  <SelectItem value="HOURLY">Hourly digest preference</SelectItem>
+                  <SelectItem value="DAILY">Daily digest preference</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <FieldLabel>Importance Level</FieldLabel>
+              <Select
+                value={form.config.minImportance ?? "MEDIUM"}
+                onValueChange={(v) =>
+                  updateConfig({ minImportance: v as MonitorConfig["minImportance"] })
+                }
+              >
+                <SelectTrigger className="border-white/[0.08] bg-black/40 text-zinc-100">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="LOW">Low and above</SelectItem>
+                  <SelectItem value="MEDIUM">Medium and above</SelectItem>
+                  <SelectItem value="HIGH">High and above</SelectItem>
+                  <SelectItem value="CRITICAL">Critical only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </SettingsSection>
 
@@ -882,7 +1028,12 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
           <span className="font-mono text-xs text-zinc-500">{monitor._count.changes} total</span>
         </div>
         {monitor.changes.length === 0 ? (
-          <p className="text-sm text-zinc-500">No changes detected yet.</p>
+          <div className="rounded-lg border border-dashed border-white/[0.08] bg-black/20 px-4 py-8 text-center">
+            <p className="text-sm font-medium text-zinc-300">No changes detected yet</p>
+            <p className="mt-1 text-xs leading-relaxed text-zinc-500">
+              Your monitor is active and watching your website.
+            </p>
+          </div>
         ) : (
           <div className="space-y-2">
             {monitor.changes.map((change, i) => (

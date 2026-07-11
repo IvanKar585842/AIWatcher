@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { History } from "lucide-react";
+import { History, Radar } from "lucide-react";
 
 export function HistoryEmptyState({ filtered }: { filtered?: boolean }) {
   return (
@@ -18,7 +18,11 @@ export function HistoryEmptyState({ filtered }: { filtered?: boolean }) {
         transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
         className="relative mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-2xl border border-cyan-400/25 bg-cyan-500/10 shadow-[0_0_48px_-10px_rgba(34,211,238,0.55)]"
       >
-        <History className="h-10 w-10 text-cyan-400/90" />
+        {filtered ? (
+          <History className="h-10 w-10 text-cyan-400/90" />
+        ) : (
+          <Radar className="h-10 w-10 text-cyan-400/90" />
+        )}
         <motion.span
           className="absolute inset-0 rounded-2xl border border-cyan-400/20"
           animate={{ scale: [1, 1.08, 1], opacity: [0.5, 0, 0.5] }}
@@ -27,12 +31,12 @@ export function HistoryEmptyState({ filtered }: { filtered?: boolean }) {
       </motion.div>
 
       <h3 className="relative text-xl font-semibold text-zinc-100">
-        {filtered ? "No changes found" : "No changes yet"}
+        {filtered ? "No matching changes" : "No changes detected yet"}
       </h3>
       <p className="relative mx-auto mt-2 max-w-md text-sm leading-relaxed text-zinc-500">
         {filtered
           ? "Try adjusting your search or filters to find what you're looking for."
-          : "Detected changes will appear here once your monitors start watching websites."}
+          : "Your monitor is active and watching your website. When something meaningful changes, it will show up here with an AI summary."}
       </p>
     </motion.div>
   );

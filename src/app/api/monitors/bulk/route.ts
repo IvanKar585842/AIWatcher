@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { MonitorStatus } from "@prisma/client";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { apiErrorResponse, parseJsonBody } from "@/lib/errors";
+import { apiErrorResponse } from "@/lib/api-response";
+import { parseJsonBody } from "@/lib/errors";
 import { withRateLimit } from "@/lib/rate-limit";
 import { z } from "zod";
 

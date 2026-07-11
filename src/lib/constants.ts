@@ -5,11 +5,15 @@ import {
   type NotificationMethod,
 } from "@prisma/client";
 
+/**
+ * Legacy limit shape used across existing call sites.
+ * Keep in sync with PLAN_ENTITLEMENTS in plan-features.ts.
+ */
 export const PLAN_LIMITS = {
   FREE: {
     maxMonitors: 3,
     minInterval: MonitoringInterval.TWELVE_HOURS,
-    historyDays: 7,
+    historyDays: 7 as number | null,
     telegram: false,
     aiSummaries: false,
     teams: false,
@@ -69,22 +73,22 @@ export const INTERVAL_ORDER: MonitoringInterval[] = [
 ];
 
 export const MODE_LABELS: Record<MonitoringMode, string> = {
-  ENTIRE_PAGE: "Entire Website",
-  VISUAL_CHANGES: "Visual Changes",
-  TEXT_CHANGES: "Text Changes",
-  CSS_SELECTOR: "CSS Selector",
+  ENTIRE_PAGE: "Full Page Monitoring",
+  VISUAL_CHANGES: "Visual Changes Monitoring",
+  TEXT_CHANGES: "Text Changes Monitoring",
+  CSS_SELECTOR: "Specific Element Monitoring",
   XPATH: "XPath Selector",
-  PRICE_DETECTION: "Price Tracking",
-  KEYWORD_DETECTION: "Keyword Tracking",
+  PRICE_DETECTION: "Price Monitoring",
+  KEYWORD_DETECTION: "Keyword Monitoring",
   TABLE_DETECTION: "Table Monitoring",
   PRODUCT_AVAILABILITY: "Product Availability",
   JOB_LISTINGS: "Job Listings",
   DOCUMENTATION_CHANGES: "Documentation Changes",
-  API_RESPONSE: "API Response",
+  API_RESPONSE: "API Monitoring",
   RSS_FEED: "RSS Feed",
   HTML_DIFF: "HTML Diff",
   SCREENSHOT_DIFF: "Screenshot Diff",
-  AI_SMART: "AI Smart Monitoring",
+  AI_SMART: "AI Monitoring",
 };
 
 export const NOTIFICATION_LABELS: Record<NotificationMethod, string> = {
@@ -116,13 +120,14 @@ export const PRICING_PLANS = [
     plan: Plan.FREE,
     name: "Free",
     price: 0,
-    description: "Perfect for trying out WatchFlow AI",
+    description: "Try WatchFlow and see how monitoring feels in practice.",
     features: [
-      "3 monitors",
-      "12 hour minimum interval",
-      "7 day history",
+      "Basic website monitoring (3 sites)",
+      "Checks every 12 hours",
+      "7-day change history",
       "Email notifications",
       "Basic change detection",
+      "5 AI analyses / month to experience the magic",
     ],
     cta: "Get Started Free",
     popular: false,
@@ -132,17 +137,18 @@ export const PRICING_PLANS = [
     plan: Plan.PRO,
     name: "Pro",
     price: 19,
-    description: "For power users who need real-time insights",
+    description: "For owners and developers who need clarity, not just alerts.",
     features: [
-      "100 monitors",
-      "5 minute interval",
+      "Up to 100 monitors",
+      "Checks as often as every 5 minutes",
+      "AI-powered change analysis",
+      "Smart importance detection",
+      "Visual & screenshot comparison",
+      "Keyword and selector monitoring",
+      "Telegram alerts",
       "Unlimited history",
-      "Telegram notifications",
-      "AI-powered summaries",
-      "All monitoring modes",
-      "Diff viewer",
     ],
-    cta: "Start Pro Trial",
+    cta: "Start Pro",
     popular: true,
   },
   {
@@ -150,23 +156,27 @@ export const PRICING_PLANS = [
     plan: Plan.BUSINESS,
     name: "Business",
     price: 49,
-    description: "For teams that need enterprise-grade monitoring",
+    description: "For teams that need shared visibility and automation.",
     features: [
       "Unlimited monitors",
-      "5 minute interval",
-      "Unlimited history",
-      "Team collaboration",
-      "API access",
-      "Priority monitoring",
-      "Dedicated support",
-      "Custom integrations",
+      "Team members & shared monitors",
+      "API access & webhooks",
+      "Unlimited AI analysis",
+      "Priority check processing",
+      "Custom notification rules",
+      "Advanced reports & export",
+      "Priority support",
     ],
-    cta: "Contact Sales",
+    cta: "Upgrade to Business",
     popular: false,
   },
 ];
 
 export const STRIPE_PRICE_IDS = {
-  PRO_MONTHLY: process.env.STRIPE_PRO_PRICE_ID ?? "",
-  BUSINESS_MONTHLY: process.env.STRIPE_BUSINESS_PRICE_ID ?? "",
+  get PRO_MONTHLY() {
+    return process.env.STRIPE_PRO_PRICE_ID?.trim() ?? "";
+  },
+  get BUSINESS_MONTHLY() {
+    return process.env.STRIPE_BUSINESS_PRICE_ID?.trim() ?? "";
+  },
 };

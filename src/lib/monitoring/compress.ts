@@ -18,7 +18,3 @@ export async function decompressHtml(stored: string): Promise<string> {
   const decompressed = await gunzipAsync(buf);
   return decompressed.toString("utf-8");
 }
-
-export function isCompressed(stored: string): boolean {
-  return stored.startsWith(PREFIX);
-}

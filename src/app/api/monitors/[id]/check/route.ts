@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
-import { apiErrorResponse } from "@/lib/errors";
-import { prisma } from "@/lib/db";
+import { apiErrorResponse } from "@/lib/api-response";
 import { processMonitor } from "@/lib/monitoring/processor";
 import { processPendingAnalyses } from "@/lib/monitoring/ai-processor";
 import { withRateLimit } from "@/lib/rate-limit";
+import { assertMonitorOwnedBy } from "@/lib/security/ownership";
+import { securityLog } from "@/lib/security/log";
 
 export const maxDuration = 60;
 
@@ -19,13 +20,7 @@ export async function POST(
     return withRateLimit(
       `monitor-check-${id}`,
       async () => {
-        const monitor = await prisma.monitor.findFirst({
-          where: { id, userId: user.id },
-        });
-
-        if (!monitor) {
-          return NextResponse.json({ error: "Monitor not found" }, { status: 404 });
-        }
+        await assertMonitorOwnedBy(user.id, id);
 
         try {
           const result = await processMonitor(id);
@@ -38,11 +33,19 @@ export async function POST(
             result,
           });
         } catch (error) {
+          securityLog({
+            type: "failsafe.activated",
+            message: "Manual monitor check failed safely",
+            userId: user.id,
+            resourceId: id,
+            metadata: { error: error instanceof Error ? error.message : String(error) },
+          });
           const message = error instanceof Error ? error.message : "Check failed";
           return NextResponse.json({ success: false, error: message }, { status: 500 });
         }
       },
-      user.id
+      user.id,
+      "sensitive"
     );
   } catch (error) {
     return apiErrorResponse(error);

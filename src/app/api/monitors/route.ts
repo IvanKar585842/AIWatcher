@@ -4,17 +4,16 @@ import { requireUser } from "@/lib/auth";
 import { trackEvent } from "@/lib/analytics";
 import {
   getEffectivePlan,
-  getUserAllowedIntervals,
-  getUserPlanLimits,
   isIntervalAllowedForUser,
 } from "@/lib/admin";
 import { prisma } from "@/lib/db";
 import { ApiError, parseJsonBody } from "@/lib/errors";
 import { apiFailure, apiFailureFromError } from "@/lib/api-response";
-import { assertNotificationAllowed } from "@/lib/plan-guards";
+import { assertMonitorModeAllowed, assertMonitorQuota, assertNotificationAllowed } from "@/lib/plan-guards";
 import { withRateLimit } from "@/lib/rate-limit";
 import { createMonitorSchema } from "@/lib/validations";
 import { syncMonitorQueue } from "@/lib/monitoring/queue";
+import { markOnboardingCompleted } from "@/lib/onboarding";
 
 function isSchemaMismatch(error: unknown): boolean {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -85,38 +84,35 @@ export async function POST(request: NextRequest) {
             );
           }
 
-          const plan = getEffectivePlan(user);
-          const limits = getUserPlanLimits(user);
-
           const monitorCount = await prisma.monitor.count({
             where: { userId: user.id },
           });
 
-          if (monitorCount >= limits.maxMonitors) {
-            return NextResponse.json(
-              {
-                success: false,
-                error: `Monitor limit reached (${limits.maxMonitors}). Upgrade your plan.`,
-              },
-              { status: 403 }
-            );
-          }
+          assertMonitorQuota(user, monitorCount);
 
           if (!isIntervalAllowedForUser(user, parsed.data.interval)) {
             return NextResponse.json(
               {
                 success: false,
-                error: `Interval not allowed on ${plan} plan. Allowed: ${getUserAllowedIntervals(user).join(", ")}`,
+                error:
+                  "Faster check intervals unlock on Pro — catch critical updates within minutes.",
+                upgrade: {
+                  feature: "FASTER_INTERVALS",
+                  title: "Faster checks on Pro",
+                  description:
+                    "Monitor as often as every 5 minutes when timing is critical.",
+                  minPlan: "PRO",
+                },
               },
               { status: 403 }
             );
           }
 
-          if (
-            parsed.data.notificationMethod === "TELEGRAM" ||
-            parsed.data.notificationMethod === "BOTH"
-          ) {
+          try {
+            assertMonitorModeAllowed(user, parsed.data.mode);
             assertNotificationAllowed(user, parsed.data.notificationMethod);
+          } catch (err) {
+            return apiFailureFromError(err);
           }
 
           const existing = await prisma.monitor.findFirst({
@@ -154,6 +150,11 @@ export async function POST(request: NextRequest) {
 
           await syncMonitorQueue(monitor.id, nextCheckAt);
 
+          // First monitor permanently dismisses onboarding (refresh/login safe)
+          if (!user.onboardingCompleted) {
+            await markOnboardingCompleted(user.id);
+          }
+
           return NextResponse.json({ success: true, monitor }, { status: 201 });
         } catch (error) {
           if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -186,7 +187,8 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ success: false, error: message }, { status: 500 });
         }
       },
-      user.id
+      user.id,
+      "strict"
     );
   } catch (error) {
     return apiFailureFromError(error);

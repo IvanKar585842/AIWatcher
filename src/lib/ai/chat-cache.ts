@@ -174,6 +174,9 @@ export async function storeCachedAnswerIfWorthwhile(
   const trimmed = question.trim();
   if (trimmed.length > 200 || answer.length > 4000) return;
 
+  const { isAccountSpecificQuestion } = await import("./chat-user-context");
+  if (isAccountSpecificQuestion(trimmed)) return;
+
   const isFaqLike = findStaticFaqAnswer(trimmed) !== null || trimmed.length <= 120;
   if (!isFaqLike) return;
 
@@ -184,6 +187,12 @@ export async function resolveCachedAnswer(question: string): Promise<{
   answer: string;
   source: "static" | "database";
 } | null> {
+  // Never serve shared FAQ cache for account-specific questions
+  const { isAccountSpecificQuestion } = await import("./chat-user-context");
+  if (isAccountSpecificQuestion(question)) {
+    return null;
+  }
+
   const staticAnswer = findStaticFaqAnswer(question);
   if (staticAnswer) {
     return { answer: staticAnswer, source: "static" };

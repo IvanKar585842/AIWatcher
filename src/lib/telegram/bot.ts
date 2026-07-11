@@ -12,6 +12,9 @@ interface TelegramUpdate {
   };
 }
 
+const CONNECTED_MESSAGE =
+  "✅ WatchFlow Telegram notifications connected successfully.";
+
 export async function handleTelegramUpdate(update: TelegramUpdate) {
   const message = update.message;
   if (!message?.text) return;
@@ -27,49 +30,34 @@ export async function handleTelegramUpdate(update: TelegramUpdate) {
 
   switch (cmd) {
     case "/start": {
-      const linkCode = args[0];
-      if (linkCode?.startsWith("link_")) {
-        const userId = verifyTelegramLinkCode(linkCode);
-        if (userId) {
-          const linkUser = await prisma.user.findUnique({ where: { id: userId } });
-          if (linkUser) {
-            if (linkUser.telegramChatId && linkUser.telegramChatId !== chatId) {
-              await sendTelegramMessage(
-                chatId,
-                "⚠️ This account is already linked to another Telegram user. Unlink it in dashboard settings first."
-              );
-              return;
-            }
-            const existing = await prisma.user.findFirst({
-              where: { telegramChatId: chatId, NOT: { id: userId } },
-            });
-            if (existing) {
-              await sendTelegramMessage(
-                chatId,
-                "⚠️ This Telegram account is already linked to another WatchFlow user."
-              );
-              return;
-            }
-            await prisma.user.update({
-              where: { id: userId },
-              data: {
-                telegramChatId: chatId,
-                telegramUsername: message.from?.username ?? null,
-              },
-            });
-            await sendTelegramMessage(
-              chatId,
-              "✅ <b>Account linked!</b>\n\nYou'll now receive change notifications here.\n\nUse /list to see your monitors."
-            );
-            return;
-          }
-        }
+      const payload = args[0];
+      if (payload) {
+        const linked = await tryLinkTelegramAccount({
+          payload,
+          chatId,
+          username: message.from?.username ?? message.chat.username ?? null,
+        });
+        if (linked) return;
+      }
+
+      if (user?.telegramConnected) {
+        await sendTelegramMessage(
+          chatId,
+          `${CONNECTED_MESSAGE}\n\n` +
+            "<b>Commands:</b>\n" +
+            "/list — View your monitors\n" +
+            "/pause [id] — Pause a monitor\n" +
+            "/resume [id] — Resume a monitor\n" +
+            "/delete [id] — Delete a monitor\n" +
+            "/latest [id] — Latest change for a monitor"
+        );
+        return;
       }
 
       await sendTelegramMessage(
         chatId,
-        "👋 <b>Welcome to WatchFlow AI Bot!</b>\n\n" +
-          "To link your account, go to Dashboard → Settings → Telegram and click Connect.\n\n" +
+        "👋 <b>Welcome to WatchFlow!</b>\n\n" +
+          "To connect notifications, open Dashboard → Settings → Notifications and tap <b>Connect Telegram</b>.\n\n" +
           "<b>Commands:</b>\n" +
           "/list — View your monitors\n" +
           "/pause [id] — Pause a monitor\n" +
@@ -82,7 +70,10 @@ export async function handleTelegramUpdate(update: TelegramUpdate) {
 
     case "/list": {
       if (!user) {
-        await sendTelegramMessage(chatId, "❌ Account not linked. Use /start with your link code from the dashboard.");
+        await sendTelegramMessage(
+          chatId,
+          "❌ Account not linked. Connect from Dashboard → Settings → Notifications."
+        );
         return;
       }
 
@@ -203,6 +194,78 @@ export async function handleTelegramUpdate(update: TelegramUpdate) {
         "Unknown command. Try /list, /pause, /resume, /delete, or /latest."
       );
   }
+}
+
+async function tryLinkTelegramAccount(params: {
+  payload: string;
+  chatId: string;
+  username: string | null;
+}): Promise<boolean> {
+  const userId = resolveStartPayloadUserId(params.payload);
+  if (!userId) {
+    await sendTelegramMessage(
+      params.chatId,
+      "⚠️ Invalid or expired connection link. Open Dashboard → Settings → Notifications and tap Connect Telegram again."
+    );
+    return true;
+  }
+
+  const linkUser = await prisma.user.findUnique({ where: { id: userId } });
+  if (!linkUser) {
+    await sendTelegramMessage(
+      params.chatId,
+      "⚠️ WatchFlow account not found for this connection link."
+    );
+    return true;
+  }
+
+  if (linkUser.telegramChatId && linkUser.telegramChatId !== params.chatId) {
+    await sendTelegramMessage(
+      params.chatId,
+      "⚠️ This WatchFlow account is already linked to another Telegram chat. Disconnect it in dashboard settings first."
+    );
+    return true;
+  }
+
+  const existing = await prisma.user.findFirst({
+    where: { telegramChatId: params.chatId, NOT: { id: userId } },
+  });
+  if (existing) {
+    await sendTelegramMessage(
+      params.chatId,
+      "⚠️ This Telegram account is already linked to another WatchFlow user."
+    );
+    return true;
+  }
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      telegramChatId: params.chatId,
+      telegramUsername: params.username,
+      telegramConnected: true,
+      telegramConnectedAt: new Date(),
+    },
+  });
+
+  await sendTelegramMessage(params.chatId, CONNECTED_MESSAGE);
+  return true;
+}
+
+/**
+ * Accepts:
+ * - start=USER_ID (cuid)
+ * - start=link_... signed codes (legacy / more secure TTL tokens)
+ */
+function resolveStartPayloadUserId(payload: string): string | null {
+  if (payload.startsWith("link_")) {
+    return verifyTelegramLinkCode(payload);
+  }
+  // Prisma cuid() ids are typically 25 chars; reject obvious garbage
+  if (/^[a-z0-9]{20,36}$/i.test(payload)) {
+    return payload;
+  }
+  return null;
 }
 
 async function resolveMonitorId(userId: string, partialId?: string): Promise<string | null> {

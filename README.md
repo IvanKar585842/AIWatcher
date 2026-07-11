@@ -85,16 +85,44 @@ npm run trigger:deploy
 
 ### Telegram Bot Setup
 
-1. Create a bot via [@BotFather](https://t.me/BotFather)
-2. Set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_BOT_USERNAME`
-3. Set webhook: `POST https://api.telegram.org/bot<TOKEN>/setWebhook` with `url` pointing to `/api/telegram/webhook`
+1. Create a bot via [@BotFather](https://t.me/BotFather) (production bot: `WatchFlowAlertsBot`)
+2. Set environment variables (never hardcode the token):
+   - `TELEGRAM_BOT_TOKEN` — bot token from BotFather
+   - `TELEGRAM_BOT_USERNAME=WatchFlowAlertsBot`
+   - `TELEGRAM_WEBHOOK_SECRET` — random secret for webhook validation
+3. Set the webhook (include the same secret):
 
-### Stripe Setup
+```bash
+curl -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook" \
+  -H "Content-Type: application/json" \
+  -d "{\"url\":\"https://YOUR_DOMAIN/api/telegram/webhook\",\"secret_token\":\"$TELEGRAM_WEBHOOK_SECRET\"}"
+```
 
-1. Create products and prices for Pro ($19/mo) and Business ($49/mo)
-2. Set `STRIPE_PRO_PRICE_ID` and `STRIPE_BUSINESS_PRICE_ID`
-3. Configure webhook endpoint: `/api/webhooks/stripe`
-4. Listen for: `checkout.session.completed`, `customer.subscription.*`
+4. In the app: Dashboard → Settings → Notifications → Connect Telegram
+5. Users open `https://t.me/WatchFlowAlertsBot?start=USER_ID` and press Start
+
+### Stripe Setup (payments)
+
+1. In [Stripe Dashboard](https://dashboard.stripe.com) create Products:
+   - **Pro** — recurring monthly price **$19**
+   - **Business** — recurring monthly price **$49**
+2. Copy Price IDs (`price_...`) into env:
+   - `STRIPE_PRO_PRICE_ID`
+   - `STRIPE_BUSINESS_PRICE_ID`
+3. Add API keys:
+   - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (`pk_test_...` / `pk_live_...`)
+   - `STRIPE_SECRET_KEY` (`sk_test_...` / `sk_live_...`)
+4. Create a webhook endpoint pointing to:
+   `https://YOUR_DOMAIN/api/webhooks/stripe`
+5. Subscribe the webhook to:
+   - `checkout.session.completed`
+   - `customer.subscription.created`
+   - `customer.subscription.updated`
+   - `customer.subscription.deleted`
+   - `invoice.payment_failed`
+6. Set `STRIPE_WEBHOOK_SECRET` (`whsec_...`) from the webhook details
+7. Set Customer Portal in Stripe Dashboard → Settings → Billing → Customer portal
+8. Restart the app; open **Dashboard → Billing** and upgrade with a test card (`4242…`)
 
 ### Cron Fallback
 

@@ -1,15 +1,24 @@
 import Stripe from "stripe";
 import { Plan } from "@prisma/client";
-import { STRIPE_PRICE_IDS } from "@/lib/constants";
 import { prisma } from "@/lib/db";
+import {
+  assertStripeCheckoutReady,
+  getStripePriceId,
+  isStripeSecretConfigured,
+  type StripePlanKey,
+} from "@/lib/stripe-config";
 
 let stripe: Stripe | null = null;
 
 export function getStripe(): Stripe {
   if (!stripe) {
-    const key = process.env.STRIPE_SECRET_KEY;
-    if (!key) throw new Error("STRIPE_SECRET_KEY is not configured");
-    stripe = new Stripe(key, { apiVersion: "2025-02-24.acacia" });
+    if (!isStripeSecretConfigured()) {
+      throw new Error("STRIPE_SECRET_KEY is not configured");
+    }
+    stripe = new Stripe(process.env.STRIPE_SECRET_KEY!.trim(), {
+      apiVersion: "2025-02-24.acacia",
+      typescript: true,
+    });
   }
   return stripe;
 }
@@ -44,24 +53,23 @@ export async function getOrCreateStripeCustomer(userId: string, email: string) {
 export async function createCheckoutSession(
   userId: string,
   email: string,
-  plan: "PRO" | "BUSINESS"
+  plan: StripePlanKey
 ) {
+  assertStripeCheckoutReady(plan);
+
   const customerId = await getOrCreateStripeCustomer(userId, email);
-  const priceId =
-    plan === "PRO" ? STRIPE_PRICE_IDS.PRO_MONTHLY : STRIPE_PRICE_IDS.BUSINESS_MONTHLY;
-
-  if (!priceId) {
-    throw new Error(`Stripe price ID not configured for ${plan}`);
-  }
-
+  const priceId = getStripePriceId(plan);
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
   const session = await getStripe().checkout.sessions.create({
     customer: customerId,
+    client_reference_id: userId,
     mode: "subscription",
     payment_method_types: ["card"],
     line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${appUrl}/dashboard/billing?success=true`,
+    allow_promotion_codes: true,
+    billing_address_collection: "auto",
+    success_url: `${appUrl}/dashboard/billing?success=true&plan=${plan}`,
     cancel_url: `${appUrl}/dashboard/billing?canceled=true`,
     metadata: { userId, plan },
     subscription_data: {
@@ -69,10 +77,18 @@ export async function createCheckoutSession(
     },
   });
 
+  if (!session.url) {
+    throw new Error("Stripe Checkout session did not return a URL");
+  }
+
   return session;
 }
 
 export async function createBillingPortalSession(customerId: string) {
+  if (!isStripeSecretConfigured()) {
+    throw new Error("STRIPE_SECRET_KEY is not configured");
+  }
+
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
   const session = await getStripe().billingPortal.sessions.create({
@@ -83,25 +99,67 @@ export async function createBillingPortalSession(customerId: string) {
   return session;
 }
 
-export async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
-  const userId = subscription.metadata.userId;
-  if (!userId) return;
-
-  const priceId = subscription.items.data[0]?.price.id;
-  let plan: Plan = Plan.FREE;
-
-  if (priceId === STRIPE_PRICE_IDS.PRO_MONTHLY) {
-    plan = Plan.PRO;
-  } else if (priceId === STRIPE_PRICE_IDS.BUSINESS_MONTHLY) {
-    plan = Plan.BUSINESS;
+async function resolveUserIdFromSubscription(
+  subscription: Stripe.Subscription
+): Promise<string | null> {
+  if (subscription.metadata?.userId) {
+    return subscription.metadata.userId;
   }
 
-  await prisma.subscription.update({
+  const customerId =
+    typeof subscription.customer === "string"
+      ? subscription.customer
+      : subscription.customer?.id;
+
+  if (!customerId) return null;
+
+  const existing = await prisma.subscription.findFirst({
+    where: { stripeCustomerId: customerId },
+    select: { userId: true },
+  });
+
+  return existing?.userId ?? null;
+}
+
+function planFromPriceId(priceId: string | undefined): Plan {
+  if (!priceId) return Plan.FREE;
+  if (priceId === getStripePriceId("PRO")) return Plan.PRO;
+  if (priceId === getStripePriceId("BUSINESS")) return Plan.BUSINESS;
+  return Plan.FREE;
+}
+
+export async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
+  const userId = await resolveUserIdFromSubscription(subscription);
+  if (!userId) {
+    console.warn("Stripe subscription update skipped — no userId", subscription.id);
+    return;
+  }
+
+  const priceId = subscription.items.data[0]?.price.id;
+  const plan = planFromPriceId(priceId);
+  const customerId =
+    typeof subscription.customer === "string"
+      ? subscription.customer
+      : subscription.customer?.id;
+
+  await prisma.subscription.upsert({
     where: { userId },
-    data: {
+    update: {
       plan,
       stripeSubscriptionId: subscription.id,
-      stripePriceId: priceId,
+      stripePriceId: priceId ?? null,
+      stripeCustomerId: customerId ?? undefined,
+      status: subscription.status,
+      currentPeriodStart: new Date(subscription.current_period_start * 1000),
+      currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+      cancelAtPeriodEnd: subscription.cancel_at_period_end,
+    },
+    create: {
+      userId,
+      plan,
+      stripeSubscriptionId: subscription.id,
+      stripePriceId: priceId ?? null,
+      stripeCustomerId: customerId ?? null,
       status: subscription.status,
       currentPeriodStart: new Date(subscription.current_period_start * 1000),
       currentPeriodEnd: new Date(subscription.current_period_end * 1000),
@@ -111,8 +169,11 @@ export async function handleSubscriptionUpdate(subscription: Stripe.Subscription
 }
 
 export async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
-  const userId = subscription.metadata.userId;
-  if (!userId) return;
+  const userId = await resolveUserIdFromSubscription(subscription);
+  if (!userId) {
+    console.warn("Stripe subscription delete skipped — no userId", subscription.id);
+    return;
+  }
 
   await prisma.subscription.update({
     where: { userId },

@@ -107,8 +107,8 @@ export const RecentActivityPanel = memo(function RecentActivityPanel({
               {changes.length === 0 ? (
                 <EmptyState
                   icon={Brain}
-                  title="No AI detections yet"
-                  description="When the AI detects meaningful changes on your monitors, they'll appear here with summaries and importance levels."
+                  title="No changes detected yet"
+                  description="Your monitors are active and watching. Meaningful updates will appear here with an AI summary and importance level."
                 />
               ) : (
                 <div className="relative space-y-0">

@@ -11,10 +11,18 @@ import { prisma } from "@/lib/db";
 import { parseMonitorConfig } from "@/lib/monitor-config";
 import { processPendingAnalyses, analyzeChangeById } from "./ai-processor";
 import { isAdminUser } from "@/lib/admin";
+import { getPlanEntitlements } from "@/lib/plan-features";
 import { compareSnapshots } from "./compare";
 import { generateTextDiff } from "./diff";
 import { closeBrowser, fetchPageContent } from "./fetcher";
-import { acquireMonitorLock, cleanupStaleLocks, releaseMonitorLock } from "./lock";
+import {
+  acquireCheckSlot,
+  acquireMonitorLock,
+  cleanupStaleLocks,
+  getCheckSlotStatus,
+  releaseCheckSlot,
+  releaseMonitorLock,
+} from "./lock";
 import { monitorLog, monitorLogError } from "./logger";
 import {
   claimDueMonitors,
@@ -46,6 +54,7 @@ function buildCleanOptions(config: ReturnType<typeof parseMonitorConfig>) {
     ignoreDynamicContent: config.ignoreDynamicContent,
     ignoreCookies: config.ignoreCookies,
     ignoreAds: config.ignoreAds,
+    ignoreSelectors: config.ignoreSelectors,
   };
 }
 
@@ -116,6 +125,16 @@ export async function processMonitor(monitorId: string): Promise<ProcessMonitorR
     return { status: "skipped", reason: "lock_held" };
   }
 
+  if (!acquireCheckSlot(monitorId)) {
+    releaseMonitorLock(monitorId);
+    monitorLog({
+      step: "lock_skipped",
+      monitorId,
+      message: "Skipped — concurrent check capacity reached (fail-safe)",
+    });
+    return { status: "skipped", reason: "capacity" };
+  }
+
   try {
     monitorLog({
       step: "lock_acquired",
@@ -125,10 +144,16 @@ export async function processMonitor(monitorId: string): Promise<ProcessMonitorR
     return await processMonitorInternal(monitorId);
   } catch (error) {
     monitorLogError("error", "Monitor processing failed", error, { monitorId });
+    // Fail safe: do not crash the batch — surface as error result when callers catch
     throw error;
   } finally {
+    releaseCheckSlot();
     releaseMonitorLock(monitorId);
-    await closeBrowser();
+    try {
+      await closeBrowser();
+    } catch (closeError) {
+      monitorLogError("error", "Browser close failed (non-fatal)", closeError, { monitorId });
+    }
   }
 }
 
@@ -242,12 +267,20 @@ async function processMonitorInternal(monitorId: string): Promise<ProcessMonitor
     }
 
     const previous = await readSnapshotHtml(previousSnapshot);
+    const previousMeta =
+      previousSnapshot.metadata &&
+      typeof previousSnapshot.metadata === "object" &&
+      !Array.isArray(previousSnapshot.metadata)
+        ? (previousSnapshot.metadata as Record<string, unknown>)
+        : null;
 
     const comparison = compareSnapshots({
       monitorId: monitor.id,
       mode: monitor.mode,
       previousHash: previousSnapshot.contentHash,
       previousText: previous.extractedText,
+      previousCleanedHtml: previous.cleanedHtml,
+      previousMetadata: previousMeta,
       current: result,
     });
 
@@ -275,6 +308,12 @@ async function processMonitorInternal(monitorId: string): Promise<ProcessMonitor
         data: { nextCheckAt: nextCheckAt.toISOString() },
       });
 
+      await trackEvent({
+        type: "monitor.check",
+        userId: monitor.userId,
+        metadata: { monitorId, changed: false, reason: comparison.reason },
+      });
+
       return { status: "no_change", reason: comparison.reason };
     }
 
@@ -292,29 +331,61 @@ async function processMonitorInternal(monitorId: string): Promise<ProcessMonitor
     });
 
     const visual = isVisualMode(monitor.mode);
+    const structureLines = comparison.structureDiff?.summaryLines ?? [];
+    const visualPct = comparison.visualDiffPercent;
+
     const diffHtml = visual
-      ? `<p>Visual change detected — full-page screenshot hash changed.</p><p>Previous: <code>${previousSnapshot.contentHash.slice(0, 16)}…</code></p><p>Current: <code>${comparison.currentHash.slice(0, 16)}…</code></p>`
-      : generateTextDiff(
-          previous.extractedText.slice(0, 5000),
-          result.extractedText.slice(0, 5000)
-        );
+      ? `<div class="visual-diff"><p>Visual change detected${
+          visualPct != null ? ` — ~${visualPct.toFixed(1)}% difference` : ""
+        }.</p><p>Previous hash: <code>${previousSnapshot.contentHash.slice(0, 16)}…</code></p><p>Current hash: <code>${comparison.currentHash.slice(0, 16)}…</code></p></div>`
+      : structureLines.length > 0
+        ? `<ul>${structureLines.map((l) => `<li>${l.replace(/</g, "&lt;")}</li>`).join("")}</ul>${generateTextDiff(
+            previous.extractedText.slice(0, 4000),
+            result.extractedText.slice(0, 4000)
+          )}`
+        : generateTextDiff(
+            previous.extractedText.slice(0, 5000),
+            result.extractedText.slice(0, 5000)
+          );
 
     const [storedOldHtml, storedNewHtml] = await Promise.all([
-      prepareHtmlForStorage(previous.cleanedHtml),
-      prepareHtmlForStorage(result.cleanedHtml),
+      prepareHtmlForStorage(
+        visual
+          ? JSON.stringify({
+              type: "visual",
+              hash: previousSnapshot.contentHash,
+              preview: previousMeta?.screenshotPreview ?? null,
+              mime: previousMeta?.screenshotMime ?? "image/jpeg",
+            })
+          : previous.cleanedHtml
+      ),
+      prepareHtmlForStorage(
+        visual
+          ? JSON.stringify({
+              type: "visual",
+              hash: comparison.currentHash,
+              preview: result.metadata.screenshotPreview ?? null,
+              mime: result.metadata.screenshotMime ?? "image/jpeg",
+            })
+          : result.cleanedHtml
+      ),
     ]);
 
     const change = await prisma.change.create({
       data: {
         monitorId: monitor.id,
-        summary: "Change detected — analysis pending",
+        summary: visual
+          ? `Visual change detected${visualPct != null ? ` (~${visualPct.toFixed(1)}%)` : ""} — analysis pending`
+          : structureLines[0]
+            ? `${structureLines[0]} — analysis pending`
+            : "Change detected — analysis pending",
         importance: "MEDIUM",
         category: "CONTENT",
         oldHtml: storedOldHtml.slice(0, 50000),
         newHtml: storedNewHtml.slice(0, 50000),
         diffHtml,
-        bulletPoints: [],
-        emoji: "🔔",
+        bulletPoints: structureLines.slice(0, 5),
+        emoji: visual ? "👁️" : "🔔",
         analysisStatus: AnalysisStatus.PENDING,
         aiRawResponse: {
           detectedAt: now.toISOString(),
@@ -323,6 +394,20 @@ async function processMonitorInternal(monitorId: string): Promise<ProcessMonitor
           previousHash: previousSnapshot.contentHash,
           currentHash: comparison.currentHash,
           captureType: result.metadata.captureType ?? null,
+          visualDiffPercent: visualPct ?? null,
+          structureSummary: structureLines,
+          previousScreenshot: previousMeta?.screenshotPreview
+            ? {
+                mime: previousMeta.screenshotMime ?? "image/jpeg",
+                data: previousMeta.screenshotPreview,
+              }
+            : null,
+          currentScreenshot: result.metadata.screenshotPreview
+            ? {
+                mime: result.metadata.screenshotMime ?? "image/jpeg",
+                data: result.metadata.screenshotPreview,
+              }
+            : null,
         },
       },
     });
@@ -380,6 +465,12 @@ async function processMonitorInternal(monitorId: string): Promise<ProcessMonitor
     }
 
     await trackEvent({
+      type: "monitor.check",
+      userId: monitor.userId,
+      metadata: { monitorId, changed: true, changeId: change.id },
+    });
+
+    await trackEvent({
       type: "change.detected",
       userId: monitor.userId,
       metadata: { monitorId, changeId: change.id, pendingAnalysis: true },
@@ -421,6 +512,16 @@ async function processMonitorInternal(monitorId: string): Promise<ProcessMonitor
       data: { errorCount, errorMessage, nextCheckAt: retryAt.toISOString() },
     });
 
+    await trackEvent({
+      type: "check.failed",
+      userId: monitor.userId,
+      metadata: {
+        monitorId,
+        errorCount,
+        message: errorMessage.slice(0, 200),
+      },
+    });
+
     throw error;
   }
 }
@@ -431,10 +532,13 @@ async function cleanupOldHistory(
   user: { email: string; role?: string | null }
 ) {
   if (isAdminUser(user)) return;
-  if (plan !== Plan.FREE) return;
+
+  const entitlements = getPlanEntitlements(plan);
+  const historyDays = entitlements.historyDays;
+  if (historyDays == null) return;
 
   const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - 7);
+  cutoff.setDate(cutoff.getDate() - historyDays);
 
   await prisma.change.deleteMany({
     where: { monitorId, createdAt: { lt: cutoff } },
@@ -497,12 +601,21 @@ export async function processDueMonitors(batchSize = 10): Promise<number> {
   const toProcess: string[] = [];
 
   for (const monitor of batch) {
+    // Prevent duplicate URL checks in the same batch (shared landing pages, etc.)
     if (seenUrls.has(monitor.url)) continue;
     seenUrls.add(monitor.url);
     toProcess.push(monitor.id);
   }
 
-  const results = await Promise.allSettled(toProcess.map((id) => processMonitor(id)));
+  // Process sequentially in small chunks to avoid launching too many browsers at once
+  const chunkSize = Math.min(3, getCheckSlotStatus().max);
+  const results: PromiseSettledResult<ProcessMonitorResult>[] = [];
+
+  for (let i = 0; i < toProcess.length; i += chunkSize) {
+    const chunk = toProcess.slice(i, i + chunkSize);
+    const chunkResults = await Promise.allSettled(chunk.map((id) => processMonitor(id)));
+    results.push(...chunkResults);
+  }
 
   let succeeded = 0;
   let failed = 0;

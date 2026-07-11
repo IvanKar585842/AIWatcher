@@ -23,8 +23,11 @@ export const monitorConfigSchema = z.object({
   ignoreAds: z.boolean().optional(),
   ignoreRandomIds: z.boolean().optional(),
   ignoreDynamicContent: z.boolean().optional(),
+  ignoreSelectors: z.string().max(2000).optional(),
   archived: z.boolean().optional(),
   monitorTypeId: z.string().max(80).optional(),
+  minImportance: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).optional(),
+  notificationFrequency: z.enum(["INSTANT", "HOURLY", "DAILY"]).optional(),
 });
 
 const monitorBaseSchema = z.object({

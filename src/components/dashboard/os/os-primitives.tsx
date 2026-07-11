@@ -119,8 +119,13 @@ export function OsUsageBar({
   limit: number | null;
   unit?: string;
 }) {
-  const pct = limit ? Math.min(100, Math.round((used / limit) * 100)) : Math.min(used, 100);
-  const display = limit ? `${used} / ${limit}${unit}` : `${used}${unit}`;
+  const pct =
+    limit != null && limit > 0
+      ? Math.min(100, Math.round((used / limit) * 100))
+      : used > 0
+        ? 8
+        : 0;
+  const display = limit != null ? `${used} / ${limit}${unit}` : `${used}${unit}`;
 
   return (
     <div>

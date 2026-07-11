@@ -23,15 +23,32 @@ export async function waitForPageReady(page: Page, timeout: number): Promise<voi
     window.scrollTo(0, 0);
   });
 
+  // Stabilize animations / transitions that cause false visual diffs
+  await page.addStyleTag({
+    content: `
+      *, *::before, *::after {
+        animation: none !important;
+        transition: none !important;
+        caret-color: transparent !important;
+      }
+      html { scroll-behavior: auto !important; }
+    `,
+  }).catch(() => {});
+
   await page.waitForTimeout(1000);
 }
 
 export async function removeDynamicElements(
   page: Page,
-  options: { ignoreAds?: boolean; ignoreCookies?: boolean }
-): Promise<{ adsRemoved: number; cookiesRemoved: number }> {
+  options: {
+    ignoreAds?: boolean;
+    ignoreCookies?: boolean;
+    ignoreSelectors?: string;
+  }
+): Promise<{ adsRemoved: number; cookiesRemoved: number; customRemoved: number }> {
   let adsRemoved = 0;
   let cookiesRemoved = 0;
+  let customRemoved = 0;
 
   if (options.ignoreAds !== false) {
     for (const selector of getAdSelectors()) {
@@ -68,5 +85,25 @@ export async function removeDynamicElements(
     }).catch(() => {});
   }
 
-  return { adsRemoved, cookiesRemoved };
+  const customSelectors = (options.ignoreSelectors ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(0, 30);
+
+  for (const selector of customSelectors) {
+    try {
+      const count = await page.evaluate((sel) => {
+        const nodes = document.querySelectorAll(sel);
+        const n = nodes.length;
+        nodes.forEach((el) => el.remove());
+        return n;
+      }, selector);
+      customRemoved += count;
+    } catch {
+      // Invalid selector — skip
+    }
+  }
+
+  return { adsRemoved, cookiesRemoved, customRemoved };
 }

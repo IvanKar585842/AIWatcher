@@ -1,8 +1,8 @@
-import { Plan, type User } from "@prisma/client";
-import { INTERVAL_ORDER, PLAN_LIMITS, type getPlanLimits } from "@/lib/constants";
-import type { MonitoringInterval } from "@prisma/client";
+import { Plan, type MonitoringInterval } from "@prisma/client";
+import { INTERVAL_ORDER, PLAN_LIMITS, getPlanLimits } from "@/lib/constants";
 import { prisma } from "@/lib/db";
 import { ApiError, UnauthorizedError } from "@/lib/errors";
+import { getPlanEntitlements, type PlanEntitlements } from "@/lib/plan-features";
 
 const DEFAULT_ADMIN_EMAILS = ["karpenkoivanb@gmail.com"];
 
@@ -44,7 +44,22 @@ export const ADMIN_LIMITS: PlanLimits = {
 
 export function getUserPlanLimits(user: AdminUserLike): PlanLimits {
   if (isAdminUser(user)) return ADMIN_LIMITS;
-  return PLAN_LIMITS[getEffectivePlan(user)];
+  return getPlanLimits(getEffectivePlan(user));
+}
+
+export function getUserPlanEntitlements(user: AdminUserLike): PlanEntitlements {
+  if (isAdminUser(user)) {
+    return {
+      ...getPlanEntitlements(Plan.BUSINESS),
+      maxMonitors: Infinity,
+      maxVisualMonitors: Infinity,
+      aiAnalysesPerMonth: null,
+      notificationsPerMonth: null,
+      storageMb: null,
+      chatDailyMessages: Infinity,
+    };
+  }
+  return getPlanEntitlements(getEffectivePlan(user));
 }
 
 export function getUserAllowedIntervals(user: AdminUserLike): MonitoringInterval[] {

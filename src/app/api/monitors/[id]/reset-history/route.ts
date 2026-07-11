@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { apiErrorResponse } from "@/lib/errors";
+import { apiErrorResponse } from "@/lib/api-response";
 import { withRateLimit } from "@/lib/rate-limit";
 
 export async function POST(

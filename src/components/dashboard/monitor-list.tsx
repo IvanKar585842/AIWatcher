@@ -130,7 +130,7 @@ export function MonitorList({
             </p>
             <p className="text-sm text-zinc-400">
               <span className="font-medium text-zinc-200">{monitors.length}</span> monitor
-              {monitors.length !== 1 ? "s" : ""} deployed
+              {monitors.length !== 1 ? "s" : ""} active
             </p>
           </div>
         </div>

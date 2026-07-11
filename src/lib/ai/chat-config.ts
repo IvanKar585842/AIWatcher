@@ -16,6 +16,8 @@ export const CHAT_DAILY_LIMITS = {
   BUSINESS: 1000,
 } as const;
 
+/** Prefer plan entitlements — these numbers mirror PLAN_ENTITLEMENTS.chatDailyMessages */
+
 export type ChatModelTier = "fast" | "advanced" | "summarize";
 
 export function getChatModelId(tier: ChatModelTier): string {

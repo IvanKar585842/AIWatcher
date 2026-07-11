@@ -116,11 +116,11 @@ export function NotificationDropdown() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="relative rounded-full border border-white/[0.06] p-2 text-zinc-400 transition-colors hover:border-cyan-400/20 hover:text-cyan-300"
+        className="relative flex min-h-10 min-w-10 items-center justify-center rounded-full border border-white/[0.06] text-zinc-400 transition-colors hover:border-cyan-400/20 hover:text-cyan-300"
         aria-label="Notifications"
         aria-expanded={open}
       >
-        <Bell className="h-4 w-4" />
+        <Bell className="h-5 w-5" />
         {unreadCount > 0 && (
           <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-cyan-500 text-[9px] font-bold text-black">
             {unreadCount > 9 ? "9+" : unreadCount}
@@ -129,21 +129,21 @@ export function NotificationDropdown() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-xl border border-white/[0.08] bg-[#111111] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8)]">
+        <div className="fixed inset-x-3 top-[3.75rem] z-50 max-h-[min(70vh,28rem)] overflow-hidden rounded-xl border border-white/[0.08] bg-[#111111] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8)] sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-80 sm:max-h-none">
           <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
             <p className="text-sm font-medium text-zinc-200">Notifications</p>
             {unreadCount > 0 && (
               <button
                 type="button"
                 onClick={markAllRead}
-                className="text-[11px] text-cyan-400/80 hover:text-cyan-300"
+                className="min-h-9 px-2 text-[11px] text-cyan-400/80 hover:text-cyan-300"
               >
                 Mark all read
               </button>
             )}
           </div>
 
-          <div className="max-h-80 overflow-y-auto">
+          <div className="max-h-[min(55vh,20rem)] overflow-y-auto sm:max-h-80">
             {loading && notifications.length === 0 && (
               <p className="px-4 py-6 text-center text-xs text-zinc-600">Loading...</p>
             )}
@@ -161,7 +161,7 @@ export function NotificationDropdown() {
                   key={item.id}
                   type="button"
                   onClick={() => handleNotificationClick(item)}
-                  className={`flex w-full gap-3 border-b border-white/[0.04] px-4 py-3 text-left transition-colors hover:bg-white/[0.03] ${
+                  className={`flex w-full gap-3 border-b border-white/[0.04] px-4 py-3.5 text-left transition-colors hover:bg-white/[0.03] active:bg-white/[0.05] ${
                     isUnread ? "bg-cyan-500/[0.04]" : ""
                   }`}
                 >
@@ -198,7 +198,7 @@ export function NotificationDropdown() {
             <Link
               href="/dashboard/notifications"
               onClick={() => setOpen(false)}
-              className="block py-1 text-center text-[11px] text-cyan-400/80 hover:text-cyan-300"
+              className="flex min-h-10 items-center justify-center text-center text-[11px] text-cyan-400/80 hover:text-cyan-300"
             >
               View all notifications
             </Link>

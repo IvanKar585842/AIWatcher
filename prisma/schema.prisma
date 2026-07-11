@@ -99,24 +99,33 @@ enum UserRole {
 }
 
 model User {
-  id               String         @id @default(cuid())
-  clerkId          String         @unique
-  email            String         @unique
-  name             String?
-  imageUrl         String?
-  role             UserRole       @default(USER)
-  telegramChatId   String?
-  telegramUsername String?
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  subscription     Subscription?
-  monitors         Monitor[]
-  notifications    Notification[]
-  chatConversations ChatConversation[]
+  id                  String         @id @default(cuid())
+  clerkId             String         @unique
+  email               String         @unique
+  name                String?
+  imageUrl            String?
+  role                UserRole       @default(USER)
+  telegramChatId                 String?
+  telegramUsername               String?
+  telegramConnected              Boolean        @default(false)
+  telegramConnectedAt            DateTime?
+  telegramNotificationsEnabled   Boolean        @default(true)
+  emailNotificationsEnabled      Boolean        @default(true)
+  onboardingCompleted            Boolean        @default(false)
+  username            String?        @unique
+  statusPageEnabled   Boolean        @default(false)
+  statusPageTitle     String?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  subscription        Subscription?
+  monitors            Monitor[]
+  notifications       Notification[]
+  chatConversations   ChatConversation[]
 
   @@index([clerkId])
   @@index([email])
   @@index([role])
+  @@index([username])
 }
 
 model Subscription {
@@ -161,6 +170,7 @@ model Monitor {
   nextCheckAt        DateTime?
   errorMessage       String?
   errorCount         Int                @default(0)
+  statusPageVisible  Boolean            @default(true)
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
   snapshots          Snapshot[]

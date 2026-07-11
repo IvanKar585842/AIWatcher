@@ -13,6 +13,7 @@ import {
   CreditCard,
   LayoutDashboard,
   MessageSquare,
+  Plug,
   Radio,
   Settings,
   Shield,
@@ -43,6 +44,7 @@ export function CommandSidebar() {
     { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
     { href: "/dashboard/history", label: "History", icon: Clock },
     { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
+    { href: "/dashboard/integrations", label: "Integrations", icon: Plug },
     { href: "/dashboard/settings", label: "Settings", icon: Settings },
     { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
     ...(isAdmin
@@ -50,7 +52,8 @@ export function CommandSidebar() {
       : []),
   ];
 
-  const width = collapsed ? 72 : 220;
+  const width = mobileOpen ? 280 : collapsed ? 72 : 220;
+  const showLabels = mobileOpen || !collapsed;
 
   return (
     <>
@@ -58,6 +61,7 @@ export function CommandSidebar() {
         <div
           className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm lg:hidden"
           onClick={() => setMobileOpen(false)}
+          aria-hidden
         />
       )}
 
@@ -65,7 +69,7 @@ export function CommandSidebar() {
         animate={{ width }}
         transition={{ type: "spring", stiffness: 380, damping: 32 }}
         className={cn(
-          "command-sidebar fixed inset-y-0 left-0 z-50 flex flex-col border-r border-white/[0.06] bg-[#090909]/95 backdrop-blur-xl",
+          "command-sidebar fixed inset-y-0 left-0 z-50 flex max-w-[85vw] flex-col border-r border-white/[0.06] bg-[#090909]/95 backdrop-blur-xl",
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
       >
@@ -77,7 +81,7 @@ export function CommandSidebar() {
             </div>
           </div>
           <AnimatePresence>
-            {!collapsed && (
+            {showLabels && (
               <motion.div
                 initial={{ opacity: 0, x: -8 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -95,7 +99,7 @@ export function CommandSidebar() {
           </AnimatePresence>
         </div>
 
-        <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+        <nav className="flex-1 space-y-1 overflow-y-auto p-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           {navItems.map((item) => {
             const isActive = item.exact
               ? pathname === item.href
@@ -106,7 +110,7 @@ export function CommandSidebar() {
                 key={item.href}
                 href={item.href}
                 onClick={() => setMobileOpen(false)}
-                title={collapsed ? item.label : undefined}
+                title={!showLabels ? item.label : undefined}
                 className="group relative block"
               >
                 {isActive && (
@@ -118,7 +122,7 @@ export function CommandSidebar() {
                 )}
                 <span
                   className={cn(
-                    "relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors",
+                    "relative flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors",
                     isActive
                       ? "text-cyan-100"
                       : "text-zinc-500 group-hover:text-zinc-300"
@@ -131,7 +135,7 @@ export function CommandSidebar() {
                     )}
                   />
                   <AnimatePresence>
-                    {!collapsed && (
+                    {showLabels && (
                       <motion.span
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -151,24 +155,25 @@ export function CommandSidebar() {
         <div className="space-y-2 border-t border-white/[0.06] p-3">
           <Link
             href="/dashboard/settings"
-            title={collapsed ? "Profile" : undefined}
-            className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-zinc-500 transition-colors hover:text-zinc-300"
+            onClick={() => setMobileOpen(false)}
+            title={!showLabels ? "Profile" : undefined}
+            className="flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm text-zinc-500 transition-colors hover:text-zinc-300"
           >
             <User className="h-4 w-4 shrink-0" />
-            {!collapsed && <span>Profile</span>}
+            {showLabels && <span>Profile</span>}
           </Link>
 
           <div
             className={cn(
               "flex items-center gap-2",
-              collapsed ? "flex-col" : "justify-between px-1"
+              !showLabels ? "flex-col" : "justify-between px-1"
             )}
           >
             <DashboardUserButton />
             <button
               type="button"
               onClick={() => setCollapsed(!collapsed)}
-              className="hidden rounded-lg border border-white/[0.06] p-1.5 text-zinc-500 transition-colors hover:border-cyan-400/20 hover:text-cyan-400 lg:block"
+              className="hidden min-h-10 min-w-10 items-center justify-center rounded-lg border border-white/[0.06] p-1.5 text-zinc-500 transition-colors hover:border-cyan-400/20 hover:text-cyan-400 lg:flex"
               aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
             >
               {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}

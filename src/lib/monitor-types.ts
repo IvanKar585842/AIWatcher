@@ -75,6 +75,8 @@ export interface MonitorTypeDefinition {
   requiresSelector?: boolean;
   requiresKeywords?: boolean;
   requiresAiPrompt?: boolean;
+  recommended?: boolean;
+  tooltip?: string;
 }
 
 export const ACCENT_STYLES: Record<
@@ -143,26 +145,114 @@ export const MONITOR_TYPE_CATEGORIES: MonitorTypeCategory[] = [
   "AI",
 ];
 
+/** Primary create-flow options — beginner-first order */
+export const PRIMARY_MONITOR_TYPE_IDS = [
+  "entire-website",
+  "visual-changes",
+  "text-changes",
+  "specific-section",
+  "price-tracking",
+  "keyword-detection",
+  "api-response",
+  "ai-smart",
+] as const;
+
 export const MONITOR_TYPE_CATALOG: MonitorTypeDefinition[] = [
-  { id: "entire-website", label: "Entire Website", description: "Watch the full page for any meaningful change", icon: Globe, category: "General", accent: "cyan", mode: "ENTIRE_PAGE" },
-  { id: "ai-smart", label: "AI Smart Monitoring", description: "Describe what matters in plain language", icon: Brain, category: "AI", accent: "violet", mode: "AI_SMART", requiresAiPrompt: true },
-  { id: "visual-changes", label: "Visual Changes", description: "Detect layout and visual structure shifts", icon: Eye, category: "Visual", accent: "blue", mode: "VISUAL_CHANGES" },
+  {
+    id: "entire-website",
+    label: "Full Page Monitoring",
+    description: "Monitor the entire page and detect important changes automatically.",
+    tooltip: "Best for beginners. Watches the whole page and filters noise automatically.",
+    icon: Globe,
+    category: "General",
+    accent: "cyan",
+    mode: "ENTIRE_PAGE",
+    recommended: true,
+  },
+  {
+    id: "visual-changes",
+    label: "Visual Changes Monitoring",
+    description: "Detect layout, design, and visual structure shifts.",
+    tooltip: "Use when appearance matters more than text — redesigns, banners, UI changes.",
+    icon: Eye,
+    category: "Visual",
+    accent: "blue",
+    mode: "VISUAL_CHANGES",
+  },
+  {
+    id: "text-changes",
+    label: "Text Changes Monitoring",
+    description: "Focus on readable text updates and ignore most HTML noise.",
+    tooltip: "Ideal for articles, announcements, and copy changes.",
+    icon: Type,
+    category: "Content",
+    accent: "cyan",
+    mode: "TEXT_CHANGES",
+  },
+  {
+    id: "specific-section",
+    label: "Specific Element Monitoring",
+    description: "Watch one section or element using a CSS selector.",
+    tooltip: "Paste a CSS selector for the exact block you care about.",
+    icon: Layers,
+    category: "Content",
+    accent: "blue",
+    mode: "CSS_SELECTOR",
+    requiresSelector: true,
+  },
+  {
+    id: "price-tracking",
+    label: "Price Monitoring",
+    description: "Track price drops and increases on product pages.",
+    tooltip: "Best for product and pricing pages with clear price text.",
+    icon: Target,
+    category: "E-commerce",
+    accent: "emerald",
+    mode: "PRICE_DETECTION",
+  },
+  {
+    id: "keyword-detection",
+    label: "Keyword Monitoring",
+    description: "Alert when specific keywords appear or disappear.",
+    tooltip: "Enter words like “sale”, “in stock”, or “remote”.",
+    icon: Hash,
+    category: "Content",
+    accent: "amber",
+    mode: "KEYWORD_DETECTION",
+    requiresKeywords: true,
+  },
+  {
+    id: "api-response",
+    label: "API Monitoring",
+    description: "Monitor JSON or XML API endpoint responses.",
+    tooltip: "Point at an API URL to detect response body changes.",
+    icon: Server,
+    category: "Technical",
+    accent: "cyan",
+    mode: "API_RESPONSE",
+  },
+  {
+    id: "ai-smart",
+    label: "AI Monitoring",
+    description: "Describe what matters in plain language and let AI decide.",
+    tooltip: "Write instructions like “Notify me only when the price drops below €100”.",
+    icon: Brain,
+    category: "AI",
+    accent: "violet",
+    mode: "AI_SMART",
+    requiresAiPrompt: true,
+  },
   { id: "screenshot-comparison", label: "Screenshot Comparison", description: "Pixel-level visual diff between captures", icon: Image, category: "Visual", accent: "sky", mode: "SCREENSHOT_DIFF" },
   { id: "html-changes", label: "HTML Changes", description: "Precise HTML structure comparison", icon: Code, category: "Visual", accent: "cyan", mode: "HTML_DIFF" },
-  { id: "text-changes", label: "Text Changes", description: "Focus on textual content updates only", icon: Type, category: "Content", accent: "cyan", mode: "TEXT_CHANGES" },
-  { id: "specific-section", label: "Specific Section", description: "Monitor one section by CSS selector", icon: Layers, category: "Content", accent: "blue", mode: "CSS_SELECTOR", requiresSelector: true },
   { id: "css-selector", label: "CSS Selector", description: "Target any element with a CSS selector", icon: MousePointerClick, category: "Content", accent: "cyan", mode: "CSS_SELECTOR", requiresSelector: true },
   { id: "xpath", label: "XPath", description: "Target elements using XPath expressions", icon: Search, category: "Content", accent: "violet", mode: "XPATH", requiresSelector: true },
-  { id: "price-tracking", label: "Price Tracking", description: "Track price drops and increases", icon: Target, category: "E-commerce", accent: "emerald", mode: "PRICE_DETECTION" },
   { id: "discount-tracking", label: "Discount Tracking", description: "Alert when sales or discounts appear", icon: BadgePercent, category: "E-commerce", accent: "amber", mode: "PRICE_DETECTION" },
   { id: "stock-availability", label: "Stock Availability", description: "Detect in-stock and out-of-stock changes", icon: Package, category: "E-commerce", accent: "emerald", mode: "PRODUCT_AVAILABILITY" },
   { id: "product-availability", label: "Product Availability", description: "Know when products become purchasable", icon: ShoppingCart, category: "E-commerce", accent: "cyan", mode: "PRODUCT_AVAILABILITY" },
-  { id: "keyword-detection", label: "Keyword Detection", description: "Alert when specific keywords appear", icon: Hash, category: "Content", accent: "amber", mode: "KEYWORD_DETECTION", requiresKeywords: true },
   { id: "table-changes", label: "Table Changes", description: "Track rows and cells in HTML tables", icon: Table, category: "Content", accent: "blue", mode: "TABLE_DETECTION" },
   { id: "news-detection", label: "News Detection", description: "Catch breaking news and headline updates", icon: Newspaper, category: "Content", accent: "rose", mode: "TEXT_CHANGES" },
   { id: "blog-updates", label: "Blog Updates", description: "Monitor blog posts and article feeds", icon: BookOpen, category: "Content", accent: "violet", mode: "TEXT_CHANGES" },
   { id: "documentation-updates", label: "Documentation Updates", description: "Track docs, changelogs, and guides", icon: FileText, category: "Content", accent: "sky", mode: "DOCUMENTATION_CHANGES" },
-  { id: "api-response", label: "API Response Monitoring", description: "Watch JSON or XML API endpoint responses", icon: Server, category: "Technical", accent: "cyan", mode: "API_RESPONSE" },
   { id: "rss-feed", label: "RSS Feed", description: "Track new items in RSS and Atom feeds", icon: Rss, category: "Content", accent: "orange", mode: "RSS_FEED" },
   { id: "job-listings", label: "Job Listings", description: "Monitor career pages for new positions", icon: Briefcase, category: "Jobs & Education", accent: "blue", mode: "JOB_LISTINGS" },
   { id: "scholarships", label: "Scholarships", description: "Track scholarship deadlines and eligibility", icon: GraduationCap, category: "Jobs & Education", accent: "emerald", mode: "AI_SMART", requiresAiPrompt: true },
@@ -196,6 +286,17 @@ export const MONITOR_TYPE_CATALOG: MonitorTypeDefinition[] = [
   { id: "uptime", label: "Uptime", description: "Know immediately when a site goes down", icon: Activity, category: "Technical", accent: "emerald", mode: "API_RESPONSE" },
   { id: "custom-ai-prompt", label: "Custom AI Prompt", description: "Full control with a custom AI instruction", icon: Brain, category: "AI", accent: "violet", mode: "AI_SMART", requiresAiPrompt: true },
 ];
+
+export function getPrimaryMonitorTypes(): MonitorTypeDefinition[] {
+  return PRIMARY_MONITOR_TYPE_IDS.map(
+    (id) => MONITOR_TYPE_CATALOG.find((t) => t.id === id)!
+  ).filter(Boolean);
+}
+
+export function getAdvancedMonitorTypes(): MonitorTypeDefinition[] {
+  const primary = new Set<string>(PRIMARY_MONITOR_TYPE_IDS);
+  return MONITOR_TYPE_CATALOG.filter((t) => !primary.has(t.id));
+}
 
 export function getMonitorTypeById(id: string): MonitorTypeDefinition | undefined {
   return MONITOR_TYPE_CATALOG.find((t) => t.id === id);

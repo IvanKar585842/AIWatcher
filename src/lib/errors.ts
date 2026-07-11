@@ -1,6 +1,3 @@
-import { NextResponse } from "next/server";
-import { apiFailureFromError } from "@/lib/api-response";
-
 export class UnauthorizedError extends Error {
   constructor(message = "Unauthorized") {
     super(message);
@@ -31,8 +28,4 @@ export async function parseJsonBody<T>(request: Request): Promise<T> {
   } catch {
     throw new ApiError("Invalid JSON body", 400);
   }
-}
-
-export function apiErrorResponse(error: unknown): NextResponse {
-  return apiFailureFromError(error);
 }

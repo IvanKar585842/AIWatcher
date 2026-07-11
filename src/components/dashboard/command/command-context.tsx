@@ -20,6 +20,23 @@ export function CommandProvider({ children }: { children: React.ReactNode }) {
     if (stored === "true") setCollapsed(true);
   }, []);
 
+  useEffect(() => {
+    if (!mobileOpen) return;
+
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setMobileOpen(false);
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previous;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [mobileOpen]);
+
   function handleSetCollapsed(v: boolean) {
     setCollapsed(v);
     localStorage.setItem("command-nav-collapsed", String(v));

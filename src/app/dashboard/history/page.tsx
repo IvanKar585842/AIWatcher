@@ -7,7 +7,7 @@ export default function HistoryPage() {
       <CommandPageHeader
         label="Archive"
         title="Change History"
-        description="Timeline of all detected changes across your monitors."
+        description="See what changed, when it happened, and why it matters."
       />
       <ChangeHistory />
     </div>

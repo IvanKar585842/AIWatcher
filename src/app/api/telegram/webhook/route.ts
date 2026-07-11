@@ -8,16 +8,18 @@ export async function POST(request: NextRequest) {
   }
 
   const headerSecret = request.headers.get("x-telegram-bot-api-secret-token");
-  if (headerSecret !== secret) {
+  if (!headerSecret || headerSecret !== secret) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
     const update = await request.json();
     await handleTelegramUpdate(update);
+    // Always acknowledge to Telegram so retries do not spam
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("Telegram webhook error:", error);
-    return NextResponse.json({ error: "Webhook processing failed" }, { status: 500 });
+    // Do not crash the app — acknowledge receipt after logging
+    return NextResponse.json({ ok: true });
   }
 }

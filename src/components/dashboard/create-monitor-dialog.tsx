@@ -9,7 +9,7 @@ import {
   NotificationMethod,
   type Monitor,
 } from "@prisma/client";
-import { ArrowLeft, ArrowRight, Loader2, Plus, Search, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, HelpCircle, Loader2, Plus, Search, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -35,9 +35,11 @@ import {
 } from "@/lib/monitor-config";
 import {
   ACCENT_STYLES,
-  MONITOR_TYPE_CATALOG,
-  MONITOR_TYPE_CATEGORIES,
+  getAdvancedMonitorTypes,
   getMonitorTypeById,
+  getPrimaryMonitorTypes,
+  MONITOR_TYPE_CATEGORIES,
+  MONITOR_TYPE_CATALOG,
   type MonitorTypeCategory,
 } from "@/lib/monitor-types";
 import { cn } from "@/lib/utils";
@@ -83,11 +85,18 @@ interface CreateMonitorDialogProps {
   triggerClassName?: string;
 }
 
-function FieldLabel({ children }: { children: React.ReactNode }) {
+function FieldLabel({
+  children,
+  hint,
+}: {
+  children: React.ReactNode;
+  hint?: string;
+}) {
   return (
-    <Label className="mb-1.5 block font-mono text-[10px] uppercase tracking-widest text-zinc-500">
-      {children}
-    </Label>
+    <div className="mb-1.5">
+      <Label className="block text-xs font-medium text-zinc-400">{children}</Label>
+      {hint ? <p className="mt-0.5 text-[11px] leading-snug text-zinc-600">{hint}</p> : null}
+    </div>
   );
 }
 
@@ -127,6 +136,7 @@ export function CreateMonitorDialog({
   const [selectedTypeId, setSelectedTypeId] = useState("entire-website");
   const [typeFilter, setTypeFilter] = useState<MonitorTypeCategory | "All">("All");
   const [typeSearch, setTypeSearch] = useState("");
+  const [showAdvancedTypes, setShowAdvancedTypes] = useState(false);
 
   useEffect(() => {
     if (prefillRequest) {
@@ -150,6 +160,7 @@ export function CreateMonitorDialog({
       setTypeSearch("");
       setTypeFilter("All");
       setSelectedTypeId("entire-website");
+      setShowAdvancedTypes(false);
     }
   }, [open]);
 
@@ -159,9 +170,12 @@ export function CreateMonitorDialog({
     [selectedTypeId]
   );
 
-  const filteredTypes = useMemo(() => {
+  const primaryTypes = useMemo(() => getPrimaryMonitorTypes(), []);
+  const advancedTypes = useMemo(() => getAdvancedMonitorTypes(), []);
+
+  const filteredAdvancedTypes = useMemo(() => {
     const q = typeSearch.trim().toLowerCase();
-    return MONITOR_TYPE_CATALOG.filter((t) => {
+    return advancedTypes.filter((t) => {
       if (typeFilter !== "All" && t.category !== typeFilter) return false;
       if (!q) return true;
       return (
@@ -170,7 +184,7 @@ export function CreateMonitorDialog({
         t.category.toLowerCase().includes(q)
       );
     });
-  }, [typeFilter, typeSearch]);
+  }, [advancedTypes, typeFilter, typeSearch]);
 
   function validateStep1(): string | null {
     if (!form.url.trim()) return "Website URL is required";
@@ -179,13 +193,15 @@ export function CreateMonitorDialog({
     } catch {
       return "Please enter a valid URL (include https://)";
     }
-    if (!form.name.trim()) return "Friendly name is required";
+    if (!form.name.trim()) return "Monitor name is required";
     return null;
   }
 
   function validateStep2(): string | null {
     if (selectedType.requiresSelector && !form.selector.trim()) {
-      return form.mode === "XPATH" ? "XPath selector is required" : "CSS selector is required";
+      return form.mode === "XPATH"
+        ? "Page section path is required"
+        : "Page section is required";
     }
     if (
       (selectedType.requiresKeywords || form.mode === "KEYWORD_DETECTION") &&
@@ -287,21 +303,21 @@ export function CreateMonitorDialog({
       )}
 
       <DialogContent
-        className="flex max-h-[min(92vh,900px)] w-[min(calc(100vw-1.5rem),56rem)] max-w-none flex-col gap-0 overflow-hidden border border-cyan-500/20 bg-[#0a0a0a] p-0 text-zinc-100 shadow-[0_0_80px_-16px_rgba(34,211,238,0.45)]"
+        className="flex max-h-[min(92dvh,900px)] w-[min(calc(100vw-1rem),56rem)] max-w-none flex-col gap-0 overflow-hidden border border-cyan-500/20 bg-[#0a0a0a] p-0 text-zinc-100 shadow-[0_0_80px_-16px_rgba(34,211,238,0.45)] sm:w-[min(calc(100vw-1.5rem),56rem)]"
       >
         {/* Header */}
-        <div className="shrink-0 border-b border-white/[0.06] bg-gradient-to-r from-cyan-500/[0.08] via-transparent to-blue-500/[0.05] px-5 py-5 sm:px-7">
+        <div className="shrink-0 border-b border-white/[0.06] bg-gradient-to-r from-cyan-500/[0.08] via-transparent to-blue-500/[0.05] px-4 py-4 pr-14 sm:px-7 sm:py-5 sm:pr-16">
           <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-cyan-500/70">
-                Deploy Monitor
+            <div className="min-w-0">
+              <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-cyan-500/70">
+                New monitor
               </p>
-              <h2 className="mt-1 text-xl font-semibold text-zinc-50">Create AI Monitor</h2>
+              <h2 className="mt-1 text-lg font-semibold text-zinc-50 sm:text-xl">Create AI Monitor</h2>
               <p className="mt-1 text-sm text-zinc-500">
-                Step {step} of 2 — {step === 1 ? "Target details" : "Monitoring configuration"}
+                Step {step} of 2 — {step === 1 ? "Website details" : "How should we watch it?"}
               </p>
             </div>
-            <Sparkles className="h-5 w-5 shrink-0 text-cyan-500/40" />
+            <Sparkles className="hidden h-5 w-5 shrink-0 text-cyan-500/40 sm:block" />
           </div>
 
           <div className="mt-4 flex gap-2">
@@ -330,7 +346,9 @@ export function CreateMonitorDialog({
                 className="space-y-4"
               >
                 <div>
-                  <FieldLabel>Website URL</FieldLabel>
+                  <FieldLabel hint="The page you want WatchFlow to check for changes.">
+                    Website URL
+                  </FieldLabel>
                   <OsInput
                     type="url"
                     placeholder="https://example.com/page"
@@ -340,7 +358,9 @@ export function CreateMonitorDialog({
                   />
                 </div>
                 <div>
-                  <FieldLabel>Friendly Name</FieldLabel>
+                  <FieldLabel hint="A short name you’ll recognize in your dashboard.">
+                    Monitor name
+                  </FieldLabel>
                   <OsInput
                     placeholder="e.g. Competitor Pricing Page"
                     value={form.name}
@@ -348,8 +368,8 @@ export function CreateMonitorDialog({
                   />
                 </div>
                 <div>
-                  <FieldLabel>Category</FieldLabel>
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                  <FieldLabel hint="Optional — helps you organize monitors later.">Category</FieldLabel>
+                  <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                     {MONITOR_CATEGORY_DEFS.map((cat) => {
                       const Icon = cat.icon;
                       const active = form.category === cat.id;
@@ -362,7 +382,7 @@ export function CreateMonitorDialog({
                           whileTap={{ scale: 0.98 }}
                           onClick={() => setForm({ ...form, category: cat.id })}
                           className={cn(
-                            "flex min-h-[100px] flex-col items-start gap-2 rounded-xl border p-3 text-left transition-all",
+                            "flex min-h-[88px] flex-col items-start gap-2 rounded-xl border p-3.5 text-left transition-all sm:min-h-[100px]",
                             active
                               ? cn(accent.border, accent.bg, accent.glow)
                               : "border-white/[0.06] bg-black/30 hover:border-cyan-500/20 hover:bg-white/[0.03]"
@@ -377,10 +397,10 @@ export function CreateMonitorDialog({
                             <Icon className="h-4 w-4" />
                           </div>
                           <div>
-                            <p className={cn("text-xs font-medium", active ? accent.text : "text-zinc-200")}>
+                            <p className={cn("text-sm font-medium", active ? accent.text : "text-zinc-200")}>
                               {cat.label}
                             </p>
-                            <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-zinc-500">
+                            <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-zinc-500">
                               {cat.description}
                             </p>
                           </div>
@@ -390,7 +410,7 @@ export function CreateMonitorDialog({
                   </div>
                 </div>
                 <div>
-                  <FieldLabel>Description</FieldLabel>
+                  <FieldLabel hint="Optional notes for yourself.">Notes</FieldLabel>
                   <textarea
                     value={form.description}
                     onChange={(e) => setForm({ ...form, description: e.target.value })}
@@ -410,47 +430,15 @@ export function CreateMonitorDialog({
                 className="space-y-5"
               >
                 <div>
-                  <FieldLabel>Monitoring Type</FieldLabel>
-                  <div className="mb-3 flex flex-wrap gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setTypeFilter("All")}
-                      className={cn(
-                        "rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider transition-colors",
-                        typeFilter === "All"
-                          ? "border-cyan-500/40 bg-cyan-500/15 text-cyan-200"
-                          : "border-white/[0.06] text-zinc-500 hover:text-zinc-300"
-                      )}
-                    >
-                      All
-                    </button>
-                    {MONITOR_TYPE_CATEGORIES.map((cat) => (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => setTypeFilter(cat)}
-                        className={cn(
-                          "rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider transition-colors",
-                          typeFilter === cat
-                            ? "border-cyan-500/40 bg-cyan-500/15 text-cyan-200"
-                            : "border-white/[0.06] text-zinc-500 hover:text-zinc-300"
-                        )}
-                      >
-                        {cat}
-                      </button>
-                    ))}
+                  <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                    <FieldLabel hint="Not sure? Keep Full Page Monitoring — it works for most sites.">
+                      Monitoring type
+                    </FieldLabel>
+                    <p className="text-[11px] text-zinc-500 sm:mb-1.5">Start with Recommended</p>
                   </div>
-                  <div className="relative mb-3">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600" />
-                    <OsInput
-                      value={typeSearch}
-                      onChange={(e) => setTypeSearch(e.target.value)}
-                      placeholder="Search monitoring types..."
-                      className="pl-9"
-                    />
-                  </div>
-                  <div className="grid max-h-[280px] grid-cols-1 gap-2 overflow-y-auto pr-1 sm:grid-cols-2 lg:grid-cols-4">
-                    {filteredTypes.map((typeDef) => {
+
+                  <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                    {primaryTypes.map((typeDef) => {
                       const Icon = typeDef.icon;
                       const active = selectedTypeId === typeDef.id;
                       const accent = ACCENT_STYLES[typeDef.accent];
@@ -458,34 +446,46 @@ export function CreateMonitorDialog({
                         <motion.button
                           key={typeDef.id}
                           type="button"
-                          whileHover={{ scale: 1.02, y: -2 }}
-                          whileTap={{ scale: 0.98 }}
+                          title={typeDef.tooltip ?? typeDef.description}
+                          whileHover={{ scale: 1.01, y: -1 }}
+                          whileTap={{ scale: 0.99 }}
                           onClick={() => selectMonitorType(typeDef.id)}
                           className={cn(
-                            "flex min-h-[96px] flex-col items-start gap-2 rounded-xl border p-3 text-left transition-all",
+                            "relative flex min-h-[108px] flex-col items-start gap-2.5 rounded-xl border p-3.5 text-left transition-all sm:min-h-[116px]",
                             active
                               ? cn(accent.border, accent.bg, accent.glow, "ring-1 ring-cyan-400/30")
                               : "border-white/[0.06] bg-black/30 hover:border-cyan-500/20 hover:bg-white/[0.03]"
                           )}
                         >
-                          <div className="flex w-full items-center justify-between gap-2">
+                          <div className="flex w-full items-start justify-between gap-2">
                             <div
                               className={cn(
-                                "flex h-8 w-8 items-center justify-center rounded-lg",
+                                "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
                                 active ? cn(accent.bg, accent.text) : "bg-white/[0.04] text-zinc-500"
                               )}
                             >
                               <Icon className="h-4 w-4" />
                             </div>
-                            <span className="font-mono text-[9px] uppercase tracking-wider text-zinc-600">
-                              {typeDef.category}
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              {typeDef.recommended && (
+                                <span className="rounded-full border border-cyan-400/30 bg-cyan-500/15 px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-cyan-200">
+                                  Recommended
+                                </span>
+                              )}
+                              <span
+                                className="inline-flex text-zinc-600"
+                                title={typeDef.tooltip ?? typeDef.description}
+                                aria-label={typeDef.tooltip ?? typeDef.description}
+                              >
+                                <HelpCircle className="h-3.5 w-3.5" />
+                              </span>
+                            </div>
                           </div>
                           <div className="min-w-0 w-full">
-                            <p className={cn("text-xs font-medium leading-tight", active ? accent.text : "text-zinc-200")}>
+                            <p className={cn("text-sm font-medium leading-tight", active ? accent.text : "text-zinc-100")}>
                               {typeDef.label}
                             </p>
-                            <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-zinc-500">
+                            <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-zinc-500 sm:text-xs">
                               {typeDef.description}
                             </p>
                           </div>
@@ -493,11 +493,137 @@ export function CreateMonitorDialog({
                       );
                     })}
                   </div>
+
+                  <div className="mt-4">
+                    <button
+                      type="button"
+                      onClick={() => setShowAdvancedTypes((v) => !v)}
+                      className="flex min-h-11 w-full items-center justify-between rounded-lg border border-white/[0.06] bg-black/20 px-3 py-2.5 text-left text-xs text-zinc-400 transition-colors hover:border-cyan-500/20 hover:text-zinc-200"
+                    >
+                      <span>
+                        {showAdvancedTypes
+                          ? "Hide extra options"
+                          : "Need something more specific?"}
+                      </span>
+                      <span className="text-[10px] uppercase tracking-wider text-zinc-600">
+                        {advancedTypes.length} options
+                      </span>
+                    </button>
+
+                    <AnimatePresence initial={false}>
+                      {showAdvancedTypes && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="mt-3 mb-3 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setTypeFilter("All")}
+                              className={cn(
+                                "min-h-9 rounded-full border px-3 py-1.5 text-xs transition-colors",
+                                typeFilter === "All"
+                                  ? "border-cyan-500/40 bg-cyan-500/15 text-cyan-200"
+                                  : "border-white/[0.06] text-zinc-500 hover:text-zinc-300"
+                              )}
+                            >
+                              All
+                            </button>
+                            {MONITOR_TYPE_CATEGORIES.map((cat) => (
+                              <button
+                                key={cat}
+                                type="button"
+                                onClick={() => setTypeFilter(cat)}
+                                className={cn(
+                                  "min-h-9 rounded-full border px-3 py-1.5 text-xs transition-colors",
+                                  typeFilter === cat
+                                    ? "border-cyan-500/40 bg-cyan-500/15 text-cyan-200"
+                                    : "border-white/[0.06] text-zinc-500 hover:text-zinc-300"
+                                )}
+                              >
+                                {cat}
+                              </button>
+                            ))}
+                          </div>
+                          <div className="relative mb-3">
+                            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600" />
+                            <OsInput
+                              value={typeSearch}
+                              onChange={(e) => setTypeSearch(e.target.value)}
+                              placeholder="Search options..."
+                              className="pl-9"
+                            />
+                          </div>
+                          {filteredAdvancedTypes.length === 0 ? (
+                            <p className="rounded-lg border border-dashed border-white/[0.08] px-4 py-8 text-center text-sm text-zinc-500">
+                              No matching options. Try another search or pick from the list above.
+                            </p>
+                          ) : (
+                          <div className="grid max-h-[min(40vh,280px)] grid-cols-1 gap-2 overflow-y-auto overscroll-contain pr-1 sm:grid-cols-2">
+                            {filteredAdvancedTypes.map((typeDef) => {
+                              const Icon = typeDef.icon;
+                              const active = selectedTypeId === typeDef.id;
+                              const accent = ACCENT_STYLES[typeDef.accent];
+                              return (
+                                <motion.button
+                                  key={typeDef.id}
+                                  type="button"
+                                  title={typeDef.description}
+                                  whileHover={{ scale: 1.01 }}
+                                  whileTap={{ scale: 0.99 }}
+                                  onClick={() => selectMonitorType(typeDef.id)}
+                                  className={cn(
+                                    "flex min-h-[88px] flex-col items-start gap-2 rounded-xl border p-3 text-left transition-all",
+                                    active
+                                      ? cn(accent.border, accent.bg, accent.glow, "ring-1 ring-cyan-400/30")
+                                      : "border-white/[0.06] bg-black/30 hover:border-cyan-500/20 hover:bg-white/[0.03]"
+                                  )}
+                                >
+                                  <div className="flex w-full items-center justify-between gap-2">
+                                    <div
+                                      className={cn(
+                                        "flex h-8 w-8 items-center justify-center rounded-lg",
+                                        active ? cn(accent.bg, accent.text) : "bg-white/[0.04] text-zinc-500"
+                                      )}
+                                    >
+                                      <Icon className="h-4 w-4" />
+                                    </div>
+                                    <span className="text-[9px] uppercase tracking-wider text-zinc-600">
+                                      {typeDef.category}
+                                    </span>
+                                  </div>
+                                  <div className="min-w-0 w-full">
+                                    <p className={cn("text-xs font-medium leading-tight", active ? accent.text : "text-zinc-200")}>
+                                      {typeDef.label}
+                                    </p>
+                                    <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-zinc-500">
+                                      {typeDef.description}
+                                    </p>
+                                  </div>
+                                </motion.button>
+                              );
+                            })}
+                          </div>
+                          )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 </div>
 
                 {selectedType.requiresSelector && (
                   <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}>
-                    <FieldLabel>{form.mode === "XPATH" ? "XPath" : "CSS Selector"}</FieldLabel>
+                    <FieldLabel
+                      hint={
+                        form.mode === "XPATH"
+                          ? "Paste the path to the page section you care about."
+                          : "Paste the CSS selector for the section you care about (ask support if unsure)."
+                      }
+                    >
+                      {form.mode === "XPATH" ? "Page section path" : "Page section"}
+                    </FieldLabel>
                     <OsInput
                       value={form.selector}
                       onChange={(e) => setForm({ ...form, selector: e.target.value })}
@@ -511,11 +637,13 @@ export function CreateMonitorDialog({
 
                 {(selectedType.requiresKeywords || form.mode === "KEYWORD_DETECTION") && (
                   <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}>
-                    <FieldLabel>Keywords</FieldLabel>
+                    <FieldLabel hint="We’ll alert you when any of these words appear or change.">
+                      Keywords to watch
+                    </FieldLabel>
                     <OsInput
                       value={form.keywords}
                       onChange={(e) => setForm({ ...form, keywords: e.target.value })}
-                      placeholder="sale, discount, remote (comma-separated)"
+                      placeholder="sale, discount, remote"
                     />
                   </motion.div>
                 )}
@@ -528,7 +656,7 @@ export function CreateMonitorDialog({
                   >
                     <div className="flex items-center gap-2 border-b border-cyan-500/15 px-4 py-3">
                       <Sparkles className="h-4 w-4 text-cyan-400" />
-                      <p className="text-sm font-medium text-cyan-100">AI Smart Monitoring</p>
+                      <p className="text-sm font-medium text-cyan-100">AI Monitoring</p>
                     </div>
                     <div className="p-4">
                       <textarea
@@ -559,12 +687,12 @@ export function CreateMonitorDialog({
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <FieldLabel>Check Interval</FieldLabel>
+                    <FieldLabel hint="How often we check the page.">Check frequency</FieldLabel>
                     <Select
                       value={form.interval}
                       onValueChange={(v) => setForm({ ...form, interval: v as MonitoringInterval })}
                     >
-                      <SelectTrigger className="border-white/[0.08] bg-black/50 text-zinc-100">
+                      <SelectTrigger className="min-h-11 border-white/[0.08] bg-black/50 text-zinc-100">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -577,14 +705,14 @@ export function CreateMonitorDialog({
                     </Select>
                   </div>
                   <div>
-                    <FieldLabel>Notifications</FieldLabel>
+                    <FieldLabel hint="Where to send important alerts.">Alert method</FieldLabel>
                     <Select
                       value={form.notificationMethod}
                       onValueChange={(v) =>
                         setForm({ ...form, notificationMethod: v as NotificationMethod })
                       }
                     >
-                      <SelectTrigger className="border-white/[0.08] bg-black/50 text-zinc-100">
+                      <SelectTrigger className="min-h-11 border-white/[0.08] bg-black/50 text-zinc-100">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -598,17 +726,17 @@ export function CreateMonitorDialog({
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-black/30 px-4 py-3">
-                  <div>
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-white/[0.06] bg-black/30 px-4 py-3">
+                  <div className="min-w-0">
                     <Label htmlFor="robots" className="text-sm text-zinc-300">
-                      Respect robots.txt
+                      Follow website access rules
                     </Label>
-                    {(form.mode === MonitoringMode.VISUAL_CHANGES ||
-                      form.mode === MonitoringMode.SCREENSHOT_DIFF) && (
-                      <p className="mt-0.5 text-[11px] text-zinc-500">
-                        Off by default for visual monitoring (e.g. Facebook, Instagram)
-                      </p>
-                    )}
+                    <p className="mt-0.5 text-[11px] text-zinc-500">
+                      {(form.mode === MonitoringMode.VISUAL_CHANGES ||
+                        form.mode === MonitoringMode.SCREENSHOT_DIFF)
+                        ? "Usually leave this off for visual checks on social sites."
+                        : "Leave on unless the site blocks monitoring."}
+                    </p>
                   </div>
                   <Switch
                     id="robots"
@@ -633,7 +761,7 @@ export function CreateMonitorDialog({
         </div>
 
         {/* Footer */}
-        <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-white/[0.06] bg-black/40 px-5 py-4 sm:flex-row sm:justify-between sm:px-7">
+        <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-white/[0.06] bg-black/40 px-4 py-4 sm:flex-row sm:justify-between sm:px-7">
           {step === 1 ? (
             <div />
           ) : (
@@ -645,7 +773,7 @@ export function CreateMonitorDialog({
                 setError("");
               }}
               disabled={loading}
-              className="border-white/[0.08] bg-transparent text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200"
+              className="min-h-12 border-white/[0.08] bg-transparent text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200"
             >
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back
@@ -665,7 +793,7 @@ export function CreateMonitorDialog({
                   setError("");
                   setStep(2);
                 }}
-                className="w-full bg-cyan-500 text-black hover:bg-cyan-400 sm:w-auto"
+                className="min-h-12 w-full bg-cyan-500 text-black hover:bg-cyan-400 sm:w-auto"
               >
                 Continue
                 <ArrowRight className="ml-2 h-4 w-4" />
@@ -675,7 +803,7 @@ export function CreateMonitorDialog({
                 type="button"
                 onClick={handleCreate}
                 disabled={loading}
-                className="w-full bg-cyan-500 text-black hover:bg-cyan-400 sm:w-auto"
+                className="min-h-12 w-full bg-cyan-500 text-black hover:bg-cyan-400 sm:w-auto"
               >
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Create Monitor

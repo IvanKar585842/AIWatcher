@@ -52,7 +52,15 @@ export async function GET() {
           where: { monitor: { userId: user.id } },
           orderBy: { createdAt: "desc" },
           take: 12,
-          include: { monitor: { select: { name: true, url: true } } },
+          select: {
+            id: true,
+            summary: true,
+            emoji: true,
+            importance: true,
+            category: true,
+            createdAt: true,
+            monitor: { select: { name: true, url: true } },
+          },
         }),
         prisma.notification.findMany({
           where: { userId: user.id },

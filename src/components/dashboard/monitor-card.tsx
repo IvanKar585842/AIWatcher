@@ -76,16 +76,16 @@ function ActionButton({
   danger?: boolean;
   children: React.ReactNode;
 }) {
-  const className = `group/btn flex flex-col items-center gap-1 rounded-lg px-2 py-1.5 text-zinc-600 transition-colors hover:bg-white/[0.04] hover:text-cyan-300 ${
+  const className = `group/btn flex min-h-11 min-w-[3.25rem] flex-col items-center justify-center gap-0.5 rounded-lg px-1.5 py-1.5 text-zinc-500 transition-colors hover:bg-white/[0.04] hover:text-cyan-300 active:bg-white/[0.06] ${
     danger ? "hover:!text-red-400" : ""
   }`;
 
   const inner = (
     <>
-      <span className="flex h-7 w-7 items-center justify-center rounded-md border border-white/[0.06] bg-[#090909] transition-colors group-hover/btn:border-cyan-400/20">
+      <span className="flex h-9 w-9 items-center justify-center rounded-md border border-white/[0.06] bg-[#090909] transition-colors group-hover/btn:border-cyan-400/20">
         {children}
       </span>
-      <span className="font-mono text-[9px] uppercase tracking-wider opacity-0 transition-opacity group-hover/btn:opacity-100">
+      <span className="font-mono text-[9px] uppercase tracking-wider text-zinc-600 opacity-100 sm:opacity-70 sm:group-hover/btn:opacity-100">
         {label}
       </span>
     </>
@@ -199,8 +199,8 @@ export function MonitorCard({
         )}
 
         {/* Actions */}
-        <div className="mt-5 flex items-center justify-between border-t border-white/[0.06] pt-4">
-          <div className="flex items-center gap-1">
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-white/[0.06] pt-4">
+          <div className="flex flex-wrap items-center gap-0.5">
             <ActionButton
               label={monitor.status === "ACTIVE" ? "Pause" : "Resume"}
               onClick={onPause}

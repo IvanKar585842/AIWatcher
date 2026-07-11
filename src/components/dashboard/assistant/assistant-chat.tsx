@@ -61,6 +61,7 @@ export function AssistantChat() {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<"one" | "all" | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -116,6 +117,7 @@ export function AssistantChat() {
     setConversations((prev) => [conv, ...prev]);
     setActiveId(conv.id);
     setMessages([]);
+    setSidebarOpen(false);
     inputRef.current?.focus();
   }
 
@@ -263,15 +265,29 @@ export function AssistantChat() {
         description="Ask anything about monitoring, settings, notifications, or troubleshooting."
       />
 
-      <div className="flex h-[calc(100vh-12rem)] min-h-[520px] overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02]">
-        {/* Sidebar */}
-        <aside className="flex w-64 shrink-0 flex-col border-r border-white/[0.06] bg-black/20">
+      <div className="relative flex h-[calc(100dvh-11rem)] min-h-[420px] overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] sm:h-[calc(100vh-12rem)] sm:min-h-[520px]">
+        {sidebarOpen && (
+          <button
+            type="button"
+            className="absolute inset-0 z-20 bg-black/60 md:hidden"
+            aria-label="Close chats"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
+        {/* Sidebar — drawer on mobile */}
+        <aside
+          className={cn(
+            "absolute inset-y-0 left-0 z-30 flex w-[min(18rem,85vw)] shrink-0 flex-col border-r border-white/[0.06] bg-[#0c0c0c] transition-transform duration-200 md:static md:z-auto md:w-64 md:translate-x-0 md:bg-black/20",
+            sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+          )}
+        >
           <div className="border-b border-white/[0.06] p-3">
             <button
               type="button"
               onClick={createConversation}
               className={cn(
-                "flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+                "flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
                 os.btnPrimary
               )}
             >
@@ -305,15 +321,19 @@ export function AssistantChat() {
                   <div
                     role="button"
                     tabIndex={0}
-                    onClick={() => setActiveId(conv.id)}
+                    onClick={() => {
+                      setActiveId(conv.id);
+                      setSidebarOpen(false);
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
                         setActiveId(conv.id);
+                        setSidebarOpen(false);
                       }
                     }}
                     className={cn(
-                      "group flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm transition-colors",
+                      "group flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm transition-colors",
                       activeId === conv.id
                         ? "border border-cyan-400/20 bg-cyan-500/[0.08] text-cyan-100"
                         : "text-zinc-500 hover:bg-white/[0.03] hover:text-zinc-300"
@@ -327,7 +347,7 @@ export function AssistantChat() {
                         e.stopPropagation();
                         setMenuOpen(menuOpen === conv.id ? null : conv.id);
                       }}
-                      className="shrink-0 rounded p-1 opacity-0 transition-opacity group-hover:opacity-100"
+                      className="flex min-h-9 min-w-9 shrink-0 items-center justify-center rounded opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100"
                     >
                       <MoreHorizontal className="h-3.5 w-3.5" />
                     </button>
@@ -338,7 +358,7 @@ export function AssistantChat() {
                   <div className="absolute right-2 top-10 z-20 w-36 rounded-lg border border-white/[0.08] bg-[#111] py-1 shadow-xl">
                     <button
                       type="button"
-                      className="flex w-full items-center gap-2 px-3 py-2 text-xs text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200"
+                      className="flex min-h-10 w-full items-center gap-2 px-3 py-2 text-xs text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200"
                       onClick={() => {
                         setRenamingId(conv.id);
                         setRenameValue(conv.title);
@@ -349,7 +369,7 @@ export function AssistantChat() {
                     </button>
                     <button
                       type="button"
-                      className="flex w-full items-center gap-2 px-3 py-2 text-xs text-red-400 hover:bg-red-500/10"
+                      className="flex min-h-10 w-full items-center gap-2 px-3 py-2 text-xs text-red-400 hover:bg-red-500/10"
                       onClick={() => {
                         setActiveId(conv.id);
                         setConfirmDelete("one");
@@ -369,7 +389,7 @@ export function AssistantChat() {
               <button
                 type="button"
                 onClick={() => setConfirmDelete("all")}
-                className="w-full rounded-lg px-3 py-2 text-xs text-zinc-600 transition-colors hover:bg-red-500/10 hover:text-red-400"
+                className="min-h-10 w-full rounded-lg px-3 py-2 text-xs text-zinc-600 transition-colors hover:bg-red-500/10 hover:text-red-400"
               >
                 Clear all history
               </button>
@@ -379,7 +399,26 @@ export function AssistantChat() {
 
         {/* Main chat */}
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-6">
+          <div className="flex items-center gap-2 border-b border-white/[0.06] px-3 py-2 md:hidden">
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(true)}
+              className="flex min-h-10 items-center gap-2 rounded-lg border border-white/[0.08] px-3 text-xs text-zinc-400"
+            >
+              <MessageSquare className="h-4 w-4" />
+              Chats
+            </button>
+            <button
+              type="button"
+              onClick={createConversation}
+              className="flex min-h-10 items-center gap-1.5 rounded-lg border border-cyan-400/25 bg-cyan-500/10 px-3 text-xs text-cyan-200"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              New
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6">
             {messages.length === 0 && !streaming && !sending && (
               <motion.div
                 initial={{ opacity: 0, y: 16 }}
@@ -397,12 +436,12 @@ export function AssistantChat() {
                   Ask about creating monitors, choosing modes, notifications, billing, or
                   troubleshooting.
                 </p>
-                <div className="mt-8 grid gap-2 sm:grid-cols-2">
+                <div className="mt-8 grid w-full max-w-lg gap-2 sm:grid-cols-2">
                   {[
-                    "How do I create a monitor?",
-                    "Why didn't I get a notification?",
-                    "What mode for price tracking?",
-                    "How does visual monitoring work?",
+                    "What changed today?",
+                    "Which changes are important?",
+                    "Which websites need attention?",
+                    "Why did I receive a notification?",
                   ].map((q) => (
                     <button
                       key={q}
@@ -411,7 +450,7 @@ export function AssistantChat() {
                         setInput(q);
                         inputRef.current?.focus();
                       }}
-                      className="rounded-xl border border-white/[0.06] bg-black/30 px-4 py-3 text-left text-xs text-zinc-400 transition-colors hover:border-cyan-400/20 hover:text-cyan-200"
+                      className="min-h-12 rounded-xl border border-white/[0.06] bg-black/30 px-4 py-3 text-left text-xs text-zinc-400 transition-colors hover:border-cyan-400/20 hover:text-cyan-200"
                     >
                       {q}
                     </button>
@@ -469,7 +508,7 @@ export function AssistantChat() {
             <div ref={bottomRef} />
           </div>
 
-          <div className="border-t border-white/[0.06] bg-black/30 p-4">
+          <div className="border-t border-white/[0.06] bg-black/30 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4">
             <div className="flex items-end gap-2 rounded-2xl border border-white/[0.08] bg-black/50 p-2 focus-within:border-cyan-400/30 focus-within:ring-1 focus-within:ring-cyan-400/20">
               <textarea
                 ref={inputRef}
@@ -480,14 +519,14 @@ export function AssistantChat() {
                 rows={1}
                 maxLength={2000}
                 disabled={sending}
-                className="max-h-32 min-h-[44px] flex-1 resize-none bg-transparent px-2 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none"
+                className="max-h-32 min-h-[44px] flex-1 resize-none bg-transparent px-2 py-2.5 text-base text-zinc-100 placeholder:text-zinc-600 outline-none sm:text-sm"
               />
               <button
                 type="button"
                 onClick={sendMessage}
                 disabled={sending || !input.trim()}
                 className={cn(
-                  "mb-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors",
+                  "mb-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors",
                   input.trim() && !sending
                     ? "border border-cyan-400/30 bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30"
                     : "text-zinc-600"

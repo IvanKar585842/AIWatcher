@@ -3,7 +3,8 @@ import { ChatMessageRole } from "@prisma/client";
 import { resolveCachedAnswer, storeCachedAnswerIfWorthwhile } from "@/lib/ai/chat-cache";
 import { buildOptimizedContext, buildConversationTitle } from "@/lib/ai/chat-context";
 import { assertChatDailyLimit } from "@/lib/ai/chat-limits";
-import { streamCachedResponse, streamChatCompletion } from "@/lib/ai/chat-openai";
+import { streamCachedResponse, streamChatCompletion, isChatOpenAIConfigured } from "@/lib/ai/chat-openai";
+import { trackEvent } from "@/lib/analytics";
 import { requireUser } from "@/lib/auth";
 import { assertUserConversation } from "@/lib/chat/access";
 import { prisma } from "@/lib/db";
@@ -57,10 +58,18 @@ export async function POST(
       }
 
       const cached = await resolveCachedAnswer(userContent);
-      const { turns, systemPrompt } = await buildOptimizedContext(
+      const { turns, systemPrompt, usedAccountContext } = await buildOptimizedContext(
         conversationId,
-        userContent
+        userContent,
+        user.id
       );
+
+      if (!cached && !isChatOpenAIConfigured()) {
+        throw new ApiError(
+          "OpenAI is not configured. Add OPENAI_API_KEY to .env.local and restart the dev server.",
+          503
+        );
+      }
 
       const encoder = new TextEncoder();
 
@@ -69,7 +78,7 @@ export async function POST(
           try {
             let result;
 
-            if (cached) {
+            if (cached && !usedAccountContext) {
               result = await streamCachedResponse(cached.answer, (token) => {
                 controller.enqueue(encoder.encode(token));
               });
@@ -83,7 +92,7 @@ export async function POST(
                 }
               );
 
-              if (result.model !== "cache") {
+              if (result.model !== "cache" && !usedAccountContext) {
                 await storeCachedAnswerIfWorthwhile(userContent, result.content);
               }
             }
@@ -98,7 +107,19 @@ export async function POST(
                 totalTokens: result.totalTokens,
                 costUsd: result.costUsd,
                 model: result.model,
-                cached: Boolean(cached),
+                cached: Boolean(cached) && !usedAccountContext,
+              },
+            });
+
+            await trackEvent({
+              type: "ai.chat",
+              userId: user.id,
+              metadata: {
+                conversationId,
+                model: result.model,
+                cached: Boolean(cached) && !usedAccountContext,
+                tokens: result.totalTokens,
+                accountContext: usedAccountContext,
               },
             });
 

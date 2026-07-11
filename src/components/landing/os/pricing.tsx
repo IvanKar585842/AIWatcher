@@ -22,7 +22,13 @@ export function OsPricing() {
           className="mb-16 text-center"
         >
           <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.35em] text-cyan-500/70">Access Tiers</p>
-          <h2 className="text-3xl font-light text-zinc-100 md:text-4xl">Scale your observation grid</h2>
+          <h2 className="text-3xl font-light text-zinc-100 md:text-4xl">
+            Pay for clarity, not just more monitors
+          </h2>
+          <p className="mx-auto mt-3 max-w-xl text-sm text-zinc-500">
+            Every plan unlocks smarter detection, faster checks, and better alerts — so you know
+            what changed and why it matters.
+          </p>
         </motion.div>
 
         <div className="grid gap-6 md:grid-cols-3">

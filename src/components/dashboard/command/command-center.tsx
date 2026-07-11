@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { CommandCenterSkeleton } from "./dashboard-skeletons";
+import { DetectionAssistantPanel } from "./detection-assistant-panel";
 import { MonitoringHealth } from "./monitoring-health";
 import { QuickActions } from "./quick-actions";
 import { RecentActivityPanel } from "./recent-activity-panel";
@@ -289,57 +290,33 @@ export function CommandCenter() {
 
 
       <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
-
         <motion.div
-
           initial={{ opacity: 0, scale: 0.98 }}
-
           animate={{ opacity: 1, scale: 1 }}
-
           transition={{ delay: 0.15 }}
-
           className="min-h-[420px]"
-
         >
-
           <Suspense
-
             fallback={
-
               <div className="min-h-[420px] animate-pulse rounded-2xl border border-white/[0.06] bg-white/[0.02]" />
-
             }
-
           >
-
             <NetworkMap monitors={stats.monitors} />
-
           </Suspense>
-
         </motion.div>
-
-
 
         <motion.div
-
           initial={{ opacity: 0, x: 20 }}
-
           animate={{ opacity: 1, x: 0 }}
-
           transition={{ delay: 0.2 }}
-
+          className="space-y-4"
         >
-
+          <DetectionAssistantPanel />
           <RecentActivityPanel
-
             changes={stats.recentChanges}
-
             notifications={stats.recentNotifications}
-
           />
-
         </motion.div>
-
       </div>
 
     </div>

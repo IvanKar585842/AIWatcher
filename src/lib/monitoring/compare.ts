@@ -3,19 +3,34 @@ import { createHash } from "crypto";
 import { hasMeaningfulChange, hashContent, normalizeForComparison } from "./content-cleaner";
 import type { FetchResult } from "./fetcher";
 import { monitorLog } from "./logger";
+import { comparePageStructures, extractPageStructure, type StructureDiff } from "./structural-diff";
+import {
+  compareVisualFingerprints,
+  type VisualFingerprint,
+} from "./visual-compare";
 
 export interface ComparisonInput {
   monitorId: string;
   mode: MonitoringMode;
   previousHash: string;
   previousText: string;
+  previousCleanedHtml?: string;
+  previousMetadata?: Record<string, unknown> | null;
   current: FetchResult;
 }
 
 export interface ComparisonResult {
   changed: boolean;
-  reason: "hash_match" | "noise_filtered" | "content_diff" | "screenshot_diff";
+  reason:
+    | "hash_match"
+    | "noise_filtered"
+    | "content_diff"
+    | "screenshot_diff"
+    | "structure_diff"
+    | "visual_noise";
   currentHash: string;
+  structureDiff?: StructureDiff | null;
+  visualDiffPercent?: number | null;
 }
 
 export function computeContentHash(mode: MonitoringMode, result: FetchResult): string {
@@ -34,7 +49,27 @@ export function computeContentHash(mode: MonitoringMode, result: FetchResult): s
     return hashContent(normalizeForComparison(result.extractedText));
   }
 
+  if (mode === MonitoringMode.ENTIRE_PAGE) {
+    const structure = extractPageStructure(result.cleanedHtml);
+    const signature = [
+      structure.headings.join("|"),
+      structure.buttons.join("|"),
+      structure.sections.join("|"),
+      structure.images.join("|"),
+      structure.textSample.slice(0, 8000),
+    ].join("\n");
+    return hashContent(signature || result.cleanedHtml);
+  }
+
   return hashContent(result.cleanedHtml);
+}
+
+function readFingerprint(meta: Record<string, unknown> | null | undefined): VisualFingerprint | null {
+  const fp = meta?.visualFingerprint;
+  if (Array.isArray(fp) && fp.every((n) => typeof n === "number")) {
+    return fp as number[];
+  }
+  return null;
 }
 
 export function compareSnapshots(input: ComparisonInput): ComparisonResult {
@@ -53,16 +88,70 @@ export function compareSnapshots(input: ComparisonInput): ComparisonResult {
     },
   });
 
-  if (input.previousHash === currentHash) {
-    return { changed: false, reason: "hash_match", currentHash };
-  }
-
   const visualMode =
     input.mode === MonitoringMode.VISUAL_CHANGES ||
     input.mode === MonitoringMode.SCREENSHOT_DIFF;
 
   if (visualMode) {
-    return { changed: true, reason: "screenshot_diff", currentHash };
+    const prevFp = readFingerprint(input.previousMetadata as Record<string, unknown> | null);
+    const currFp = readFingerprint(input.current.metadata as Record<string, unknown>);
+    const visual = compareVisualFingerprints(prevFp, currFp);
+
+    if (!visual.changed && input.previousHash === currentHash) {
+      return {
+        changed: false,
+        reason: "hash_match",
+        currentHash,
+        visualDiffPercent: visual.percent,
+      };
+    }
+
+    if (!visual.changed) {
+      return {
+        changed: false,
+        reason: "visual_noise",
+        currentHash,
+        visualDiffPercent: visual.percent,
+      };
+    }
+
+    return {
+      changed: true,
+      reason: "screenshot_diff",
+      currentHash,
+      visualDiffPercent: visual.percent,
+    };
+  }
+
+  if (input.previousHash === currentHash) {
+    return { changed: false, reason: "hash_match", currentHash };
+  }
+
+  if (input.mode === MonitoringMode.ENTIRE_PAGE && input.previousCleanedHtml) {
+    const structureDiff = comparePageStructures(
+      input.previousCleanedHtml,
+      input.current.cleanedHtml
+    );
+
+    if (!structureDiff.changed && !hasMeaningfulChange(input.previousText, input.current.extractedText)) {
+      return {
+        changed: false,
+        reason: "noise_filtered",
+        currentHash,
+        structureDiff,
+      };
+    }
+
+    if (structureDiff.changed || hasMeaningfulChange(input.previousText, input.current.extractedText)) {
+      return {
+        changed: true,
+        reason: structureDiff.changed ? "structure_diff" : "content_diff",
+        currentHash,
+        structureDiff,
+      };
+    }
+
+    return { changed: false, reason: "noise_filtered", currentHash, structureDiff };
   }
 
   if (!hasMeaningfulChange(input.previousText, input.current.extractedText)) {

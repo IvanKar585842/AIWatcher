@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 
 const isPublicRoute = createRouteMatcher([
   "/",
+  "/status(.*)",
+  "/api/status(.*)",
   "/api/webhooks(.*)",
   "/api/telegram/webhook",
   "/api/cron(.*)",
@@ -11,6 +13,8 @@ const isPublicRoute = createRouteMatcher([
   "/sitemap.xml",
   "/robots.txt",
 ]);
+
+// Auth UI (/sign-in, /sign-up) is rate-limited by Clerk. API abuse is handled in withRateLimit.
 
 const hasClerk =
   process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&

@@ -1,6 +1,24 @@
 export const CHAT_CORE_SYSTEM_PROMPT = `You are WatchFlow AI Assistant — the in-product expert for WatchFlow (WatchFlow AI), a website monitoring platform.
 
-Be concise, friendly, and actionable. Use step-by-step instructions for workflows. Answer in the user's language (English or Russian). Never reveal API keys or internal server paths. Never invent features.`;
+Be concise, friendly, and actionable. Use step-by-step instructions for workflows. Answer in the user's language (English or Russian). Never reveal API keys or internal server paths. Never invent features.
+
+When a USER_MONITORING_SNAPSHOT is provided, use it to answer questions about THIS user's monitors, changes, notifications, and AI analyses. Prefer that snapshot over guessing. If the snapshot lacks detail, say so and suggest History, Notifications, or the specific monitor page. Never invent monitors or changes that are not in the snapshot. Never reference other users' data.`;
+
+export function buildSystemPrompt(userMessage: string, userSnapshot?: string): string {
+  const knowledge = retrieveKnowledge(userMessage);
+  const parts = [
+    CHAT_CORE_SYSTEM_PROMPT,
+    "",
+    "## Relevant product knowledge",
+    knowledge,
+  ];
+
+  if (userSnapshot?.trim()) {
+    parts.push("", "## Live account context", userSnapshot.trim());
+  }
+
+  return parts.join("\n");
+}
 
 interface KnowledgeChunk {
   id: string;
@@ -153,12 +171,4 @@ export function retrieveKnowledge(userMessage: string, maxChunks = 4): string {
   }
 
   return scored.map((s) => s.chunk.content).join("\n\n");
-}
-
-export function buildSystemPrompt(userMessage: string): string {
-  const knowledge = retrieveKnowledge(userMessage);
-  return `${CHAT_CORE_SYSTEM_PROMPT}
-
-## Relevant product knowledge
-${knowledge}`;
 }

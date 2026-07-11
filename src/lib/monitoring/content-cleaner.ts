@@ -88,6 +88,10 @@ const DYNAMIC_PATTERNS = [
   /\blast\s*(seen|updated|modified)\s*:?\s*[\w\s,:-]+/gi,
   /\bcsrf[_-]?token["\s:=]+[\w-]+/gi,
   /\bsession[_-]?id["\s:=]+[\w-]+/gi,
+  /\b\d{10,13}\b/g, // unix timestamps / epoch ms noise
+  /\bviewers?\s*:\s*\d+/gi,
+  /\bonline\s*:\s*\d+/gi,
+  /\b\d+\s*(views?|likes?|shares?|comments?)\b/gi,
 ];
 
 const RANDOM_ID_PATTERNS = [
@@ -103,6 +107,7 @@ export interface CleanOptions {
   ignoreDynamicContent?: boolean;
   ignoreCookies?: boolean;
   ignoreAds?: boolean;
+  ignoreSelectors?: string;
 }
 
 export function stripTrackingParamsFromUrls(html: string): string {
@@ -185,7 +190,26 @@ export function cleanHtml(html: string, options: CleanOptions = {}): string {
 
   cleaned = cleaned
     .replace(/<svg[\s\S]*?<\/svg>/gi, "")
+    .replace(/<iframe[\s\S]*?<\/iframe>/gi, "")
+    .replace(/<video[\s\S]*?<\/video>/gi, "[VIDEO]")
+    .replace(/<img[^>]*src=["']([^"']+)["'][^>]*>/gi, (_m, src: string) => {
+      try {
+        const parsed = new URL(src, "https://placeholder.local");
+        for (const param of TRACKING_QUERY_PARAMS) {
+          parsed.searchParams.delete(param);
+        }
+        const cleanSrc =
+          parsed.hostname === "placeholder.local"
+            ? `${parsed.pathname}${parsed.search}`
+            : parsed.toString();
+        if (cleanSrc.startsWith("data:")) return "[IMAGE:data]";
+        return `[IMAGE:${cleanSrc.slice(0, 200)}]`;
+      } catch {
+        return "[IMAGE]";
+      }
+    })
     .replace(/<img[^>]*>/gi, "[IMAGE]")
+    .replace(/\s+(style|onclick|onload|onerror)=["'][^"']*["']/gi, "")
     .replace(/\s+/g, " ")
     .replace(/>\s+</g, "><")
     .trim();
@@ -237,11 +261,43 @@ export function hasMeaningfulChange(oldContent: string, newContent: string): boo
   const lengthDiff = Math.abs(oldNorm.length - newNorm.length);
   const maxLen = Math.max(oldNorm.length, newNorm.length);
 
-  if (maxLen > 0 && lengthDiff / maxLen < 0.005) {
+  // Tiny length churn alone is usually noise
+  if (maxLen > 0 && lengthDiff / maxLen < 0.008 && lengthDiff < 40) {
     return false;
   }
 
   return true;
+}
+
+/** Compact line-level change bullets for AI (avoids sending full HTML). */
+export function extractTextChangeBullets(
+  oldText: string,
+  newText: string,
+  limit = 12
+): string[] {
+  const oldLines = normalizeForComparison(oldText)
+    .split(/[.!?]\s+|\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 12);
+  const newLines = normalizeForComparison(newText)
+    .split(/[.!?]\s+|\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 12);
+
+  const oldSet = new Set(oldLines);
+  const newSet = new Set(newLines);
+  const bullets: string[] = [];
+
+  for (const line of newLines) {
+    if (!oldSet.has(line)) bullets.push(`Added: ${line.slice(0, 180)}`);
+    if (bullets.length >= limit) break;
+  }
+  for (const line of oldLines) {
+    if (!newSet.has(line)) bullets.push(`Removed: ${line.slice(0, 180)}`);
+    if (bullets.length >= limit) break;
+  }
+
+  return bullets;
 }
 
 export function contentHashesEqual(a: string, b: string): boolean {
