@@ -1,6 +1,6 @@
 import { MonitoringMode } from "@prisma/client";
 
-const BOT_ALIASES = new Set(["*", "watchflowai", "watchflow"]);
+const BOT_ALIASES = new Set(["*", "watchflowing", "WatchFlowing", "WatchFlowAI", "watchflowai"]);
 
 interface RobotsRule {
   type: "allow" | "disallow";
@@ -112,7 +112,7 @@ export async function isUrlAllowedByRobotsTxt(url: string): Promise<boolean> {
     const parsed = new URL(url);
     const response = await fetch(`${parsed.origin}/robots.txt`, {
       signal: AbortSignal.timeout(5000),
-      headers: { "User-Agent": "WatchFlowAI/1.0 (+https://watchflow.ai/bot)" },
+      headers: { "User-Agent": "WatchFlowing/1.0 (+https://watchflowing.com/bot)" },
     });
 
     if (!response.ok) return true;

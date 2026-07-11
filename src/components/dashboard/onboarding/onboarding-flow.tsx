@@ -184,7 +184,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
         <div className="border-b border-white/[0.06] bg-gradient-to-r from-cyan-500/[0.08] via-transparent to-blue-500/[0.05] px-5 py-5 sm:px-8">
           <p className={os.label}>First-time setup</p>
           <h1 className="mt-2 text-2xl font-semibold text-zinc-50 sm:text-3xl">
-            Welcome to AI Watcher
+            Welcome to WatchFlowing
           </h1>
           <p className="mt-2 max-w-xl text-sm text-zinc-500">
             Set up your first monitor in under a minute.
@@ -223,7 +223,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                 className="space-y-5"
               >
                 <p className="text-sm leading-relaxed text-zinc-400">
-                  AI Watcher (WatchFlow) continuously monitors websites you care about,
+                  WatchFlowing (WatchFlowing) continuously monitors websites you care about,
                   detects meaningful changes, and explains them with AI — so you never miss
                   an important update.
                 </p>

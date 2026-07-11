@@ -1,4 +1,4 @@
-# WatchFlow AI
+# WatchFlowing
 
 AI-powered web monitoring SaaS. Monitor any webpage and get intelligent explanations of **what changed** and **why it matters**.
 

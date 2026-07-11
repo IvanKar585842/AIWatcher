@@ -26,7 +26,7 @@ const STATIC_FAQ: FaqEntry[] = [
       /как создать монитор/i,
       /как добавить монитор/i,
     ],
-    answer: `To create a monitor in WatchFlow:
+    answer: `To create a monitor in WatchFlowing:
 
 1. Go to **Monitors** in the sidebar (or use the dashboard empty state).
 2. Click **Create Monitor**.
@@ -47,7 +47,7 @@ The first check stores a baseline snapshot. Later checks compare against it and 
       /как работает оплата/i,
       /тариф/i,
     ],
-    answer: `WatchFlow has three plans:
+    answer: `WatchFlowing has three plans:
 
 **Free** — 3 monitors, 12-hour minimum interval, 7-day history, email notifications.
 
@@ -65,11 +65,11 @@ Open **Dashboard → Billing** to see your current plan, usage limits, and upgra
       /как работает ai/i,
       /ии мониторинг/i,
     ],
-    answer: `AI monitoring in WatchFlow works in two ways:
+    answer: `AI monitoring in WatchFlowing works in two ways:
 
 **AI Smart mode** — When creating a monitor, choose AI Smart to focus on the main content area instead of noisy page chrome.
 
-**Change analysis** — After any detected change, WatchFlow sends old vs. new content to AI (OpenAI or Gemini) with your optional custom prompt. The AI writes a human-readable summary and decides if the change is important enough to notify you.
+**Change analysis** — After any detected change, WatchFlowing sends old vs. new content to AI (OpenAI or Gemini) with your optional custom prompt. The AI writes a human-readable summary and decides if the change is important enough to notify you.
 
 If no AI API key is configured, a built-in fallback still produces a useful text summary. Noise like timestamps and ads is typically filtered out.`,
   },
@@ -122,7 +122,7 @@ For social sites like Facebook, use **Visual Changes** (robots.txt is skipped fo
 4. Set your preferred check interval and notifications.
 5. Save the monitor.
 
-WatchFlow extracts price-like content from the page and alerts you when it changes. For a single price element, you can also use **CSS Selector** mode with a selector pointing to the price element.`,
+WatchFlowing extracts price-like content from the page and alerts you when it changes. For a single price element, you can also use **CSS Selector** mode with a selector pointing to the price element.`,
   },
 ];
 

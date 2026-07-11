@@ -115,15 +115,17 @@ export default function SettingsPage() {
   useEffect(() => {
     const controller = new AbortController();
 
-    function applyTelegramData(data: {
-      linked?: boolean;
+    type TelegramStatus = {
+      linked: boolean;
       connected?: boolean;
       telegramUsername: string | null;
-      linkUrl?: string | null;
+      linkUrl: string | null;
       email?: string;
       telegramNotificationsEnabled?: boolean;
       emailNotificationsEnabled?: boolean;
-    }) {
+    };
+
+    function applyTelegramData(data: TelegramStatus) {
       setTelegram(data);
       setTelegramError(false);
       setSettings((prev) => {
@@ -149,7 +151,24 @@ export default function SettingsPage() {
           if (!r.ok) throw new Error("Failed");
           return r.json();
         })
-        .then(applyTelegramData);
+        .then((raw: Record<string, unknown>) => {
+          applyTelegramData({
+            linked: Boolean(raw.linked ?? raw.connected),
+            connected: Boolean(raw.connected ?? raw.linked),
+            telegramUsername:
+              typeof raw.telegramUsername === "string" ? raw.telegramUsername : null,
+            linkUrl: typeof raw.linkUrl === "string" ? raw.linkUrl : null,
+            email: typeof raw.email === "string" ? raw.email : undefined,
+            telegramNotificationsEnabled:
+              typeof raw.telegramNotificationsEnabled === "boolean"
+                ? raw.telegramNotificationsEnabled
+                : undefined,
+            emailNotificationsEnabled:
+              typeof raw.emailNotificationsEnabled === "boolean"
+                ? raw.emailNotificationsEnabled
+                : undefined,
+          });
+        });
     }
 
     loadTelegram(controller.signal)
@@ -324,7 +343,7 @@ export default function SettingsPage() {
             </SettingRow>
             <SettingRow
               title="Usage analytics"
-              description="Help improve WatchFlow with anonymous usage data"
+              description="Help improve WatchFlowing with anonymous usage data"
             >
               <Switch
                 checked={settings.analyticsEnabled}

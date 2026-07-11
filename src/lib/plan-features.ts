@@ -180,7 +180,7 @@ export const FEATURE_UPGRADE_COPY: Record<
   },
   API_ACCESS: {
     title: "API access is included with Business",
-    description: "Connect WatchFlow to your internal tools and automate workflows.",
+    description: "Connect WatchFlowing to your internal tools and automate workflows.",
     minPlan: Plan.BUSINESS,
   },
   TEAM_MEMBERS: {

@@ -242,7 +242,7 @@ async function fetchPageContentOnce(options: FetchOptions): Promise<FetchResult>
   const browser = await getBrowser();
   const context = await browser.newContext({
     userAgent:
-      "WatchFlowAI/1.0 (+https://watchflow.ai/bot; monitoring service)",
+      "WatchFlowing/1.0 (+https://watchflowing.com/bot; monitoring service)",
     viewport: { width: VISUAL_VIEWPORT.width, height: VISUAL_VIEWPORT.height },
     deviceScaleFactor: 1,
     ignoreHTTPSErrors: true,
@@ -501,7 +501,7 @@ async function fetchStaticContent(
   const response = await fetch(url, {
     signal: AbortSignal.timeout(timeout),
     headers: {
-      "User-Agent": "WatchFlowAI/1.0 (+https://watchflow.ai/bot; monitoring service)",
+      "User-Agent": "WatchFlowing/1.0 (+https://watchflowing.com/bot; monitoring service)",
       Accept: mode === MonitoringMode.RSS_FEED ? "application/rss+xml, application/xml, text/xml" : "*/*",
     },
   });

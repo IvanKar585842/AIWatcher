@@ -39,11 +39,15 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
 };
 
 const STORAGE_KEY = "watchflow-user-settings";
+const LEGACY_STORAGE_KEYS = ["WatchFlowing-user-settings", "watchflow-ai-user-settings"];
 
 export function loadUserSettings(): UserSettings {
   if (typeof window === "undefined") return DEFAULT_USER_SETTINGS;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw =
+      localStorage.getItem(STORAGE_KEY) ??
+      LEGACY_STORAGE_KEYS.map((k) => localStorage.getItem(k)).find(Boolean) ??
+      null;
     if (!raw) return DEFAULT_USER_SETTINGS;
     return { ...DEFAULT_USER_SETTINGS, ...JSON.parse(raw) };
   } catch {

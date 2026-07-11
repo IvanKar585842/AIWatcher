@@ -6,8 +6,8 @@ import { useState } from "react";
 
 const FAQS = [
   {
-    q: "How is WatchFlow different from change detectors?",
-    a: "Most tools alert you that something changed. WatchFlow's AI explains what changed, classifies it, and rates its importance — like having an analyst watching every page.",
+    q: "How is WatchFlowing different from change detectors?",
+    a: "Most tools alert you that something changed. WatchFlowing's AI explains what changed, classifies it, and rates its importance — like having an analyst watching every page.",
   },
   {
     q: "What can it monitor?",

@@ -567,7 +567,7 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
         <SettingsSection
           id="modes"
           title="Monitoring Modes"
-          subtitle="Choose how WatchFlow detects changes"
+          subtitle="Choose how WatchFlowing detects changes"
           icon={<span className="text-lg">◎</span>}
           open={openSections.modes}
           onToggle={() => toggleSection("modes")}

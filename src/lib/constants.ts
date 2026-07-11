@@ -120,7 +120,7 @@ export const PRICING_PLANS = [
     plan: Plan.FREE,
     name: "Free",
     price: 0,
-    description: "Try WatchFlow and see how monitoring feels in practice.",
+    description: "Try WatchFlowing and see how monitoring feels in practice.",
     features: [
       "Basic website monitoring (3 sites)",
       "Checks every 12 hours",

@@ -66,7 +66,7 @@ interface ChangeEmailParams {
 
 export async function sendChangeEmail(params: ChangeEmailParams) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const from = process.env.RESEND_FROM_EMAIL ?? "WatchFlow AI <notifications@watchflow.ai>";
+  const from = process.env.RESEND_FROM_EMAIL ?? "WatchFlowing <notifications@watchflowing.com>";
   const dashboardUrl = `${appUrl}/dashboard/changes/${params.changeId}`;
   const settingsUrl = `${appUrl}/dashboard/settings`;
   const notificationsUrl = `${appUrl}/dashboard/notifications`;
@@ -145,7 +145,7 @@ export async function sendChangeEmail(params: ChangeEmailParams) {
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#111111;border:1px solid rgba(56,189,248,0.18);border-radius:16px;overflow:hidden;">
           <tr>
             <td style="padding:28px 24px 20px;border-bottom:1px solid rgba(255,255,255,0.06);background:linear-gradient(135deg,rgba(34,211,238,0.08),transparent 55%);">
-              <p style="margin:0 0 8px;font-size:11px;letter-spacing:0.22em;text-transform:uppercase;color:rgba(56,189,248,0.75);">AI Watcher</p>
+              <p style="margin:0 0 8px;font-size:11px;letter-spacing:0.22em;text-transform:uppercase;color:rgba(56,189,248,0.75);">WatchFlowing</p>
               <h1 style="margin:0;color:#fafafa;font-size:22px;font-weight:600;line-height:1.3;">
                 ${urgencyIcon}${safe.emoji} ${safe.headline}
               </h1>
@@ -250,7 +250,7 @@ export async function sendChangeEmail(params: ChangeEmailParams) {
                 <a href="${safe.settingsUrl}" style="color:#71717a;text-decoration:underline;">Unsubscribe / pause</a>
               </p>
               <p style="margin:12px 0 0;font-size:11px;color:#3f3f46;">
-                AI Watcher · Intelligent website monitoring
+                WatchFlowing · Intelligent website monitoring
               </p>
             </td>
           </tr>
@@ -300,16 +300,16 @@ export async function sendChangeEmail(params: ChangeEmailParams) {
 
 export async function sendWelcomeEmail(to: string, name: string) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const from = process.env.RESEND_FROM_EMAIL ?? "WatchFlow AI <notifications@watchflow.ai>";
+  const from = process.env.RESEND_FROM_EMAIL ?? "WatchFlowing <notifications@watchflowing.com>";
   const safeName = escapeHtml(name);
 
   await getResend().emails.send({
     from,
     to,
-    subject: "Welcome to AI Watcher",
+    subject: "Welcome to WatchFlowing",
     html: `
       <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:560px;margin:0 auto;padding:40px 20px;background:#090909;color:#d4d4d8;">
-        <p style="margin:0 0 8px;font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:rgba(56,189,248,0.75);">AI Watcher</p>
+        <p style="margin:0 0 8px;font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:rgba(56,189,248,0.75);">WatchFlowing</p>
         <h1 style="color:#fafafa;margin:0 0 12px;">Welcome, ${safeName}</h1>
         <p style="line-height:1.6;color:#a1a1aa;">Your monitoring workspace is ready. Add a monitor and we will watch the web for meaningful changes.</p>
         <a href="${escapeHtml(appUrl)}/dashboard" style="display:inline-block;background:#22d3ee;color:#090909;padding:12px 24px;border-radius:999px;text-decoration:none;margin-top:16px;font-weight:700;">Open Dashboard</a>

@@ -261,7 +261,7 @@ export function AssistantChat() {
     <div className={os.page}>
       <CommandPageHeader
         label="AI Assistant"
-        title="WatchFlow Assistant"
+        title="WatchFlowing Assistant"
         description="Ask anything about monitoring, settings, notifications, or troubleshooting."
       />
 
@@ -515,7 +515,7 @@ export function AssistantChat() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Ask WatchFlow Assistant…"
+                placeholder="Ask WatchFlowing Assistant…"
                 rows={1}
                 maxLength={2000}
                 disabled={sending}

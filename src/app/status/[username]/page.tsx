@@ -102,7 +102,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const data = await loadStatusPage(username);
   if (!data) return { title: "Status — Not found" };
   return {
-    title: `${data.title} | AI Watcher`,
+    title: `${data.title} | WatchFlowing`,
     description: `Public monitoring status for ${data.username}`,
   };
 }

@@ -6,7 +6,7 @@ import {
 } from "./types";
 import { truncateContent, withRetry } from "./utils";
 
-const SYSTEM_INSTRUCTION = `You are WatchFlow AI's change analyst.
+const SYSTEM_INSTRUCTION = `You are WatchFlowing's change analyst.
 Compare old and new webpage snapshots and return structured JSON only.
 Honor the user's monitoring prompt when deciding importance and shouldNotify.
 Set shouldNotify=false for noise: ads, timestamps, cookie banners, minor formatting, tracking params.`;

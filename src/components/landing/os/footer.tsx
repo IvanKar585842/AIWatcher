@@ -99,14 +99,14 @@ export function OsFooter() {
           <p className="mt-3 text-sm text-zinc-600">Deploy your first monitor in under 60 seconds.</p>
           <div className="mt-6 flex justify-center">
             <SignUpCTA className="!rounded-full !border-cyan-400/30 !bg-cyan-500/10 !px-8 !text-cyan-100">
-              Initialize WatchFlow
+              Initialize WatchFlowing
             </SignUpCTA>
           </div>
         </motion.div>
 
         <div className="flex flex-col items-center justify-between gap-6 border-t border-white/[0.04] pt-8 md:flex-row">
           <p className="font-mono text-[10px] tracking-widest text-zinc-600">
-            WATCHFLOW © {new Date().getFullYear()}
+            WatchFlowing © {new Date().getFullYear()}
           </p>
           <div className="flex gap-8">
             {["Features", "Pricing", "FAQ", "Dashboard"].map((l) => (

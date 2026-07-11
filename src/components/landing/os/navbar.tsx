@@ -23,7 +23,7 @@ export function OsNavbar() {
             />
           </span>
           <span className="text-sm font-medium tracking-wide text-zinc-200">
-            Watch<span className="text-cyan-400">Flow</span>
+            Watch<span className="text-cyan-400">Flowing</span>
           </span>
         </Link>
 

@@ -346,7 +346,7 @@ export function CreateMonitorDialog({
                 className="space-y-4"
               >
                 <div>
-                  <FieldLabel hint="The page you want WatchFlow to check for changes.">
+                  <FieldLabel hint="The page you want WatchFlowing to check for changes.">
                     Website URL
                   </FieldLabel>
                   <OsInput

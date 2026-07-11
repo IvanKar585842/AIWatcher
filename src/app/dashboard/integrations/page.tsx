@@ -64,7 +64,7 @@ const INTEGRATIONS: Integration[] = [
   {
     id: "zapier",
     name: "Zapier",
-    description: "Connect AI Watcher to thousands of apps without writing code.",
+    description: "Connect WatchFlowing to thousands of apps without writing code.",
     icon: Zap,
     status: "coming_soon",
   },
@@ -141,7 +141,7 @@ export default function IntegrationsPage() {
       <CommandPageHeader
         label="Connect"
         title="Integrations"
-        description="Connect AI Watcher to the tools your team already uses."
+        description="Connect WatchFlowing to the tools your team already uses."
       />
 
       <div className="mb-8 flex items-center gap-2 text-xs text-zinc-500">

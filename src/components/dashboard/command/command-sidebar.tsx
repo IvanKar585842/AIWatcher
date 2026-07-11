@@ -89,7 +89,7 @@ export function CommandSidebar() {
                 className="min-w-0"
               >
                 <p className="truncate text-sm font-semibold tracking-wide text-zinc-100">
-                  WatchFlow
+                  WatchFlowing
                 </p>
                 <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-cyan-500/70">
                   Command

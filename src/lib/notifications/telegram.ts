@@ -124,7 +124,7 @@ export async function sendTelegramChangeNotification(
       : "Review when convenient.");
 
   const text = [
-    `🚨 <b>WatchFlow Alert</b>`,
+    `🚨 <b>WatchFlowing Alert</b>`,
     ``,
     `<b>Website:</b>`,
     escapeHtml(hostname),

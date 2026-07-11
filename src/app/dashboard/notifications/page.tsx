@@ -18,6 +18,7 @@ import { MODE_LABELS } from "@/lib/constants";
 import type { MonitoringMode } from "@prisma/client";
 
 const READ_KEY = "watchflow-read-notifications";
+const LEGACY_READ_KEY = "WatchFlowing-read-notifications";
 
 interface NotificationItem {
   id: string;
@@ -42,7 +43,9 @@ interface NotificationItem {
 function getReadIds(): Set<string> {
   if (typeof window === "undefined") return new Set();
   try {
-    return new Set(JSON.parse(localStorage.getItem(READ_KEY) || "[]") as string[]);
+    const raw =
+      localStorage.getItem(READ_KEY) ?? localStorage.getItem(LEGACY_READ_KEY) ?? "[]";
+    return new Set(JSON.parse(raw) as string[]);
   } catch {
     return new Set();
   }

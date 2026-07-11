@@ -34,7 +34,7 @@ export function QuickActions({ onRefresh, pausedCount, activeCount }: QuickActio
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `watchflow-monitors-${new Date().toISOString().slice(0, 10)}.json`;
+        a.download = `WatchFlowing-monitors-${new Date().toISOString().slice(0, 10)}.json`;
         a.click();
         URL.revokeObjectURL(url);
       } else {

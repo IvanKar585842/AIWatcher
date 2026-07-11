@@ -128,7 +128,7 @@ export default function BillingPage() {
   const paymentsReady = overview?.payments?.checkoutReady ?? false;
   const planCopy =
     currentPlan === "FREE"
-      ? "You're exploring WatchFlow. Upgrade when you want AI clarity, faster checks, and richer alerts."
+      ? "You're exploring WatchFlowing. Upgrade when you want AI clarity, faster checks, and richer alerts."
       : currentPlan === "PRO"
         ? "You have AI analysis, faster intervals, visual monitoring, and Telegram — built for serious monitoring."
         : "Full team access with API, webhooks, priority processing, and unlimited AI.";

@@ -1,14 +1,14 @@
 import { type Metadata } from "next";
 
 export const siteConfig = {
-  name: "WatchFlow AI",
+  name: "WatchFlowing",
   description:
     "Monitor any webpage and get AI-powered explanations of what changed and why it matters. Intelligent web monitoring for teams and individuals.",
-  url: process.env.NEXT_PUBLIC_APP_URL ?? "https://watchflow.ai",
+  url: process.env.NEXT_PUBLIC_APP_URL ?? "https://watchflowing.com",
   ogImage: "/og-image.png",
   links: {
-    twitter: "https://twitter.com/watchflowai",
-    github: "https://github.com/watchflow-ai",
+    twitter: "https://twitter.com/watchflowing",
+    github: "https://github.com/watchflowing",
   },
 };
 
@@ -27,8 +27,8 @@ export const defaultMetadata: Metadata = {
     "competitor tracking",
     "SaaS",
   ],
-  authors: [{ name: "WatchFlow AI" }],
-  creator: "WatchFlow AI",
+  authors: [{ name: "WatchFlowing" }],
+  creator: "WatchFlowing",
   openGraph: {
     type: "website",
     locale: "en_US",
@@ -41,7 +41,7 @@ export const defaultMetadata: Metadata = {
     card: "summary_large_image",
     title: siteConfig.name,
     description: siteConfig.description,
-    creator: "@watchflowai",
+    creator: "@watchflowing",
   },
   robots: {
     index: true,
@@ -59,7 +59,7 @@ export const defaultMetadata: Metadata = {
 export const structuredData = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  name: "WatchFlow AI",
+  name: "WatchFlowing",
   applicationCategory: "BusinessApplication",
   operatingSystem: "Web",
   description: siteConfig.description,

@@ -128,14 +128,14 @@ export function HeroDashboard() {
           <h1 className="max-w-4xl text-4xl font-light tracking-tight text-zinc-100 sm:text-5xl md:text-6xl">
             The internet moves.
             <br />
-            <span className="font-normal text-cyan-300">WatchFlow sees everything.</span>
+            <span className="font-normal text-cyan-300">WatchFlowing sees everything.</span>
           </h1>
           <p className="mt-5 max-w-xl text-base leading-relaxed text-zinc-500">
             An AI operating system that watches pages for you — then explains what changed and why it matters.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
             <SignUpCTA className="!rounded-full !border-cyan-400/30 !bg-cyan-500/10 !px-8 !py-3 !text-cyan-50 hover:!border-cyan-300/50">
-              Initialize WatchFlow
+              Initialize WatchFlowing
             </SignUpCTA>
             <MagneticButton variant="ghost" onClick={() => document.getElementById("os-features")?.scrollIntoView({ behavior: "smooth" })}>
               Explore the system
@@ -155,7 +155,7 @@ export function HeroDashboard() {
                   <span className="h-2 w-2 rounded-full bg-zinc-700" />
                 </div>
                 <span className="font-mono text-[10px] tracking-widest text-zinc-600">
-                  WATCHFLOW_OS v1.0 · 6 MONITORS ACTIVE
+                  WatchFlowing_OS v1.0 · 6 MONITORS ACTIVE
                 </span>
                 <span className="font-mono text-[10px] text-cyan-500/80">LIVE</span>
               </div>

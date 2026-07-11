@@ -13,7 +13,7 @@ interface TelegramUpdate {
 }
 
 const CONNECTED_MESSAGE =
-  "✅ WatchFlow Telegram notifications connected successfully.";
+  "✅ WatchFlowing Telegram notifications connected successfully.";
 
 export async function handleTelegramUpdate(update: TelegramUpdate) {
   const message = update.message;
@@ -56,7 +56,7 @@ export async function handleTelegramUpdate(update: TelegramUpdate) {
 
       await sendTelegramMessage(
         chatId,
-        "👋 <b>Welcome to WatchFlow!</b>\n\n" +
+        "👋 <b>Welcome to WatchFlowing!</b>\n\n" +
           "To connect notifications, open Dashboard → Settings → Notifications and tap <b>Connect Telegram</b>.\n\n" +
           "<b>Commands:</b>\n" +
           "/list — View your monitors\n" +
@@ -214,7 +214,7 @@ async function tryLinkTelegramAccount(params: {
   if (!linkUser) {
     await sendTelegramMessage(
       params.chatId,
-      "⚠️ WatchFlow account not found for this connection link."
+      "⚠️ WatchFlowing account not found for this connection link."
     );
     return true;
   }
@@ -222,7 +222,7 @@ async function tryLinkTelegramAccount(params: {
   if (linkUser.telegramChatId && linkUser.telegramChatId !== params.chatId) {
     await sendTelegramMessage(
       params.chatId,
-      "⚠️ This WatchFlow account is already linked to another Telegram chat. Disconnect it in dashboard settings first."
+      "⚠️ This WatchFlowing account is already linked to another Telegram chat. Disconnect it in dashboard settings first."
     );
     return true;
   }
@@ -233,7 +233,7 @@ async function tryLinkTelegramAccount(params: {
   if (existing) {
     await sendTelegramMessage(
       params.chatId,
-      "⚠️ This Telegram account is already linked to another WatchFlow user."
+      "⚠️ This Telegram account is already linked to another WatchFlowing user."
     );
     return true;
   }

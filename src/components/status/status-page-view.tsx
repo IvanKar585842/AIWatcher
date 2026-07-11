@@ -72,7 +72,7 @@ export function StatusPageView({ data }: { data: StatusPageData }) {
             className="inline-flex items-center gap-2 text-xs text-zinc-500 transition-colors hover:text-cyan-300"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
-            AI Watcher
+            WatchFlowing
           </Link>
           <p className="font-mono text-[10px] uppercase tracking-widest text-zinc-600">
             Public status
@@ -201,7 +201,7 @@ export function StatusPageView({ data }: { data: StatusPageData }) {
           <p className="text-xs text-zinc-600">
             Powered by{" "}
             <Link href="/" className="text-cyan-400/80 hover:text-cyan-300">
-              AI Watcher
+              WatchFlowing
             </Link>
           </p>
         </footer>
