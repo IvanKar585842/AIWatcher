@@ -22,6 +22,26 @@ import { assertSafeFetchUrl } from "@/lib/security/url";
 
 const FETCH_RETRY_BASE_MS = 1000;
 
+/** Remote Chromium pack for Vercel — arch-specific (generic -pack.tar 404s on v149+) */
+function defaultChromiumPackUrl(): string {
+  const arch = process.arch === "arm64" ? "arm64" : "x64";
+  return `https://github.com/Sparticuz/chromium/releases/download/v149.0.0/chromium-v149.0.0-pack.${arch}.tar`;
+}
+
+const CHROMIUM_PACK_URL =
+  process.env.CHROMIUM_PACK_URL?.trim() || defaultChromiumPackUrl();
+
+/** Match Sparticuz lib selection to the actual Node major on the function */
+function resolveLambdaJsRuntime(): string {
+  if (process.env.AWS_LAMBDA_JS_RUNTIME?.trim()) {
+    return process.env.AWS_LAMBDA_JS_RUNTIME.trim();
+  }
+  const major = Number(process.versions.node.split(".")[0] || "22");
+  if (major >= 24) return "nodejs24.x";
+  if (major >= 22) return "nodejs22.x";
+  return "nodejs20.x";
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -57,27 +77,41 @@ function isServerlessRuntime(): boolean {
 }
 
 async function launchWithSparticuz(): Promise<Browser> {
-  // Must be set BEFORE importing @sparticuz/chromium so it picks AL2023 libs
-  // (required on Vercel Fluid Compute — otherwise libnss3.so / libnspr4.so fail to load)
-  if (!process.env.AWS_LAMBDA_JS_RUNTIME) {
-    process.env.AWS_LAMBDA_JS_RUNTIME = "nodejs22.x";
-  }
+  // Must be set BEFORE importing chromium so the correct AL2023 libs are selected
+  process.env.AWS_LAMBDA_JS_RUNTIME = resolveLambdaJsRuntime();
 
-  const chromium = (await import("@sparticuz/chromium")).default;
-  // Property setter (not a method) — disables WebGL / swiftshader on serverless
+  // chromium-min has no local bin/ — the pack URL is required
+  const chromium = (await import("@sparticuz/chromium-min")).default;
   chromium.setGraphicsMode = false;
 
-  const executablePath = await chromium.executablePath();
-  if (!executablePath) {
-    throw new Error("Serverless Chromium executable path is empty");
+  let executablePath: string;
+  try {
+    executablePath = await chromium.executablePath(CHROMIUM_PACK_URL);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Failed to download Chromium pack (${CHROMIUM_PACK_URL}). ` +
+        `Set CHROMIUM_PACK_URL to a valid pack.x64/arm64.tar. Cause: ${detail}`,
+      { cause: error }
+    );
   }
 
-  // Shared libraries unpack under /tmp (and /tmp/al2023/lib). Keep both on the path.
+  if (!executablePath) {
+    throw new Error(
+      `Serverless Chromium executable path is empty after downloading ${CHROMIUM_PACK_URL}`
+    );
+  }
+
   const execDir = path.dirname(executablePath);
   const al2023Lib = path.join("/tmp", "al2023", "lib");
   process.env.LD_LIBRARY_PATH = [execDir, al2023Lib, process.env.LD_LIBRARY_PATH]
     .filter(Boolean)
     .join(":");
+
+  monitorLog({
+    step: "fetch_start",
+    message: `Chromium ready (${process.env.AWS_LAMBDA_JS_RUNTIME}, ${process.arch}, node ${process.versions.node})`,
+  });
 
   return playwrightChromium.launch({
     args: chromium.args,

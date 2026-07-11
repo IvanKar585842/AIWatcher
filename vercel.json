@@ -8,9 +8,6 @@
       "schedule": "0 3 * * *"
     }
   ],
-  "env": {
-    "AWS_LAMBDA_JS_RUNTIME": "nodejs22.x"
-  },
   "functions": {
     "src/app/api/cron/monitoring/route.ts": {
       "maxDuration": 60,

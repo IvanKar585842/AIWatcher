@@ -15,7 +15,12 @@ const nextConfig: NextConfig = {
     ],
     formats: ["image/avif", "image/webp"],
   },
-  serverExternalPackages: ["playwright", "playwright-core", "@sparticuz/chromium"],
+  // Keep Chromium / Playwright out of the webpack bundle so binaries are not relocated
+  serverExternalPackages: [
+    "playwright",
+    "playwright-core",
+    "@sparticuz/chromium-min",
+  ],
   poweredByHeader: false,
   compress: true,
 };
