@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { defaultMetadata, structuredData } from "@/lib/seo";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { ClerkThemeProvider } from "@/components/providers/clerk-provider";
@@ -23,6 +24,7 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <ClerkThemeProvider>{children}</ClerkThemeProvider>
         </ThemeProvider>
+        <SpeedInsights />
       </body>
     </html>
   );
