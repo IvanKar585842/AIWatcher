@@ -188,7 +188,7 @@ export function DetectionAssistantPanel() {
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.12 }}
-      className="flex min-h-[380px] flex-col overflow-hidden rounded-2xl border border-cyan-500/15 bg-white/[0.02]"
+      className="flex h-[240px] max-h-[240px] flex-col overflow-hidden rounded-2xl border border-cyan-500/15 bg-white/[0.02]"
     >
       <div className="flex items-center justify-between gap-3 border-b border-white/[0.06] px-4 py-3">
         <div className="min-w-0">
@@ -220,28 +220,28 @@ export function DetectionAssistantPanel() {
         </div>
       </div>
 
-      <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
         {booting && (
           <p className="py-8 text-center text-xs text-zinc-600">Loading assistant…</p>
         )}
 
         {!booting && messages.length === 0 && !streaming && !sending && (
-          <div className="flex h-full flex-col justify-center py-4">
-            <div className="mb-3 flex justify-center">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-400/25 bg-cyan-500/10">
-                <Bot className="h-5 w-5 text-cyan-400" />
+          <div className="flex h-full min-h-0 flex-col justify-center py-2">
+            <div className="mb-2 flex justify-center">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-cyan-400/25 bg-cyan-500/10">
+                <Bot className="h-4 w-4 text-cyan-400" />
               </div>
             </div>
-            <p className="text-center text-xs text-zinc-500">
+            <p className="text-center text-[11px] text-zinc-500">
               I can read your detections and explain what matters.
             </p>
-            <div className="mt-4 grid gap-2">
-              {SUGGESTIONS.map((q) => (
+            <div className="mt-3 grid gap-1.5">
+              {SUGGESTIONS.slice(0, 3).map((q) => (
                 <button
                   key={q}
                   type="button"
                   onClick={() => void sendMessage(q)}
-                  className="min-h-10 rounded-xl border border-white/[0.06] bg-black/30 px-3 py-2 text-left text-xs text-zinc-400 transition-colors hover:border-cyan-400/20 hover:text-cyan-200"
+                  className="min-h-9 rounded-lg border border-white/[0.06] bg-black/30 px-3 py-1.5 text-left text-[11px] text-zinc-400 transition-colors hover:border-cyan-400/20 hover:text-cyan-200"
                 >
                   {q}
                 </button>

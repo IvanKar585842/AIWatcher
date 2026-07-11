@@ -57,12 +57,27 @@ function isServerlessRuntime(): boolean {
 }
 
 async function launchWithSparticuz(): Promise<Browser> {
-  const chromium = (await import("@sparticuz/chromium")).default;
-  const executablePath = await chromium.executablePath();
-
-  if (executablePath) {
-    process.env.LD_LIBRARY_PATH = path.dirname(executablePath);
+  // Must be set BEFORE importing @sparticuz/chromium so it picks AL2023 libs
+  // (required on Vercel Fluid Compute — otherwise libnss3.so / libnspr4.so fail to load)
+  if (!process.env.AWS_LAMBDA_JS_RUNTIME) {
+    process.env.AWS_LAMBDA_JS_RUNTIME = "nodejs22.x";
   }
+
+  const chromium = (await import("@sparticuz/chromium")).default;
+  // Property setter (not a method) — disables WebGL / swiftshader on serverless
+  chromium.setGraphicsMode = false;
+
+  const executablePath = await chromium.executablePath();
+  if (!executablePath) {
+    throw new Error("Serverless Chromium executable path is empty");
+  }
+
+  // Shared libraries unpack under /tmp (and /tmp/al2023/lib). Keep both on the path.
+  const execDir = path.dirname(executablePath);
+  const al2023Lib = path.join("/tmp", "al2023", "lib");
+  process.env.LD_LIBRARY_PATH = [execDir, al2023Lib, process.env.LD_LIBRARY_PATH]
+    .filter(Boolean)
+    .join(":");
 
   return playwrightChromium.launch({
     args: chromium.args,
@@ -118,10 +133,18 @@ async function launchBrowser(): Promise<Browser> {
 }
 
 async function getBrowser(): Promise<Browser> {
-  if (!browserInstance || !browserInstance.isConnected()) {
-    browserInstance = await launchBrowser();
+  if (browserInstance && browserInstance.isConnected()) {
+    return browserInstance;
   }
-  return browserInstance;
+
+  browserInstance = null;
+  try {
+    browserInstance = await launchBrowser();
+    return browserInstance;
+  } catch (error) {
+    browserInstance = null;
+    throw error;
+  }
 }
 
 export async function closeBrowser(): Promise<void> {

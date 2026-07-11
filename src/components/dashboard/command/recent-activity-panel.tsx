@@ -52,7 +52,7 @@ export const RecentActivityPanel = memo(function RecentActivityPanel({
   ];
 
   return (
-    <div className="flex h-full min-h-[420px] flex-col overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02]">
+    <div className="flex h-[280px] max-h-[280px] flex-col overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02]">
       <div className="border-b border-white/[0.06] px-5 py-4">
         <div className="flex items-center justify-between">
           <div>
@@ -93,7 +93,7 @@ export const RecentActivityPanel = memo(function RecentActivityPanel({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         <AnimatePresence mode="wait">
           {tab === "detections" ? (
             <motion.div

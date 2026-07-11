@@ -289,16 +289,16 @@ export function CommandCenter() {
 
 
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
+      <div className="grid items-start gap-4 lg:grid-cols-[1fr_340px]">
         <motion.div
           initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.15 }}
-          className="min-h-[420px]"
+          className="min-h-[360px]"
         >
           <Suspense
             fallback={
-              <div className="min-h-[420px] animate-pulse rounded-2xl border border-white/[0.06] bg-white/[0.02]" />
+              <div className="min-h-[360px] animate-pulse rounded-2xl border border-white/[0.06] bg-white/[0.02]" />
             }
           >
             <NetworkMap monitors={stats.monitors} />
@@ -309,7 +309,7 @@ export function CommandCenter() {
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.2 }}
-          className="space-y-4"
+          className="flex max-h-[540px] flex-col gap-3 lg:sticky lg:top-20"
         >
           <DetectionAssistantPanel />
           <RecentActivityPanel

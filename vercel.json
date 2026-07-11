@@ -14,11 +14,11 @@
   "functions": {
     "src/app/api/cron/monitoring/route.ts": {
       "maxDuration": 60,
-      "memory": 1024
+      "memory": 1536
     },
     "src/app/api/monitors/[id]/check/route.ts": {
       "maxDuration": 60,
-      "memory": 1024
+      "memory": 1536
     }
   }
 }
