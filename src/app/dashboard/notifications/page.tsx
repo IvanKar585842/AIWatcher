@@ -184,9 +184,15 @@ export default function NotificationsPage() {
           ))}
 
         {!loading && items.length === 0 && (
-          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-12 text-center">
-            <Bell className="mx-auto h-8 w-8 text-zinc-700" />
-            <p className="mt-4 text-sm text-zinc-500">No notifications match your filters</p>
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] px-6 py-14 text-center">
+            <Bell className="mx-auto h-8 w-8 text-cyan-400/50" />
+            <p className="mt-4 text-sm font-medium text-zinc-200">
+              Your AI monitoring feed will appear here
+            </p>
+            <p className="mx-auto mt-2 max-w-sm text-xs leading-relaxed text-zinc-500">
+              WatchFlowing will analyze important changes and explain what requires attention.
+              Adjust filters if you&apos;re looking for a specific channel.
+            </p>
           </div>
         )}
 

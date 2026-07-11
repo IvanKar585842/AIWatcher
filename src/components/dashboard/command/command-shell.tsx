@@ -32,7 +32,7 @@ function CommandMain({ children }: { children: React.ReactNode }) {
       )}
     >
       <CommandTopbar />
-      <div className="relative min-h-[calc(100vh-4rem)] overflow-x-hidden pb-20 lg:pb-0">
+      <div className="relative min-h-[calc(100vh-4rem)] max-w-full overflow-x-hidden pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">
         {children}
       </div>
       <MobileBottomNav />

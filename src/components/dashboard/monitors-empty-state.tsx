@@ -33,9 +33,12 @@ export function MonitorsEmptyState({
         />
       </motion.div>
 
-      <h3 className="relative text-xl font-semibold text-zinc-100">No monitors yet</h3>
+      <h3 className="relative text-xl font-semibold tracking-tight text-zinc-100">
+        Start watching your websites
+      </h3>
       <p className="relative mx-auto mt-2 max-w-md text-sm leading-relaxed text-zinc-500">
-        Create your first AI monitor and start watching any website.
+        Create your first monitor. WatchFlowing will check for meaningful changes and explain
+        what needs your attention — like a senior analyst on call 24/7.
       </p>
 
       {showCreateButton && (

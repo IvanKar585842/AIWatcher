@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
 export const os = {
-  page: "p-4 lg:p-6",
+  page: "w-full max-w-full overflow-x-hidden p-3 sm:p-4 lg:p-6",
   card: "rounded-2xl border border-white/[0.06] bg-white/[0.02] backdrop-blur-sm",
   cardHover: "transition-all hover:border-cyan-500/20 hover:bg-white/[0.03]",
   glow: "shadow-[0_0_40px_-12px_rgba(34,211,238,0.25)]",
@@ -72,7 +72,7 @@ export function OsExpandableSection({
         type="button"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
-        className="flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-white/[0.02]"
+        className="flex w-full min-h-12 items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.02] sm:gap-4 sm:px-5 sm:py-4"
       >
         <div
           className={cn(

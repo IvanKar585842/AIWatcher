@@ -91,7 +91,7 @@ export function QuickActions({ onRefresh, pausedCount, activeCount }: QuickActio
             whileTap={{ scale: action.disabled ? 1 : 0.98 }}
             onClick={action.onClick}
             disabled={action.disabled || isLoading}
-            className="inline-flex min-h-10 items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] px-4 py-2.5 text-xs font-medium text-zinc-400 transition-all hover:border-white/[0.14] hover:bg-white/[0.05] hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-xs font-medium text-zinc-400 transition-all hover:border-white/[0.14] hover:bg-white/[0.05] hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none sm:px-4"
           >
             {isLoading ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />

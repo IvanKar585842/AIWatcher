@@ -30,13 +30,13 @@ export function HistoryEmptyState({ filtered }: { filtered?: boolean }) {
         />
       </motion.div>
 
-      <h3 className="relative text-xl font-semibold text-zinc-100">
-        {filtered ? "No matching changes" : "No changes detected yet"}
+      <h3 className="relative text-xl font-semibold tracking-tight text-zinc-100">
+        {filtered ? "No matching changes" : "Your change timeline is ready"}
       </h3>
       <p className="relative mx-auto mt-2 max-w-md text-sm leading-relaxed text-zinc-500">
         {filtered
           ? "Try adjusting your search or filters to find what you're looking for."
-          : "Your monitor is active and watching your website. When something meaningful changes, it will show up here with an AI summary."}
+          : "As soon as something meaningful changes, WatchFlowing will record it here with an AI summary, importance level, and clear next steps."}
       </p>
     </motion.div>
   );

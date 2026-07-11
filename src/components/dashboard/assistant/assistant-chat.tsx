@@ -265,7 +265,7 @@ export function AssistantChat() {
         description="Ask anything about monitoring, settings, notifications, or troubleshooting."
       />
 
-      <div className="relative flex h-[calc(100dvh-11rem)] min-h-[420px] overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] sm:h-[calc(100vh-12rem)] sm:min-h-[520px]">
+      <div className="relative flex h-[calc(100dvh-13.5rem)] min-h-[360px] w-full min-w-0 overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] sm:h-[calc(100dvh-12rem)] sm:min-h-[480px] lg:h-[calc(100vh-11rem)] lg:min-h-[520px]">
         {sidebarOpen && (
           <button
             type="button"
@@ -477,13 +477,13 @@ export function AssistantChat() {
                   )}
                   <div
                     className={cn(
-                      "max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed",
+                      "max-w-[min(92%,28rem)] break-words rounded-2xl px-4 py-3 text-sm leading-relaxed",
                       msg.role === "USER"
                         ? "border border-cyan-400/20 bg-cyan-500/10 text-cyan-50"
                         : "border border-white/[0.06] bg-white/[0.03] text-zinc-300"
                     )}
                   >
-                    <p className="whitespace-pre-wrap">{msg.content}</p>
+                    <p className="whitespace-pre-wrap break-words">{msg.content}</p>
                   </div>
                 </motion.div>
               ))}
@@ -498,8 +498,8 @@ export function AssistantChat() {
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-cyan-400/20 bg-cyan-500/10">
                   <Bot className="h-4 w-4 text-cyan-400" />
                 </div>
-                <div className="max-w-[85%] rounded-2xl border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-sm leading-relaxed text-zinc-300">
-                  <p className="whitespace-pre-wrap">{streaming}</p>
+                <div className="max-w-[min(92%,28rem)] break-words rounded-2xl border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-sm leading-relaxed text-zinc-300">
+                  <p className="whitespace-pre-wrap break-words">{streaming}</p>
                 </div>
               </motion.div>
             )}
@@ -508,12 +508,17 @@ export function AssistantChat() {
             <div ref={bottomRef} />
           </div>
 
-          <div className="border-t border-white/[0.06] bg-black/30 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4">
-            <div className="flex items-end gap-2 rounded-2xl border border-white/[0.08] bg-black/50 p-2 focus-within:border-cyan-400/30 focus-within:ring-1 focus-within:ring-cyan-400/20">
+          <div className="border-t border-white/[0.06] bg-black/30 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4 lg:pb-4">
+            <div className="flex w-full min-w-0 items-end gap-2 rounded-2xl border border-white/[0.08] bg-black/50 p-2 focus-within:border-cyan-400/30 focus-within:ring-1 focus-within:ring-cyan-400/20">
               <textarea
                 ref={inputRef}
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={(e) => {
+                  setInput(e.target.value);
+                  const el = e.target;
+                  el.style.height = "auto";
+                  el.style.height = `${Math.min(el.scrollHeight, 128)}px`;
+                }}
                 onKeyDown={handleKeyDown}
                 placeholder="Ask WatchFlowing Assistant…"
                 rows={1}
@@ -531,6 +536,7 @@ export function AssistantChat() {
                     ? "border border-cyan-400/30 bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30"
                     : "text-zinc-600"
                 )}
+                aria-label="Send message"
               >
                 {sending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -539,7 +545,7 @@ export function AssistantChat() {
                 )}
               </button>
             </div>
-            <p className="mt-2 text-center font-mono text-[10px] text-zinc-600">
+            <p className="mt-2 hidden text-center font-mono text-[10px] text-zinc-600 sm:block">
               Enter to send · Shift+Enter for new line
             </p>
           </div>

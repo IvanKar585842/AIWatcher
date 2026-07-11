@@ -27,7 +27,7 @@ export function DiffViewer({
       </TabsList>
 
       <TabsContent value="diff">
-        <ScrollArea className="h-[400px] rounded-lg border p-4">
+        <ScrollArea className="h-[min(50dvh,400px)] max-w-full rounded-lg border p-3 sm:h-[400px] sm:p-4">
           {diffHtml ? (
             <div
               className="text-sm font-mono leading-relaxed [&_.diff-add]:bg-green-100 [&_.diff-add]:text-green-800 [&_.diff-remove]:bg-red-100 [&_.diff-remove]:text-red-800 [&_.diff-remove]:line-through dark:[&_.diff-add]:bg-green-900/30 dark:[&_.diff-add]:text-green-400 dark:[&_.diff-remove]:bg-red-900/30 dark:[&_.diff-remove]:text-red-400"
@@ -56,7 +56,7 @@ export function DiffViewer({
       </TabsContent>
 
       <TabsContent value="old">
-        <ScrollArea className="h-[400px] rounded-lg border p-4">
+        <ScrollArea className="h-[min(50dvh,400px)] max-w-full rounded-lg border p-3 sm:h-[400px] sm:p-4">
           <pre className="text-xs font-mono whitespace-pre-wrap break-words text-muted-foreground">
             {oldHtml ?? oldValue ?? "No previous content stored."}
           </pre>
@@ -64,7 +64,7 @@ export function DiffViewer({
       </TabsContent>
 
       <TabsContent value="new">
-        <ScrollArea className="h-[400px] rounded-lg border p-4">
+        <ScrollArea className="h-[min(50dvh,400px)] max-w-full rounded-lg border p-3 sm:h-[400px] sm:p-4">
           <pre className="text-xs font-mono whitespace-pre-wrap break-words text-muted-foreground">
             {newHtml ?? newValue ?? "No current content stored."}
           </pre>

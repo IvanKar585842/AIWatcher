@@ -104,7 +104,7 @@ export function StatusPageView({ data }: { data: StatusPageData }) {
           <div className="mt-3 space-y-3">
             {data.monitors.length === 0 && (
               <p className="rounded-xl border border-dashed border-white/[0.08] px-4 py-10 text-center text-sm text-zinc-500">
-                No public monitors yet.
+                Public monitors will appear here once enabled in WatchFlowing settings.
               </p>
             )}
             {data.monitors.map((m) => {
@@ -198,11 +198,14 @@ export function StatusPageView({ data }: { data: StatusPageData }) {
         </section>
 
         <footer className="mt-12 border-t border-white/[0.06] pt-6 text-center">
-          <p className="text-xs text-zinc-600">
-            Powered by{" "}
-            <Link href="/" className="text-cyan-400/80 hover:text-cyan-300">
-              WatchFlowing
+          <p className="text-xs text-zinc-500">
+            Reliability insights powered by{" "}
+            <Link href="/" className="text-cyan-400/90 hover:text-cyan-300">
+              WatchFlowing AI
             </Link>
+          </p>
+          <p className="mt-1 font-mono text-[10px] text-zinc-700">
+            Generated for clients, teams, and stakeholders
           </p>
         </footer>
       </div>

@@ -117,7 +117,7 @@ export const PLAN_ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
       LONGER_HISTORY: feature(true, null),
       FASTER_INTERVALS: feature(true),
       SHARED_MONITORS: feature(false),
-      ADVANCED_REPORTS: feature(false),
+      ADVANCED_REPORTS: feature(true),
     },
   },
   BUSINESS: {

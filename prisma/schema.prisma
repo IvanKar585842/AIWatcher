@@ -98,6 +98,18 @@ enum UserRole {
   ADMIN
 }
 
+enum ReportFrequency {
+  WEEKLY
+  MONTHLY
+}
+
+enum ReportType {
+  BUSINESS
+  DEVELOPER
+  SEO
+  COMPETITOR
+}
+
 model User {
   id                  String         @id @default(cuid())
   clerkId             String         @unique
@@ -115,17 +127,25 @@ model User {
   username            String?        @unique
   statusPageEnabled   Boolean        @default(false)
   statusPageTitle     String?
+  referralCode        String?        @unique
+  referredBy          String?
+  referralSignups     Int            @default(0)
+  weeklyReportEnabled Boolean        @default(true)
+  reportFrequency     ReportFrequency @default(WEEKLY)
+  reportType          ReportType      @default(BUSINESS)
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
   subscription        Subscription?
   monitors            Monitor[]
   notifications       Notification[]
   chatConversations   ChatConversation[]
+  weeklyReports       WeeklyReport[]
 
   @@index([clerkId])
   @@index([email])
   @@index([role])
   @@index([username])
+  @@index([referralCode])
 }
 
 model Subscription {
@@ -328,4 +348,29 @@ model ChatAnswerCache {
   updatedAt          DateTime @updatedAt
 
   @@index([hitCount])
+}
+
+model WeeklyReport {
+  id               String          @id @default(cuid())
+  userId           String
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  periodStart      DateTime
+  periodEnd        DateTime
+  reportType       ReportType      @default(BUSINESS)
+  frequency        ReportFrequency @default(WEEKLY)
+  status           String          @default("READY")
+  executiveSummary String          @db.Text
+  payload          Json
+  shareToken       String?         @unique
+  shareEnabled     Boolean         @default(false)
+  aiUsed           Boolean         @default(false)
+  emailSentAt      DateTime?
+  telegramSentAt   DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@unique([userId, periodStart, periodEnd, reportType])
+  @@index([userId, createdAt])
+  @@index([shareToken])
+  @@index([periodEnd])
 }

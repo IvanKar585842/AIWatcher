@@ -39,21 +39,25 @@ export function CommandCenterSkeleton() {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="space-y-6 p-4 lg:p-6"
+      className="space-y-3 p-3 sm:space-y-4 sm:p-4 lg:space-y-6 lg:p-6"
     >
       <div className="flex items-end justify-between gap-4">
         <div className="space-y-2">
           <ShimmerBlock className="h-3 w-32" />
           <ShimmerBlock className="h-6 w-48" />
         </div>
-        <ShimmerBlock className="h-9 w-28 rounded-full" />
+        <ShimmerBlock className="hidden h-9 w-28 rounded-full lg:block" />
       </div>
-      <QuickActionsSkeleton />
-      <StatReadoutsSkeleton />
-      <MonitoringHealthSkeleton />
-      <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
-        <ShimmerBlock className="min-h-[420px] border border-white/[0.04]" />
-        <ShimmerBlock className="min-h-[420px] border border-white/[0.04]" />
+      <ShimmerBlock className="h-[min(520px,62dvh)] min-h-[420px] border border-white/[0.04]" />
+      <div className="grid grid-cols-3 gap-2 lg:hidden">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <ShimmerBlock key={i} className="h-24 border border-white/[0.04]" />
+        ))}
+      </div>
+      <ShimmerBlock className="min-h-[320px] border border-white/[0.04] lg:min-h-[560px]" />
+      <div className="hidden space-y-4 lg:block">
+        <StatReadoutsSkeleton />
+        <MonitoringHealthSkeleton />
       </div>
     </motion.div>
   );
@@ -100,20 +104,16 @@ export function EmptyState({
 }) {
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.98 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ type: "spring", stiffness: 300, damping: 28 }}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
       className="flex flex-col items-center justify-center px-6 py-12 text-center"
     >
-      <motion.div
-        animate={{ y: [0, -4, 0] }}
-        transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-        className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-cyan-400/20 bg-gradient-to-br from-cyan-500/[0.08] to-violet-500/[0.04]"
-      >
-        <Icon className="h-6 w-6 text-cyan-400/70" />
-      </motion.div>
-      <p className="text-sm font-medium text-zinc-300">{title}</p>
-      <p className="mt-1.5 max-w-xs text-xs leading-relaxed text-zinc-600">{description}</p>
+      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-500/[0.08]">
+        <Icon className="h-6 w-6 text-cyan-400/80" />
+      </div>
+      <p className="text-sm font-medium text-zinc-200">{title}</p>
+      <p className="mt-2 max-w-sm text-xs leading-relaxed text-zinc-500">{description}</p>
       {action && <div className="mt-5">{action}</div>}
     </motion.div>
   );

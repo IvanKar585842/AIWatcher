@@ -36,7 +36,7 @@ function HealthCard({
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay, type: "spring", stiffness: 320, damping: 28 }}
-      className="group relative overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 transition-colors hover:border-white/[0.1]"
+      className="group relative min-w-0 overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3 transition-colors hover:border-white/[0.1] sm:p-4"
     >
       <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${accent} opacity-40`} />
       <div className="relative">
@@ -126,7 +126,7 @@ export const MonitoringHealth = memo(function MonitoringHealth({
           <span className="font-mono text-[10px] text-zinc-600">Live</span>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
         {cards.map((card, i) => (
           <HealthCard key={card.label} {...card} delay={i * 0.06} />
         ))}

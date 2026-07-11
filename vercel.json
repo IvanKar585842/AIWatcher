@@ -6,12 +6,20 @@
     {
       "path": "/api/cron/chat-cleanup",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/weekly-reports",
+      "schedule": "0 8 * * 1"
     }
   ],
   "functions": {
     "src/app/api/cron/monitoring/route.ts": {
       "maxDuration": 120,
       "memory": 1536
+    },
+    "src/app/api/cron/weekly-reports/route.ts": {
+      "maxDuration": 120,
+      "memory": 1024
     },
     "src/app/api/monitors/[id]/check/route.ts": {
       "maxDuration": 120,

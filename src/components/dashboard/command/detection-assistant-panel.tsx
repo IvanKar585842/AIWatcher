@@ -59,7 +59,6 @@ export function DetectionAssistantPanel() {
   }, [conversationId]);
 
   useEffect(() => {
-    // Prefer an existing recent conversation titled for detections, else idle until first send
     fetch("/api/chat/conversations")
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
@@ -183,28 +182,33 @@ export function DetectionAssistantPanel() {
     }
   }
 
+  function autoGrow(el: HTMLTextAreaElement) {
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+  }
+
   return (
     <motion.section
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.12 }}
-      className="flex h-[240px] max-h-[240px] flex-col overflow-hidden rounded-2xl border border-cyan-500/15 bg-white/[0.02]"
+      className="flex h-[min(520px,62dvh)] min-h-[420px] w-full min-w-0 flex-col overflow-hidden rounded-2xl border border-cyan-500/15 bg-white/[0.02] lg:h-[480px] lg:min-h-0 lg:max-h-[480px]"
     >
-      <div className="flex items-center justify-between gap-3 border-b border-white/[0.06] px-4 py-3">
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/[0.06] px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 shrink-0 text-cyan-400" />
-            <h3 className="text-sm font-medium text-zinc-100">Detection Assistant</h3>
+            <h3 className="truncate text-sm font-medium text-zinc-100">Detection Assistant</h3>
           </div>
-          <p className="mt-0.5 truncate text-[11px] text-zinc-500">
-            Ask about your monitors, changes, and alerts
+          <p className="mt-0.5 hidden truncate text-[11px] text-zinc-500 sm:block">
+            Ask anything — AI that understands your monitors
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <button
             type="button"
             onClick={() => void clearChat()}
-            className="flex min-h-9 min-w-9 items-center justify-center rounded-lg text-zinc-600 transition-colors hover:bg-white/[0.04] hover:text-zinc-300"
+            className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-zinc-600 transition-colors hover:bg-white/[0.04] hover:text-zinc-300"
             title="Clear conversation"
             aria-label="Clear conversation"
           >
@@ -212,15 +216,15 @@ export function DetectionAssistantPanel() {
           </button>
           <Link
             href="/dashboard/assistant"
-            className="flex min-h-9 items-center gap-1.5 rounded-lg border border-white/[0.06] px-2.5 text-[11px] text-zinc-400 hover:border-cyan-400/20 hover:text-cyan-200"
+            className="flex min-h-11 items-center gap-1.5 rounded-lg border border-white/[0.06] px-2.5 text-[11px] text-zinc-400 hover:border-cyan-400/20 hover:text-cyan-200"
           >
             <MessageSquare className="h-3.5 w-3.5" />
-            Full chat
+            <span className="hidden xs:inline sm:inline">Full chat</span>
           </Link>
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-3 py-3 sm:px-4">
         {booting && (
           <p className="py-8 text-center text-xs text-zinc-600">Loading assistant…</p>
         )}
@@ -228,20 +232,20 @@ export function DetectionAssistantPanel() {
         {!booting && messages.length === 0 && !streaming && !sending && (
           <div className="flex h-full min-h-0 flex-col justify-center py-2">
             <div className="mb-2 flex justify-center">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-cyan-400/25 bg-cyan-500/10">
-                <Bot className="h-4 w-4 text-cyan-400" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-400/25 bg-cyan-500/10">
+                <Bot className="h-5 w-5 text-cyan-400" />
               </div>
             </div>
-            <p className="text-center text-[11px] text-zinc-500">
+            <p className="px-2 text-center text-xs text-zinc-500 sm:text-[11px]">
               I can read your detections and explain what matters.
             </p>
-            <div className="mt-3 grid gap-1.5">
+            <div className="mt-3 grid gap-2">
               {SUGGESTIONS.slice(0, 3).map((q) => (
                 <button
                   key={q}
                   type="button"
                   onClick={() => void sendMessage(q)}
-                  className="min-h-9 rounded-lg border border-white/[0.06] bg-black/30 px-3 py-1.5 text-left text-[11px] text-zinc-400 transition-colors hover:border-cyan-400/20 hover:text-cyan-200"
+                  className="min-h-11 rounded-xl border border-white/[0.06] bg-black/30 px-3 py-2.5 text-left text-xs text-zinc-400 transition-colors hover:border-cyan-400/20 hover:text-cyan-200"
                 >
                   {q}
                 </button>
@@ -260,21 +264,21 @@ export function DetectionAssistantPanel() {
           >
             <div
               className={cn(
-                "max-w-[92%] rounded-2xl px-3 py-2 text-xs leading-relaxed sm:text-sm",
+                "max-w-[min(92%,28rem)] break-words rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed",
                 msg.role === "USER"
                   ? "border border-cyan-400/20 bg-cyan-500/10 text-cyan-50"
                   : "border border-white/[0.06] bg-white/[0.03] text-zinc-300"
               )}
             >
-              <p className="whitespace-pre-wrap">{msg.content}</p>
+              <p className="whitespace-pre-wrap break-words">{msg.content}</p>
             </div>
           </div>
         ))}
 
         {streaming && (
           <div className="flex justify-start">
-            <div className="max-w-[92%] rounded-2xl border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-xs text-zinc-300 sm:text-sm">
-              <p className="whitespace-pre-wrap">{streaming}</p>
+            <div className="max-w-[min(92%,28rem)] break-words rounded-2xl border border-white/[0.06] bg-white/[0.03] px-3.5 py-2.5 text-sm text-zinc-300">
+              <p className="whitespace-pre-wrap break-words">{streaming}</p>
             </div>
           </div>
         )}
@@ -295,25 +299,28 @@ export function DetectionAssistantPanel() {
         <div ref={bottomRef} />
       </div>
 
-      <div className="border-t border-white/[0.06] p-3">
-        <div className="flex items-end gap-2 rounded-xl border border-white/[0.08] bg-black/40 p-1.5 focus-within:border-cyan-400/30">
+      <div className="shrink-0 border-t border-white/[0.06] bg-black/20 p-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] sm:p-3">
+        <div className="flex w-full min-w-0 items-end gap-2 rounded-2xl border border-white/[0.08] bg-black/40 p-1.5 focus-within:border-cyan-400/30">
           <textarea
             ref={inputRef}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => {
+              setInput(e.target.value);
+              autoGrow(e.target);
+            }}
             onKeyDown={handleKeyDown}
             placeholder="Ask about your detections…"
             rows={1}
             maxLength={2000}
             disabled={sending}
-            className="max-h-24 min-h-[40px] flex-1 resize-none bg-transparent px-2 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none"
+            className="max-h-[120px] min-h-[44px] flex-1 resize-none bg-transparent px-2.5 py-2.5 text-base text-zinc-100 placeholder:text-zinc-600 outline-none sm:text-sm"
           />
           <button
             type="button"
             onClick={() => void sendMessage()}
             disabled={sending || !input.trim()}
             className={cn(
-              "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors",
+              "mb-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors",
               input.trim() && !sending
                 ? "border border-cyan-400/30 bg-cyan-500/20 text-cyan-300"
                 : "text-zinc-600"

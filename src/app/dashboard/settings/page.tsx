@@ -10,6 +10,7 @@ import {
   Clock,
   Copy,
   ExternalLink,
+  Gift,
   Loader2,
   Lock,
   Monitor,
@@ -72,7 +73,7 @@ function OsSelectTrigger({ className, ...props }: React.ComponentProps<typeof Se
     <SelectTrigger
       {...props}
       className={cn(
-        "w-full min-w-[180px] border-white/[0.08] bg-black/50 text-zinc-100 sm:w-56",
+        "w-full max-w-full border-white/[0.08] bg-black/50 text-zinc-100 sm:w-56",
         className
       )}
     />
@@ -107,6 +108,20 @@ export default function SettingsPage() {
   const [statusLoading, setStatusLoading] = useState(true);
   const [statusSaving, setStatusSaving] = useState(false);
   const [publicUrl, setPublicUrl] = useState<string | null>(null);
+  const [referral, setReferral] = useState<{
+    code: string;
+    inviteUrl: string;
+    signups: number;
+    note: string;
+  } | null>(null);
+  const [referralLoading, setReferralLoading] = useState(true);
+  const [referralCopied, setReferralCopied] = useState(false);
+  const [reportPrefs, setReportPrefs] = useState<{
+    weeklyReportEnabled: boolean;
+    reportFrequency: "WEEKLY" | "MONTHLY";
+    reportType: "BUSINESS" | "DEVELOPER" | "SEO" | "COMPETITOR";
+  } | null>(null);
+  const [reportPrefsSaving, setReportPrefsSaving] = useState(false);
 
   useEffect(() => {
     setSettings(loadUserSettings());
@@ -212,6 +227,78 @@ export default function SettingsPage() {
       .finally(() => setStatusLoading(false));
     return () => controller.abort();
   }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/user/referrals", { signal: controller.signal })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data?.referralCode) return;
+        setReferral({
+          code: data.referralCode,
+          inviteUrl: data.inviteUrl,
+          signups: data.referralStats?.signups ?? 0,
+          note: data.note ?? "",
+        });
+      })
+      .catch(() => {})
+      .finally(() => setReferralLoading(false));
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/reports/preferences", { signal: controller.signal })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data) return;
+        setReportPrefs({
+          weeklyReportEnabled: Boolean(data.weeklyReportEnabled),
+          reportFrequency: data.reportFrequency ?? "WEEKLY",
+          reportType: data.reportType ?? "BUSINESS",
+        });
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
+
+  async function saveReportPrefs(
+    patch: Partial<{
+      weeklyReportEnabled: boolean;
+      reportFrequency: "WEEKLY" | "MONTHLY";
+      reportType: "BUSINESS" | "DEVELOPER" | "SEO" | "COMPETITOR";
+    }>
+  ) {
+    if (!reportPrefs) return;
+    const next = { ...reportPrefs, ...patch };
+    setReportPrefs(next);
+    setReportPrefsSaving(true);
+    try {
+      const res = await fetch("/api/reports/preferences", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      if (!res.ok) throw new Error("Failed");
+      toast("Report preferences saved", "success");
+      // keep local weeklySummary in sync for UI consistency
+      if (typeof patch.weeklyReportEnabled === "boolean") {
+        updateSettings({ weeklySummary: patch.weeklyReportEnabled });
+      }
+    } catch {
+      toast("Could not save report preferences", "error");
+    } finally {
+      setReportPrefsSaving(false);
+    }
+  }
+
+  async function copyReferralLink() {
+    if (!referral?.inviteUrl) return;
+    await navigator.clipboard.writeText(referral.inviteUrl);
+    setReferralCopied(true);
+    toast("Invite link copied", "success");
+    window.setTimeout(() => setReferralCopied(false), 2000);
+  }
 
   function updateSettings(patch: Partial<UserSettings>) {
     setSettings((prev) => {
@@ -449,13 +536,58 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <SettingRow title="Weekly summary" description="Digest of all detected changes">
+            <SettingRow
+              title="Weekly AI report"
+              description="Monday intelligence digest via email / Telegram"
+            >
               <Switch
-                checked={settings.weeklySummary}
-                onCheckedChange={(v) => updateSettings({ weeklySummary: v })}
+                checked={reportPrefs?.weeklyReportEnabled ?? settings.weeklySummary}
+                disabled={!reportPrefs || reportPrefsSaving}
+                onCheckedChange={(v) => void saveReportPrefs({ weeklyReportEnabled: v })}
                 className="data-[state=checked]:bg-cyan-500"
               />
             </SettingRow>
+
+            {reportPrefs && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <OsFieldLabel>Report type</OsFieldLabel>
+                  <select
+                    value={reportPrefs.reportType}
+                    disabled={reportPrefsSaving}
+                    onChange={(e) =>
+                      void saveReportPrefs({
+                        reportType: e.target.value as typeof reportPrefs.reportType,
+                      })
+                    }
+                    className="h-11 w-full rounded-xl border border-white/[0.08] bg-black/40 px-3 text-sm text-zinc-200"
+                  >
+                    <option value="BUSINESS">Business</option>
+                    <option value="DEVELOPER">Developer</option>
+                    <option value="SEO">SEO</option>
+                    <option value="COMPETITOR">Competitor</option>
+                  </select>
+                </div>
+                <div>
+                  <OsFieldLabel>Frequency</OsFieldLabel>
+                  <select
+                    value={reportPrefs.reportFrequency}
+                    disabled={reportPrefsSaving}
+                    onChange={(e) =>
+                      void saveReportPrefs({
+                        reportFrequency: e.target
+                          .value as typeof reportPrefs.reportFrequency,
+                      })
+                    }
+                    className="h-11 w-full rounded-xl border border-white/[0.08] bg-black/40 px-3 text-sm text-zinc-200"
+                  >
+                    <option value="WEEKLY">Weekly</option>
+                    <option value="MONTHLY">Monthly</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
             <SettingRow title="Instant alerts" description="Notify immediately on important changes">
               <Switch
                 checked={settings.instantAlerts}
@@ -679,7 +811,7 @@ export default function SettingsPage() {
                 <div className="space-y-4">
                   <SettingRow
                     title="Enable public status page"
-                    description="Share a read-only uptime page at /status/your-username"
+                  description="Share a client-ready reliability page at /status/your-username"
                   >
                     <Switch
                       checked={statusEnabled}
@@ -766,6 +898,56 @@ export default function SettingsPage() {
                 </div>
               )}
             </div>
+          </div>
+        </OsExpandableSection>
+
+        <OsExpandableSection
+          title="Invite & referrals"
+          subtitle="Share WatchFlowing with teams and clients"
+          icon={<Gift className="h-5 w-5" />}
+        >
+          <div className="space-y-4">
+            <p className="text-sm leading-relaxed text-zinc-500">
+              Give partners your personal invite link. Rewards are coming soon — your code and
+              signup tracking are ready now.
+            </p>
+            {referralLoading ? (
+              <Loader2 className="h-5 w-5 animate-spin text-cyan-400" />
+            ) : referral ? (
+              <div className="rounded-xl border border-white/[0.06] bg-black/20 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="font-mono text-[10px] uppercase tracking-widest text-zinc-600">
+                      Your referral code
+                    </p>
+                    <p className="mt-1 font-mono text-lg text-cyan-200">{referral.code}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-mono text-[10px] uppercase tracking-widest text-zinc-600">
+                      Signups
+                    </p>
+                    <p className="mt-1 font-mono text-lg text-zinc-100">{referral.signups}</p>
+                  </div>
+                </div>
+                <p className="mt-3 break-all font-mono text-[11px] text-zinc-500">
+                  {referral.inviteUrl}
+                </p>
+                <Button
+                  type="button"
+                  onClick={() => void copyReferralLink()}
+                  className="mt-4 min-h-11 rounded-full border border-cyan-400/30 bg-cyan-500/15 text-cyan-100 hover:bg-cyan-500/25"
+                  variant="outline"
+                >
+                  <Copy className="mr-2 h-4 w-4" />
+                  {referralCopied ? "Copied" : "Copy invite link"}
+                </Button>
+                {referral.note && (
+                  <p className="mt-3 text-xs text-zinc-600">{referral.note}</p>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-zinc-500">Could not load referral details.</p>
+            )}
           </div>
         </OsExpandableSection>
 
