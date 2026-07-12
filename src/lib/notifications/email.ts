@@ -306,13 +306,19 @@ export async function sendWelcomeEmail(to: string, name: string) {
   await getResend().emails.send({
     from,
     to,
-    subject: "Welcome to WatchFlowing",
+    subject: "Welcome to WatchFlowing — create your first monitor",
     html: `
       <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:560px;margin:0 auto;padding:40px 20px;background:#090909;color:#d4d4d8;">
         <p style="margin:0 0 8px;font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:rgba(56,189,248,0.75);">WatchFlowing</p>
         <h1 style="color:#fafafa;margin:0 0 12px;">Welcome, ${safeName}</h1>
-        <p style="line-height:1.6;color:#a1a1aa;">Your monitoring workspace is ready. Add a monitor and we will watch the web for meaningful changes.</p>
+        <p style="line-height:1.6;color:#a1a1aa;">Your monitoring workspace is ready. Here’s the fastest path to value:</p>
+        <ol style="line-height:1.7;color:#a1a1aa;padding-left:18px;">
+          <li>Create a monitor for your homepage or a competitor URL</li>
+          <li>We store a baseline snapshot automatically</li>
+          <li>AI explains the next meaningful change and alerts you</li>
+        </ol>
         <a href="${escapeHtml(appUrl)}/dashboard" style="display:inline-block;background:#22d3ee;color:#090909;padding:12px 24px;border-radius:999px;text-decoration:none;margin-top:16px;font-weight:700;">Open Dashboard</a>
+        <p style="margin-top:28px;font-size:12px;color:#71717a;">Need help? Reply to this email or open the Detection Assistant in your dashboard.</p>
       </div>
     `,
   });

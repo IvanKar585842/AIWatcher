@@ -27,11 +27,10 @@ const nextConfig: NextConfig = {
     "@sparticuz/chromium",
     "@sparticuz/chromium-min",
   ],
-  // Ensure Chromium brotli binaries are included in the Vercel serverless trace
+  // Only attach Chromium binaries to routes that actually launch a browser
   outputFileTracingIncludes: {
     "/api/monitors/[id]/check": chromiumIncludes,
     "/api/cron/monitoring": chromiumIncludes,
-    "/*": chromiumIncludes,
   },
   poweredByHeader: false,
   compress: true,

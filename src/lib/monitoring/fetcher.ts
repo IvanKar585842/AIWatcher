@@ -18,7 +18,7 @@ import {
   robotsTxtBlockedMessage,
   shouldEnforceRobotsTxt,
 } from "./robots";
-import { assertSafeFetchUrl } from "@/lib/security/url";
+import { assertSafeFetchUrl, fetchWithSafeRedirects } from "@/lib/security/url";
 
 const FETCH_RETRY_BASE_MS = 1000;
 
@@ -346,6 +346,16 @@ async function fetchPageContentOnce(options: FetchOptions): Promise<FetchResult>
   try {
     page = await context.newPage();
 
+    // Block SSRF via redirect hops (re-validate every request URL)
+    await page.route("**/*", async (route) => {
+      try {
+        await assertSafeFetchUrl(route.request().url());
+        await route.continue();
+      } catch {
+        await route.abort("blockedbyclient");
+      }
+    });
+
     const response = await page.goto(url, {
       waitUntil: "domcontentloaded",
       timeout,
@@ -354,6 +364,9 @@ async function fetchPageContentOnce(options: FetchOptions): Promise<FetchResult>
     if (!response) {
       throw new Error("Navigation returned no response");
     }
+
+    // Final landed URL must also be safe
+    await assertSafeFetchUrl(response.url());
 
     if (response.status() >= 400) {
       throw new Error(`HTTP ${response.status()} loading page`);
@@ -591,7 +604,7 @@ async function fetchStaticContent(
   cleanOptions?: CleanOptions,
   monitorId?: string
 ): Promise<FetchResult> {
-  const response = await fetch(url, {
+  const response = await fetchWithSafeRedirects(url, {
     signal: AbortSignal.timeout(timeout),
     headers: {
       "User-Agent": "WatchFlowing/1.0 (+https://watchflowing.com/bot; monitoring service)",

@@ -31,8 +31,27 @@ function startOfUtcDay(): Date {
 /**
  * Compact, privacy-scoped snapshot of the user's monitoring world.
  * Only summaries — never full HTML snapshots.
+ * Cached briefly in-process to avoid 5 DB queries on every chat turn.
  */
+const contextCache = new Map<string, { at: number; value: string }>();
+const CONTEXT_TTL_MS = 45_000;
+
 export async function buildUserMonitoringContext(userId: string): Promise<string> {
+  const hit = contextCache.get(userId);
+  if (hit && Date.now() - hit.at < CONTEXT_TTL_MS) {
+    return hit.value;
+  }
+
+  const value = await buildUserMonitoringContextUncached(userId);
+  contextCache.set(userId, { at: Date.now(), value });
+  if (contextCache.size > 500) {
+    const oldest = contextCache.keys().next().value;
+    if (oldest) contextCache.delete(oldest);
+  }
+  return value;
+}
+
+async function buildUserMonitoringContextUncached(userId: string): Promise<string> {
   const today = startOfUtcDay();
   const since7d = new Date();
   since7d.setDate(since7d.getDate() - 7);

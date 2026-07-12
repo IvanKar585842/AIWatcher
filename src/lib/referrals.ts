@@ -1,5 +1,7 @@
 import { randomBytes } from "node:crypto";
+import { Plan } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { trackEvent } from "@/lib/analytics";
 
 /** Short human-friendly referral codes, e.g. WF-A3K9XQ */
 export function generateReferralCode(): string {
@@ -23,7 +25,14 @@ export async function ensureReferralCode(userId: string): Promise<string> {
         data: { referralCode: code },
         select: { referralCode: true },
       });
-      if (updated.referralCode) return updated.referralCode;
+      if (updated.referralCode) {
+        await trackEvent({
+          type: "referral_created",
+          userId,
+          metadata: { code: updated.referralCode },
+        });
+        return updated.referralCode;
+      }
     } catch {
       // Unique collision — retry
     }
@@ -35,58 +44,100 @@ export async function ensureReferralCode(userId: string): Promise<string> {
 export type ReferralStats = {
   code: string;
   invitePath: string;
+  /** Alias for referralSignups */
+  referralCount: number;
   signups: number;
+  bonusMonitors: number;
+  proUntil: string | null;
   pendingRewards: number;
-  status: "foundation";
+  status: "active";
+  rewards: {
+    referrerBonusMonitors: number;
+    refereeProDays: number;
+  };
 };
+
+const REFEREE_PRO_DAYS = 7;
+const REFERRER_BONUS_MONITORS = 1;
 
 export async function getReferralStats(userId: string): Promise<ReferralStats> {
   const code = await ensureReferralCode(userId);
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: userId },
-    select: { referralSignups: true },
+    select: {
+      referralSignups: true,
+      referralBonusMonitors: true,
+      referralProUntil: true,
+    },
   });
 
   return {
     code,
     invitePath: `/sign-up?ref=${encodeURIComponent(code)}`,
+    referralCount: user.referralSignups,
     signups: user.referralSignups,
+    bonusMonitors: user.referralBonusMonitors,
+    proUntil: user.referralProUntil?.toISOString() ?? null,
     pendingRewards: 0,
-    status: "foundation",
+    status: "active",
+    rewards: {
+      referrerBonusMonitors: REFERRER_BONUS_MONITORS,
+      refereeProDays: REFEREE_PRO_DAYS,
+    },
   };
 }
 
 /**
  * Attach referredBy when a new user signs up with ?ref=CODE.
- * Does not grant credits — foundation only.
+ * Rewards: +1 monitor slot for referrer, 7-day Pro trial for referee (non-spammy).
  */
 export async function applyReferralOnSignup(
   newUserId: string,
   referralCode: string | null | undefined
-): Promise<void> {
+): Promise<boolean> {
   const code = referralCode?.trim().toUpperCase();
-  if (!code) return;
+  if (!code) return false;
 
   const referrer = await prisma.user.findFirst({
     where: { referralCode: code },
     select: { id: true },
   });
-  if (!referrer || referrer.id === newUserId) return;
+  if (!referrer || referrer.id === newUserId) return false;
 
   const me = await prisma.user.findUnique({
     where: { id: newUserId },
-    select: { referredBy: true },
+    select: { referredBy: true, subscription: { select: { plan: true } } },
   });
-  if (me?.referredBy) return;
+  if (me?.referredBy) return false;
+
+  const proUntil = new Date();
+  proUntil.setDate(proUntil.getDate() + REFEREE_PRO_DAYS);
 
   await prisma.$transaction([
     prisma.user.update({
       where: { id: newUserId },
-      data: { referredBy: code },
+      data: {
+        referredBy: code,
+        // Only grant trial Pro if still on FREE
+        ...(me?.subscription?.plan === Plan.FREE || !me?.subscription
+          ? { referralProUntil: proUntil }
+          : {}),
+      },
     }),
     prisma.user.update({
       where: { id: referrer.id },
-      data: { referralSignups: { increment: 1 } },
+      data: {
+        referralSignups: { increment: 1 },
+        referralBonusMonitors: { increment: REFERRER_BONUS_MONITORS },
+      },
     }),
   ]);
+
+  await trackEvent({
+    type: "signup_from_report",
+    userId: newUserId,
+    metadata: { source: "referral", code, referrerId: referrer.id },
+  });
+
+  return true;
 }

@@ -57,6 +57,7 @@ enum MonitoringInterval {
 
 enum AnalysisStatus {
   PENDING
+  PROCESSING
   COMPLETED
   SKIPPED
   FAILED
@@ -130,9 +131,15 @@ model User {
   referralCode        String?        @unique
   referredBy          String?
   referralSignups     Int            @default(0)
+  referralBonusMonitors Int          @default(0)
+  referralProUntil    DateTime?
   weeklyReportEnabled Boolean        @default(true)
   reportFrequency     ReportFrequency @default(WEEKLY)
   reportType          ReportType      @default(BUSINESS)
+  agencyModeEnabled   Boolean        @default(false)
+  agencyBrandName     String?
+  agencyShowPoweredBy Boolean        @default(true)
+  badgeEnabled        Boolean        @default(false)
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
   subscription        Subscription?
@@ -140,6 +147,7 @@ model User {
   notifications       Notification[]
   chatConversations   ChatConversation[]
   weeklyReports       WeeklyReport[]
+  intelligenceScores  IntelligenceScore[]
 
   @@index([clerkId])
   @@index([email])
@@ -261,6 +269,7 @@ model Notification {
   @@index([userId])
   @@index([changeId])
   @@index([status])
+  @@index([userId, createdAt])
 }
 
 model MonitorQueue {
@@ -275,6 +284,7 @@ model MonitorQueue {
 
   @@index([scheduledAt])
   @@index([lockedAt])
+  @@index([scheduledAt, lockedAt])
 }
 
 model AnalyticsEvent {
@@ -373,4 +383,21 @@ model WeeklyReport {
   @@index([userId, createdAt])
   @@index([shareToken])
   @@index([periodEnd])
+}
+
+/** Public Intelligence Score scans — lightweight, no Playwright */
+model IntelligenceScore {
+  id           String   @id @default(cuid())
+  url          String
+  hostname     String
+  overallScore Int
+  payload      Json
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  shareToken   String?  @unique
+  createdAt    DateTime @default(now())
+
+  @@index([hostname, createdAt])
+  @@index([userId])
+  @@index([shareToken])
 }

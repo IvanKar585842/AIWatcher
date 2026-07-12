@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { trackEvent } from "@/lib/analytics";
-import { ApiError, isUnauthorizedError } from "@/lib/errors";
+import { ApiError, isUnauthorizedError, safeClientErrorMessage } from "@/lib/errors";
 import { isUpgradeRequiredError } from "@/lib/upgrade-error";
 
 export type ApiSuccess<T> = { success: true; data: T };
@@ -64,6 +64,7 @@ export function apiFailureFromError(error: unknown): NextResponse<ApiFailure> {
           metadata: { status: error.status },
         })
       );
+      return apiFailure("Internal server error", 500);
     }
     return apiFailure(error.message, error.status);
   }
@@ -80,11 +81,7 @@ export function apiFailureFromError(error: unknown): NextResponse<ApiFailure> {
       metadata: { name: safeName },
     })
   );
-  const message =
-    error instanceof Error && error.message.includes("Invalid")
-      ? error.message
-      : "Internal server error";
-  return apiFailure(message, 500);
+  return apiFailure(safeClientErrorMessage(error, "Internal server error"), 500);
 }
 
 /** Alias for older route imports */

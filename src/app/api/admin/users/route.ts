@@ -1,4 +1,5 @@
 import { Plan } from "@prisma/client";
+import { z } from "zod";
 import { requireAdmin } from "@/lib/admin";
 import { prisma } from "@/lib/db";
 import { apiFailure, apiFailureFromError, apiSuccess } from "@/lib/api-response";
@@ -6,6 +7,16 @@ import { parseJsonBody } from "@/lib/errors";
 import { getUserUsage } from "@/lib/usage";
 import { withRateLimit } from "@/lib/rate-limit";
 import { securityLog } from "@/lib/security/log";
+
+const adminUserPatchSchema = z
+  .object({
+    userId: z.string().min(1).max(64),
+    role: z.enum(["USER", "ADMIN"]).optional(),
+    plan: z.nativeEnum(Plan).optional(),
+  })
+  .refine((b) => b.role !== undefined || b.plan !== undefined, {
+    message: "role or plan required",
+  });
 
 export async function GET(request: Request) {
   try {
@@ -110,33 +121,31 @@ export async function PATCH(request: Request) {
     return withRateLimit(
       "admin-users-patch",
       async () => {
-        const body = await parseJsonBody<{
-          userId: string;
-          role?: "USER" | "ADMIN";
-          plan?: Plan;
-        }>(request);
-
-        if (!body.userId) {
-          return apiFailure("userId required", 400);
+        const raw = await parseJsonBody(request);
+        const parsed = adminUserPatchSchema.safeParse(raw);
+        if (!parsed.success) {
+          return apiFailure(parsed.error.errors[0]?.message ?? "Invalid request", 400);
         }
 
+        const { userId, role, plan } = parsed.data;
         const updates: Promise<unknown>[] = [];
 
-        if (body.role) {
+        if (role) {
+          // Only server-side admins reach here (requireAdmin). Clients cannot self-promote.
           updates.push(
             prisma.user.update({
-              where: { id: body.userId },
-              data: { role: body.role },
+              where: { id: userId },
+              data: { role },
             })
           );
         }
 
-        if (body.plan) {
+        if (plan) {
           updates.push(
             prisma.subscription.upsert({
-              where: { userId: body.userId },
-              update: { plan: body.plan, status: "active" },
-              create: { userId: body.userId, plan: body.plan, status: "active" },
+              where: { userId },
+              update: { plan, status: "active" },
+              create: { userId, plan, status: "active" },
             })
           );
         }
@@ -147,13 +156,13 @@ export async function PATCH(request: Request) {
           type: "suspicious.activity",
           message: "Admin updated user role/plan",
           userId: admin.id,
-          resourceId: body.userId,
+          resourceId: userId,
           route: "admin-users-patch",
-          metadata: { role: body.role, plan: body.plan },
+          metadata: { role, plan },
         });
 
         const user = await prisma.user.findUnique({
-          where: { id: body.userId },
+          where: { id: userId },
           include: { subscription: true },
         });
 

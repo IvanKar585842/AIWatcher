@@ -6,7 +6,7 @@ import { assertChatDailyLimit } from "@/lib/ai/chat-limits";
 import { streamCachedResponse, streamChatCompletion, isChatOpenAIConfigured } from "@/lib/ai/chat-openai";
 import { trackEvent } from "@/lib/analytics";
 import { requireUser } from "@/lib/auth";
-import { assertUserConversation } from "@/lib/chat/access";
+import { assertUserConversationOwned } from "@/lib/chat/access";
 import { prisma } from "@/lib/db";
 import { apiFailureFromError } from "@/lib/api-response";
 import { ApiError, parseJsonBody } from "@/lib/errors";
@@ -33,7 +33,7 @@ export async function POST(
         throw new ApiError(parsed.error.errors[0]?.message ?? "Invalid message", 400);
       }
 
-      const conversation = await assertUserConversation(user.id, conversationId);
+      const conversation = await assertUserConversationOwned(user.id, conversationId);
       const userContent = parsed.data.content.trim();
 
       await prisma.chatMessage.create({
@@ -44,7 +44,7 @@ export async function POST(
         },
       });
 
-      const isFirstMessage = conversation.messages.length === 0;
+      const isFirstMessage = conversation._count.messages === 0;
       if (isFirstMessage || conversation.title === "New conversation") {
         await prisma.chatConversation.update({
           where: { id: conversationId },
@@ -57,44 +57,103 @@ export async function POST(
         });
       }
 
+      // FAQ / shared cache: skip expensive context build + OpenAI
       const cached = await resolveCachedAnswer(userContent);
-      const { turns, systemPrompt, usedAccountContext } = await buildOptimizedContext(
-        conversationId,
-        userContent,
-        user.id
-      );
+      if (cached) {
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream({
+          async start(controller) {
+            try {
+              const result = await streamCachedResponse(cached.answer, (token) => {
+                controller.enqueue(encoder.encode(token));
+              });
 
-      if (!cached && !isChatOpenAIConfigured()) {
+              await prisma.chatMessage.create({
+                data: {
+                  conversationId,
+                  role: ChatMessageRole.ASSISTANT,
+                  content: result.content,
+                  promptTokens: result.promptTokens,
+                  completionTokens: result.completionTokens,
+                  totalTokens: result.totalTokens,
+                  costUsd: result.costUsd,
+                  model: result.model,
+                  cached: true,
+                },
+              });
+
+              await trackEvent({
+                type: "ai.chat",
+                userId: user.id,
+                metadata: {
+                  conversationId,
+                  model: result.model,
+                  cached: true,
+                  tokens: result.totalTokens,
+                  accountContext: false,
+                  cacheSource: cached.source,
+                },
+              });
+
+              await prisma.chatConversation.update({
+                where: { id: conversationId },
+                data: {
+                  updatedAt: new Date(),
+                  totalTokens: { increment: result.totalTokens },
+                  totalCostUsd: { increment: result.costUsd },
+                },
+              });
+
+              controller.close();
+            } catch (error) {
+              console.error("[chat] cache stream error:", error);
+              controller.enqueue(
+                encoder.encode("\n\n[Error: Failed to generate response. Please try again.]")
+              );
+              controller.close();
+            }
+          },
+        });
+
+        return new Response(stream, {
+          headers: {
+            "Content-Type": "text/plain; charset=utf-8",
+            "Cache-Control": "no-cache, no-transform",
+            "X-Conversation-Id": conversationId,
+            "X-Chat-Cache": cached.source,
+          },
+        });
+      }
+
+      if (!isChatOpenAIConfigured()) {
         throw new ApiError(
           "OpenAI is not configured. Add OPENAI_API_KEY to .env.local and restart the dev server.",
           503
         );
       }
 
+      const { turns, systemPrompt, usedAccountContext } = await buildOptimizedContext(
+        conversationId,
+        userContent,
+        user.id
+      );
+
       const encoder = new TextEncoder();
 
       const stream = new ReadableStream({
         async start(controller) {
           try {
-            let result;
-
-            if (cached && !usedAccountContext) {
-              result = await streamCachedResponse(cached.answer, (token) => {
+            const result = await streamChatCompletion(
+              systemPrompt,
+              turns,
+              userContent,
+              (token) => {
                 controller.enqueue(encoder.encode(token));
-              });
-            } else {
-              result = await streamChatCompletion(
-                systemPrompt,
-                turns,
-                userContent,
-                (token) => {
-                  controller.enqueue(encoder.encode(token));
-                }
-              );
-
-              if (result.model !== "cache" && !usedAccountContext) {
-                await storeCachedAnswerIfWorthwhile(userContent, result.content);
               }
+            );
+
+            if (result.model !== "cache" && !usedAccountContext) {
+              await storeCachedAnswerIfWorthwhile(userContent, result.content);
             }
 
             await prisma.chatMessage.create({
@@ -107,7 +166,7 @@ export async function POST(
                 totalTokens: result.totalTokens,
                 costUsd: result.costUsd,
                 model: result.model,
-                cached: Boolean(cached) && !usedAccountContext,
+                cached: false,
               },
             });
 
@@ -117,7 +176,7 @@ export async function POST(
               metadata: {
                 conversationId,
                 model: result.model,
-                cached: Boolean(cached) && !usedAccountContext,
+                cached: false,
                 tokens: result.totalTokens,
                 accountContext: usedAccountContext,
               },
@@ -134,9 +193,10 @@ export async function POST(
 
             controller.close();
           } catch (error) {
-            const message =
-              error instanceof Error ? error.message : "Failed to generate response";
-            controller.enqueue(encoder.encode(`\n\n[Error: ${message}]`));
+            console.error("[chat] stream error:", error);
+            controller.enqueue(
+              encoder.encode("\n\n[Error: Failed to generate response. Please try again.]")
+            );
             controller.close();
           }
         },

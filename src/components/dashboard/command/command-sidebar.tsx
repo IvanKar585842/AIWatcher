@@ -30,12 +30,23 @@ export function CommandSidebar() {
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    fetch("/api/user/context")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data?.isAdmin) setIsAdmin(true);
-      })
-      .catch(() => {});
+    let cancelled = false;
+
+    async function loadAdminFlag() {
+      try {
+        const res = await fetch("/api/user/context", { credentials: "same-origin" });
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        if (!cancelled && data?.isAdmin) setIsAdmin(true);
+      } catch {
+        // ignore — Admin nav stays hidden for non-admins / failed loads
+      }
+    }
+
+    void loadAdminFlag();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const navItems = [
@@ -50,7 +61,7 @@ export function CommandSidebar() {
     { href: "/dashboard/settings", label: "Settings", icon: Settings },
     { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
     ...(isAdmin
-      ? [{ href: "/dashboard/admin", label: "Admin", icon: Shield, exact: false }]
+      ? [{ href: "/admin", label: "Admin", icon: Shield, exact: false }]
       : []),
   ];
 

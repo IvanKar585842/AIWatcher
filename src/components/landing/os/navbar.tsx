@@ -37,6 +37,12 @@ export function OsNavbar() {
               {item}
             </Link>
           ))}
+          <Link
+            href="/score"
+            className="text-xs uppercase tracking-[0.2em] text-zinc-500 transition-colors hover:text-cyan-400/90"
+          >
+            Score
+          </Link>
         </nav>
 
         <div className="flex items-center gap-2">

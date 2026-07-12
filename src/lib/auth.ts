@@ -1,6 +1,7 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { Plan } from "@prisma/client";
 import { ensureAdminPrivileges } from "@/lib/admin";
+import { trackEvent } from "@/lib/analytics";
 import { prisma } from "@/lib/db";
 import { UnauthorizedError } from "@/lib/errors";
 
@@ -16,6 +17,12 @@ export async function getOrCreateUser() {
       ?.emailAddress ?? clerkUser.emailAddresses[0]?.emailAddress;
 
   if (!email) return null;
+
+  const existing = await prisma.user.findUnique({
+    where: { clerkId: userId },
+    select: { id: true },
+  });
+  const isNewUser = !existing;
 
   let user = await prisma.user.upsert({
     where: { clerkId: userId },
@@ -42,6 +49,23 @@ export async function getOrCreateUser() {
     where: { id: user.id },
     include: { subscription: true },
   });
+
+  if (isNewUser) {
+    void trackEvent({
+      type: "user.signup",
+      userId: user.id,
+      metadata: { emailDomain: email.split("@")[1] ?? null },
+    });
+
+    // Welcome email — never block login
+    if (process.env.RESEND_API_KEY?.trim()) {
+      void import("@/lib/notifications/email")
+        .then(({ sendWelcomeEmail }) =>
+          sendWelcomeEmail(email, user.name ?? email.split("@")[0] ?? "there")
+        )
+        .catch((err) => console.error("[auth] welcome email failed:", err));
+    }
+  }
 
   return user;
 }

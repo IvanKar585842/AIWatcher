@@ -1,4 +1,5 @@
 import { MonitoringMode } from "@prisma/client";
+import { fetchWithSafeRedirects } from "@/lib/security/url";
 
 const BOT_ALIASES = new Set(["*", "watchflowing", "WatchFlowing", "WatchFlowAI", "watchflowai"]);
 
@@ -110,7 +111,7 @@ function isPathAllowed(group: RobotsGroup, urlPath: string): boolean {
 export async function isUrlAllowedByRobotsTxt(url: string): Promise<boolean> {
   try {
     const parsed = new URL(url);
-    const response = await fetch(`${parsed.origin}/robots.txt`, {
+    const response = await fetchWithSafeRedirects(`${parsed.origin}/robots.txt`, {
       signal: AbortSignal.timeout(5000),
       headers: { "User-Agent": "WatchFlowing/1.0 (+https://watchflowing.com/bot)" },
     });

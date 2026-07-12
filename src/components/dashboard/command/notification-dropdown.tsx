@@ -54,7 +54,7 @@ export function NotificationDropdown() {
   const loadNotifications = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/notifications");
+      const res = await fetch("/api/notifications?lean=1&limit=15");
       if (!res.ok) return;
       const data = await res.json();
       const items: NotificationItem[] = data.notifications ?? [];
@@ -80,7 +80,7 @@ export function NotificationDropdown() {
   useEffect(() => {
     setReadIds(getReadIds());
     loadNotifications();
-    const interval = setInterval(loadNotifications, 15_000);
+    const interval = setInterval(loadNotifications, 30_000);
     return () => clearInterval(interval);
   }, [loadNotifications]);
 

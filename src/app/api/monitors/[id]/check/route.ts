@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { apiErrorResponse } from "@/lib/api-response";
+import { safeClientErrorMessage } from "@/lib/errors";
 import { processMonitor } from "@/lib/monitoring/processor";
 import { processPendingAnalyses } from "@/lib/monitoring/ai-processor";
 import { withRateLimit } from "@/lib/rate-limit";
@@ -40,8 +41,13 @@ export async function POST(
             resourceId: id,
             metadata: { error: error instanceof Error ? error.message : String(error) },
           });
-          const message = error instanceof Error ? error.message : "Check failed";
-          return NextResponse.json({ success: false, error: message }, { status: 500 });
+          return NextResponse.json(
+            {
+              success: false,
+              error: safeClientErrorMessage(error, "Check failed. Please try again."),
+            },
+            { status: 500 }
+          );
         }
       },
       user.id,

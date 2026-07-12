@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth";
+import { trackEvent } from "@/lib/analytics";
 import { apiErrorResponse } from "@/lib/api-response";
 import { parseJsonBody } from "@/lib/errors";
 import { withRateLimit } from "@/lib/rate-limit";
@@ -46,6 +47,12 @@ export async function POST(request: NextRequest) {
           user.email,
           parsed.data.plan
         );
+
+        void trackEvent({
+          type: "checkout.started",
+          userId: user.id,
+          metadata: { plan: parsed.data.plan, sessionId: session.id },
+        });
 
         return NextResponse.json({
           success: true,

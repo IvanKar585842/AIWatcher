@@ -3,14 +3,31 @@ import type { Prisma } from "@prisma/client";
 
 export type AnalyticsEventType =
   | "user.active"
+  | "user.signup"
   | "monitor.check"
+  | "monitor.created"
+  | "monitor.first_created"
   | "check.failed"
   | "change.detected"
+  | "alert.first"
   | "email.sent"
   | "telegram.sent"
   | "ai.analysis"
   | "ai.chat"
-  | "api.error";
+  | "ai.failed"
+  | "api.error"
+  | "cron.monitoring"
+  | "cron.failed"
+  | "onboarding.completed"
+  | "checkout.started"
+  | "subscription.upgraded"
+  | "subscription.canceled"
+  | "report_created"
+  | "report_shared"
+  | "badge_installed"
+  | "referral_created"
+  | "signup_from_report"
+  | "score_generated";
 
 interface TrackEventParams {
   type: AnalyticsEventType;
@@ -41,15 +58,18 @@ export async function getAnalyticsSummary(userId?: string) {
 
     const where = userId ? { userId, createdAt: { gte: since } } : { createdAt: { gte: since } };
 
-    const [changes, emails, checks, aiEvents] = await Promise.all([
+    const [changes, emails, checks, aiEvents, signups, upgrades] = await Promise.all([
       prisma.analyticsEvent.count({ where: { ...where, type: "change.detected" } }),
       prisma.analyticsEvent.count({ where: { ...where, type: "email.sent" } }),
       prisma.analyticsEvent.count({ where: { ...where, type: "monitor.check" } }),
       prisma.analyticsEvent.findMany({
         where: { ...where, type: "ai.analysis", durationMs: { not: null } },
         select: { durationMs: true },
-        take: 500,
+        take: 100,
+        orderBy: { createdAt: "desc" },
       }),
+      prisma.analyticsEvent.count({ where: { ...where, type: "user.signup" } }),
+      prisma.analyticsEvent.count({ where: { ...where, type: "subscription.upgraded" } }),
     ]);
 
     const avgAiMs =
@@ -77,6 +97,8 @@ export async function getAnalyticsSummary(userId?: string) {
       emailsSent: emails,
       monitoringChecks: checks,
       avgAiResponseMs: avgAiMs,
+      signups,
+      upgrades,
     };
   } catch {
     const activeMonitors = await prisma.monitor
@@ -90,6 +112,8 @@ export async function getAnalyticsSummary(userId?: string) {
       emailsSent: 0,
       monitoringChecks: 0,
       avgAiResponseMs: 0,
+      signups: 0,
+      upgrades: 0,
     };
   }
 }

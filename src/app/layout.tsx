@@ -3,6 +3,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { defaultMetadata, structuredData } from "@/lib/seo";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { ClerkThemeProvider } from "@/components/providers/clerk-provider";
+import { GrowthCapture } from "@/components/growth/growth-capture";
 import "./globals.css";
 
 export const metadata: Metadata = defaultMetadata;
@@ -22,7 +23,10 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen font-sans antialiased">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          <ClerkThemeProvider>{children}</ClerkThemeProvider>
+          <ClerkThemeProvider>
+            <GrowthCapture />
+            {children}
+          </ClerkThemeProvider>
         </ThemeProvider>
         <SpeedInsights />
       </body>

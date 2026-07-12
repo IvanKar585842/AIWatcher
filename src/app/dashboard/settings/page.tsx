@@ -24,6 +24,7 @@ import {
 import { MonitoringInterval, MonitoringMode, NotificationMethod } from "@prisma/client";
 import { CommandPageHeader } from "@/components/dashboard/command/command-page-header";
 import { OsExpandableSection, OsFieldLabel, OsInput } from "@/components/dashboard/os/os-primitives";
+import { AgencyBadgeSettings } from "@/components/growth/agency-badge-settings";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
@@ -908,8 +909,8 @@ export default function SettingsPage() {
         >
           <div className="space-y-4">
             <p className="text-sm leading-relaxed text-zinc-500">
-              Give partners your personal invite link. Rewards are coming soon — your code and
-              signup tracking are ready now.
+              Share your invite link. Each signup gives you +1 monitor slot; new users get 7 days of
+              Pro. No spammy popups — just a quiet growth loop.
             </p>
             {referralLoading ? (
               <Loader2 className="h-5 w-5 animate-spin text-cyan-400" />
@@ -924,7 +925,7 @@ export default function SettingsPage() {
                   </div>
                   <div className="text-right">
                     <p className="font-mono text-[10px] uppercase tracking-widest text-zinc-600">
-                      Signups
+                      Referral count
                     </p>
                     <p className="mt-1 font-mono text-lg text-zinc-100">{referral.signups}</p>
                   </div>
@@ -949,6 +950,14 @@ export default function SettingsPage() {
               <p className="text-sm text-zinc-500">Could not load referral details.</p>
             )}
           </div>
+        </OsExpandableSection>
+
+        <OsExpandableSection
+          title="Agency & badge"
+          subtitle="Client-ready branding and embeddable trust badge"
+          icon={<Plug className="h-5 w-5" />}
+        >
+          <AgencyBadgeSettings />
         </OsExpandableSection>
 
         {/* Account */}

@@ -35,12 +35,62 @@ const TIER_CONFIG: Record<
 const limiters = new Map<RateLimitTier, Ratelimit>();
 let warnedMissingRedis = false;
 
+/** Process-local sliding window when Upstash is unavailable (fail closed, not open). */
+type MemoryBucket = { timestamps: number[] };
+const memoryBuckets = new Map<string, MemoryBucket>();
+
+function windowMsFromConfig(window: string): number {
+  const match = window.match(/^(\d+)\s*([smhd])$/);
+  if (!match) return 60_000;
+  const n = Number(match[1]);
+  const unit = match[2];
+  if (unit === "s") return n * 1000;
+  if (unit === "m") return n * 60_000;
+  if (unit === "h") return n * 3_600_000;
+  return n * 86_400_000;
+}
+
+function checkMemoryRateLimit(
+  identifier: string,
+  tier: RateLimitTier
+): { success: boolean; remaining: number; reset: number } {
+  const cfg = TIER_CONFIG[tier];
+  const windowMs = windowMsFromConfig(cfg.window);
+  const now = Date.now();
+  const key = `${tier}:${identifier}`;
+  let bucket = memoryBuckets.get(key);
+  if (!bucket) {
+    bucket = { timestamps: [] };
+    memoryBuckets.set(key, bucket);
+  }
+  bucket.timestamps = bucket.timestamps.filter((t) => now - t < windowMs);
+  if (bucket.timestamps.length >= cfg.requests) {
+    const oldest = bucket.timestamps[0] ?? now;
+    return {
+      success: false,
+      remaining: 0,
+      reset: oldest + windowMs,
+    };
+  }
+  bucket.timestamps.push(now);
+  // Bound map growth in long-lived processes
+  if (memoryBuckets.size > 10_000) {
+    const firstKey = memoryBuckets.keys().next().value;
+    if (firstKey) memoryBuckets.delete(firstKey);
+  }
+  return {
+    success: true,
+    remaining: Math.max(0, cfg.requests - bucket.timestamps.length),
+    reset: now + windowMs,
+  };
+}
+
 function getRedis() {
   if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
-    if (process.env.NODE_ENV === "production" && !warnedMissingRedis) {
+    if (!warnedMissingRedis) {
       warnedMissingRedis = true;
       console.warn(
-        "[rate-limit] Upstash Redis is not configured — API rate limits are disabled"
+        "[rate-limit] Upstash Redis is not configured — using in-memory rate limits (per instance)"
       );
     }
     return null;
@@ -78,9 +128,8 @@ export async function checkRateLimit(
   tier: RateLimitTier = "api"
 ): Promise<{ success: boolean; remaining: number; reset: number }> {
   const rl = getLimiter(tier);
-  const fallback = TIER_CONFIG[tier].requests;
   if (!rl) {
-    return { success: true, remaining: fallback, reset: Date.now() + 60_000 };
+    return checkMemoryRateLimit(identifier, tier);
   }
 
   const result = await rl.limit(identifier);

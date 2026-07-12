@@ -4,7 +4,7 @@ import { memo, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bell, Brain, Sparkles } from "lucide-react";
-import { formatRelativeTime } from "@/lib/utils";
+import { cn, formatRelativeTime } from "@/lib/utils";
 import { EmptyState } from "./dashboard-skeletons";
 
 export interface ActivityChange {
@@ -55,9 +55,11 @@ function hostFromUrl(url: string): string {
 export const RecentActivityPanel = memo(function RecentActivityPanel({
   changes,
   notifications,
+  embedded = false,
 }: {
   changes: ActivityChange[];
   notifications: ActivityNotification[];
+  embedded?: boolean;
 }) {
   const [tab, setTab] = useState<Tab>("detections");
 
@@ -67,22 +69,39 @@ export const RecentActivityPanel = memo(function RecentActivityPanel({
   ];
 
   return (
-    <div className="flex w-full min-w-0 flex-col rounded-2xl border border-white/[0.06] bg-white/[0.02] lg:h-[560px] lg:max-h-[560px] lg:overflow-hidden">
-      <div className="shrink-0 border-b border-white/[0.06] px-3 py-3 sm:px-5 sm:py-4">
-        <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0">
-            <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-cyan-500/70">
-              Recent Activity
-            </p>
-            <h3 className="mt-1 text-sm font-medium text-zinc-100">Intelligence Feed</h3>
-            <p className="mt-0.5 hidden text-[11px] text-zinc-500 sm:block">
-              Changes WatchFlowing understands — not just detects
-            </p>
+    <div
+      className={cn(
+        "flex w-full min-w-0 flex-col",
+        embedded ? "" : "rounded-2xl border border-white/[0.06] bg-white/[0.02]"
+      )}
+    >
+      <div
+        className={cn(
+          "shrink-0 px-3 py-3 sm:px-5 sm:py-4",
+          embedded ? "border-b border-white/[0.04]" : "border-b border-white/[0.06]"
+        )}
+      >
+        {!embedded && (
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-cyan-500/70">
+                Recent Activity
+              </p>
+              <h3 className="mt-1 text-sm font-medium text-zinc-100">Intelligence Feed</h3>
+              <p className="mt-0.5 hidden text-[11px] text-zinc-500 sm:block">
+                Changes WatchFlowing understands — not just detects
+              </p>
+            </div>
+            <Sparkles className="h-4 w-4 shrink-0 text-cyan-500/40" />
           </div>
-          <Sparkles className="h-4 w-4 shrink-0 text-cyan-500/40" />
-        </div>
+        )}
 
-        <div className="mt-3 flex gap-1 rounded-lg border border-white/[0.06] bg-black/30 p-1 sm:mt-4">
+        <div
+          className={cn(
+            "grid grid-cols-2 gap-1 rounded-xl border border-white/[0.06] bg-black/30 p-1",
+            embedded ? "mt-0" : "mt-3 sm:mt-4"
+          )}
+        >
           {tabs.map((t) => {
             const Icon = t.icon;
             const active = tab === t.id;
@@ -91,14 +110,14 @@ export const RecentActivityPanel = memo(function RecentActivityPanel({
                 key={t.id}
                 type="button"
                 onClick={() => setTab(t.id)}
-                className={`relative flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-medium transition-colors ${
+                className={`relative flex min-h-11 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-medium transition-colors ${
                   active ? "text-cyan-100" : "text-zinc-500 hover:text-zinc-300"
                 }`}
               >
                 {active && (
                   <motion.div
-                    layoutId="activity-tab"
-                    className="absolute inset-0 rounded-md border border-cyan-500/20 bg-cyan-500/10"
+                    layoutId={embedded ? "feed-inner-tab" : "activity-tab"}
+                    className="absolute inset-0 rounded-lg border border-cyan-500/20 bg-cyan-500/10"
                     transition={{ type: "spring", stiffness: 400, damping: 30 }}
                   />
                 )}
@@ -112,23 +131,22 @@ export const RecentActivityPanel = memo(function RecentActivityPanel({
         </div>
       </div>
 
-      {/* Mobile: expand with page scroll. Desktop: internal scroll. */}
-      <div className="min-h-0 lg:flex-1 lg:overflow-y-auto">
+      <div className="w-full min-w-0">
         <AnimatePresence mode="wait">
           {tab === "detections" ? (
             <motion.div
               key="detections"
-              initial={{ opacity: 0, x: -12 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 12 }}
-              transition={{ duration: 0.2 }}
-              className="p-3 sm:p-4"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18 }}
+              className="p-3 sm:p-5"
             >
               {changes.length === 0 ? (
                 <EmptyState
                   icon={Brain}
-                  title="Your AI monitoring feed will appear here"
-                  description="WatchFlowing will analyze important changes and explain what requires attention — so you never chase noise."
+                  title="No intelligence insights yet"
+                  description="Once WatchFlowing detects important changes, AI insights will appear here."
                 />
               ) : (
                 <div className="space-y-2">
@@ -159,14 +177,17 @@ export const RecentActivityPanel = memo(function RecentActivityPanel({
                                 {formatRelativeTime(change.createdAt)}
                               </span>
                             </div>
-                            <p className="mt-1.5 truncate text-sm font-medium text-zinc-100 group-hover:text-cyan-100">
+                            <p className="mt-1.5 break-words text-sm font-medium text-zinc-100 group-hover:text-cyan-100">
                               {change.monitor.name}
                             </p>
                             <p className="truncate font-mono text-[10px] text-zinc-600">
                               {hostFromUrl(change.monitor.url)}
                             </p>
-                            <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-zinc-400">
+                            <p className="mt-1.5 line-clamp-3 text-xs leading-relaxed text-zinc-400">
                               {change.summary}
+                            </p>
+                            <p className="mt-2 text-[10px] font-medium text-cyan-500/70">
+                              Recommended: review this change →
                             </p>
                           </div>
                         </div>
@@ -179,17 +200,17 @@ export const RecentActivityPanel = memo(function RecentActivityPanel({
           ) : (
             <motion.div
               key="notifications"
-              initial={{ opacity: 0, x: 12 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -12 }}
-              transition={{ duration: 0.2 }}
-              className="p-3 sm:p-4"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18 }}
+              className="p-3 sm:p-5"
             >
               {notifications.length === 0 ? (
                 <EmptyState
                   icon={Bell}
-                  title="Your intelligence alerts are ready"
-                  description="When something important changes, WatchFlowing will deliver a clear AI summary here — via email, Telegram, or in-app."
+                  title="No intelligence insights yet"
+                  description="Once WatchFlowing detects important changes, AI insights will appear here."
                 />
               ) : (
                 <div className="space-y-2">
@@ -207,7 +228,7 @@ export const RecentActivityPanel = memo(function RecentActivityPanel({
                         <span className="mt-0.5 text-base">{notif.change.emoji}</span>
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <p className="truncate text-sm font-medium text-zinc-200 group-hover:text-cyan-100">
+                            <p className="break-words text-sm font-medium text-zinc-200 group-hover:text-cyan-100">
                               {notif.change.monitor.name}
                             </p>
                             <span
@@ -218,7 +239,7 @@ export const RecentActivityPanel = memo(function RecentActivityPanel({
                               {notif.status}
                             </span>
                           </div>
-                          <p className="mt-1 line-clamp-2 text-xs text-zinc-400">
+                          <p className="mt-1 line-clamp-3 text-xs text-zinc-400">
                             {notif.change.summary}
                           </p>
                           <p className="mt-1.5 font-mono text-[10px] text-zinc-600">

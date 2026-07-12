@@ -84,7 +84,7 @@ export async function claimDueMonitors(batchSize: number): Promise<string[]> {
   }
 }
 
-export async function syncAllDueMonitorsToQueue(): Promise<void> {
+export async function syncAllDueMonitorsToQueue(maxDue = 200): Promise<void> {
   const now = new Date();
 
   try {
@@ -94,13 +94,16 @@ export async function syncAllDueMonitorsToQueue(): Promise<void> {
         OR: [{ nextCheckAt: null }, { nextCheckAt: { lte: now } }],
       },
       select: { id: true, nextCheckAt: true },
+      orderBy: { nextCheckAt: "asc" },
+      take: maxDue,
     });
 
-    await Promise.all(
-      dueMonitors.map((m) =>
-        syncMonitorQueue(m.id, m.nextCheckAt ?? now)
-      )
-    );
+    // Upsert in chunks to avoid bursting the DB connection pool
+    const chunkSize = 25;
+    for (let i = 0; i < dueMonitors.length; i += chunkSize) {
+      const chunk = dueMonitors.slice(i, i + chunkSize);
+      await Promise.all(chunk.map((m) => syncMonitorQueue(m.id, m.nextCheckAt ?? now)));
+    }
   } catch {
     // optional
   }

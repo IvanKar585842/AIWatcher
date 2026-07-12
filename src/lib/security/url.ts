@@ -160,3 +160,44 @@ export async function assertSafeFetchUrl(urlString: string): Promise<URL> {
 
   return url;
 }
+
+const MAX_SAFE_REDIRECTS = 5;
+
+/**
+ * Fetch with manual redirect following; re-validates each hop against SSRF rules.
+ */
+export async function fetchWithSafeRedirects(
+  urlString: string,
+  init?: RequestInit,
+  maxRedirects = MAX_SAFE_REDIRECTS
+): Promise<Response> {
+  let current = (await assertSafeFetchUrl(urlString)).toString();
+  const { redirect: _ignored, ...rest } = init ?? {};
+
+  for (let hops = 0; hops <= maxRedirects; hops++) {
+    const response = await fetch(current, { ...rest, redirect: "manual" });
+
+    if (response.status < 300 || response.status >= 400) {
+      return response;
+    }
+
+    const location = response.headers.get("location");
+    if (!location) {
+      return response;
+    }
+
+    if (hops === maxRedirects) {
+      securityLog({
+        type: "url.blocked",
+        message: "Too many redirects during safe fetch",
+        metadata: { url: current.slice(0, 200) },
+      });
+      throw new Error("Too many redirects while fetching URL");
+    }
+
+    const nextUrl = new URL(location, current).toString();
+    current = (await assertSafeFetchUrl(nextUrl)).toString();
+  }
+
+  throw new Error("Too many redirects while fetching URL");
+}

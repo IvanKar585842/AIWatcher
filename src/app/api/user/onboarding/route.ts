@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
+import { trackEvent } from "@/lib/analytics";
 import { apiFailureFromError } from "@/lib/api-response";
 import { parseJsonBody } from "@/lib/errors";
 import { markOnboardingCompleted, resolveOnboardingState } from "@/lib/onboarding";
@@ -48,6 +49,12 @@ export async function PATCH(request: Request) {
         }
 
         await markOnboardingCompleted(user.id);
+
+        void trackEvent({
+          type: "onboarding.completed",
+          userId: user.id,
+          metadata: { intent: parsed.data.intent ?? null, via: "wizard" },
+        });
 
         return NextResponse.json({
           success: true,

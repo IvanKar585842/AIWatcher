@@ -3,11 +3,11 @@ import { Prisma } from "@prisma/client";
 import { requireUser } from "@/lib/auth";
 import { isIntervalAllowedForUser } from "@/lib/admin";
 import { prisma } from "@/lib/db";
-import { apiFailureFromError } from "@/lib/api-response";
-import { apiErrorResponse } from "@/lib/api-response";
+import { apiFailureFromError, apiErrorResponse } from "@/lib/api-response";
 import { ApiError, parseJsonBody } from "@/lib/errors";
 import { assertMonitorModeAllowed, assertNotificationAllowed } from "@/lib/plan-guards";
 import { withRateLimit } from "@/lib/rate-limit";
+import { assertMonitorOwnedBy } from "@/lib/security/ownership";
 import { updateMonitorSchema } from "@/lib/validations";
 export async function GET(
   _request: NextRequest,
@@ -158,12 +158,8 @@ export async function DELETE(
     return withRateLimit(
       `monitor-delete-${id}`,
       async () => {
-        const existing = await prisma.monitor.findFirst({
-          where: { id, userId: user.id },
-        });
-        if (!existing) {
-          return NextResponse.json({ error: "Monitor not found" }, { status: 404 });
-        }
+        // Ownership check — prevents deleting another user's monitor
+        await assertMonitorOwnedBy(user.id, id);
         await prisma.monitor.delete({ where: { id } });
         return NextResponse.json({ success: true });
       },

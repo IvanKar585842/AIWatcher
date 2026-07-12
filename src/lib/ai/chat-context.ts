@@ -4,6 +4,7 @@ import { CHAT_LIMITS, getChatModelId } from "./chat-config";
 import { buildSystemPrompt } from "./chat-knowledge";
 import {
   buildUserMonitoringContext,
+  isAccountSpecificQuestion,
 } from "./chat-user-context";
 import {
   calculateCostUsd,
@@ -78,23 +79,32 @@ export async function maybeCompressConversation(conversationId: string): Promise
 
   const conversation = await prisma.chatConversation.findUnique({
     where: { id: conversationId },
-    include: {
-      messages: { orderBy: { createdAt: "asc" } },
+    select: {
+      id: true,
+      summary: true,
+      summaryUpdatedAt: true,
+      _count: { select: { messages: true } },
     },
   });
 
   if (!conversation) return;
 
-  const messageCount = conversation.messages.length;
+  const messageCount = conversation._count.messages;
   if (messageCount < CHAT_LIMITS.SUMMARIZE_AFTER_MESSAGES) return;
 
+  const messages = await prisma.chatMessage.findMany({
+    where: { conversationId },
+    orderBy: { createdAt: "asc" },
+    select: { role: true, content: true, createdAt: true },
+  });
+
   const keepCount = CHAT_LIMITS.KEEP_MESSAGES_AFTER_SUMMARY * 2;
-  const toSummarize = conversation.messages.slice(0, -keepCount);
+  const toSummarize = messages.slice(0, -keepCount);
   if (toSummarize.length < 6) return;
 
   const lastSummarizedAt = conversation.summaryUpdatedAt;
   const messagesSinceSummary = lastSummarizedAt
-    ? conversation.messages.filter((m) => m.createdAt > lastSummarizedAt).length
+    ? messages.filter((m) => m.createdAt > lastSummarizedAt).length
     : messageCount;
 
   if (messagesSinceSummary < 8 && conversation.summary) return;
@@ -126,10 +136,19 @@ export async function buildOptimizedContext(
 ): Promise<{ turns: ChatTurn[]; systemPrompt: string; usedAccountContext: boolean }> {
   await maybeCompressConversation(conversationId);
 
+  const recentLimit = CHAT_LIMITS.RECENT_TURN_COUNT * 2 + 4;
+
   const conversation = await prisma.chatConversation.findUnique({
     where: { id: conversationId },
-    include: {
-      messages: { orderBy: { createdAt: "asc" } },
+    select: {
+      id: true,
+      userId: true,
+      summary: true,
+      messages: {
+        orderBy: { createdAt: "desc" },
+        take: recentLimit,
+        select: { role: true, content: true },
+      },
     },
   });
 
@@ -146,7 +165,8 @@ export async function buildOptimizedContext(
   let userSnapshot = "";
   let usedAccountContext = false;
 
-  if (ownerId) {
+  // Only attach live account data when the question needs it (saves DB + tokens)
+  if (ownerId && isAccountSpecificQuestion(userMessage)) {
     try {
       userSnapshot = await buildUserMonitoringContext(ownerId);
       usedAccountContext = Boolean(userSnapshot);
@@ -165,7 +185,7 @@ export async function buildOptimizedContext(
     });
   }
 
-  const recent = conversation.messages.slice(-CHAT_LIMITS.RECENT_TURN_COUNT * 2);
+  const recent = [...conversation.messages].reverse();
 
   for (const msg of recent) {
     if (msg.role === ChatMessageRole.SYSTEM) continue;

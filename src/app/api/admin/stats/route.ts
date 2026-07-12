@@ -14,11 +14,25 @@ export async function GET() {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        const [usage, adminUsers, totalMonitors, changesToday, pendingAnalyses, recentUsers, recentErrors] =
-          await Promise.all([
+        const [
+          usage,
+          adminUsers,
+          totalMonitors,
+          activeSubscriptions,
+          changesToday,
+          pendingAnalyses,
+          recentUsers,
+          recentErrors,
+        ] = await Promise.all([
             getPlatformUsage(30),
             prisma.user.count({ where: { role: "ADMIN" } }),
             prisma.monitor.count(),
+            prisma.subscription.count({
+              where: {
+                status: "active",
+                plan: { not: "FREE" },
+              },
+            }),
             prisma.change.count({ where: { createdAt: { gte: today } } }),
             prisma.change.count({ where: { analysisStatus: "PENDING" } }),
             prisma.user.findMany({
@@ -54,6 +68,7 @@ export async function GET() {
           adminUsers,
           totalMonitors,
           activeMonitors: usage.activeMonitors,
+          activeSubscriptions,
           errorMonitors: usage.errorMonitors,
           totalChecks: usage.totalChecks,
           checksToday: usage.checksToday,

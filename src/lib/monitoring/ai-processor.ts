@@ -103,6 +103,16 @@ export async function analyzeChangeById(changeId: string): Promise<void> {
     return;
   }
 
+  // Cluster-safe lease: only one worker may move PENDING → PROCESSING
+  const claimed = await prisma.change.updateMany({
+    where: { id: changeId, analysisStatus: AnalysisStatus.PENDING },
+    data: { analysisStatus: AnalysisStatus.PROCESSING },
+  });
+
+  if (claimed.count === 0) {
+    return;
+  }
+
   const change = await prisma.change.findUnique({
     where: { id: changeId },
     include: {
@@ -118,13 +128,17 @@ export async function analyzeChangeById(changeId: string): Promise<void> {
     throw new Error(`Change ${changeId} not found`);
   }
 
-  if (change.analysisStatus !== AnalysisStatus.PENDING) {
-    return;
-  }
-
   analyzingChangeIds.add(changeId);
   try {
     await analyzeChangeRecord(change);
+  } catch (error) {
+    await prisma.change
+      .updateMany({
+        where: { id: changeId, analysisStatus: AnalysisStatus.PROCESSING },
+        data: { analysisStatus: AnalysisStatus.PENDING },
+      })
+      .catch(() => undefined);
+    throw error;
   } finally {
     analyzingChangeIds.delete(changeId);
   }
@@ -136,26 +150,45 @@ export async function processPendingAnalyses(batchSize = MAX_AI_BATCH): Promise<
     where: { analysisStatus: AnalysisStatus.PENDING },
     orderBy: { createdAt: "asc" },
     take: safeBatch,
-    include: {
-      monitor: {
-        include: {
-          user: { include: { subscription: true } },
-        },
-      },
-    },
+    select: { id: true },
   });
 
   let processed = 0;
 
-  for (const change of pending) {
-    if (analyzingChangeIds.has(change.id)) {
+  for (const item of pending) {
+    if (analyzingChangeIds.has(item.id)) {
       continue;
     }
+
+    const claimed = await prisma.change.updateMany({
+      where: { id: item.id, analysisStatus: AnalysisStatus.PENDING },
+      data: { analysisStatus: AnalysisStatus.PROCESSING },
+    });
+    if (claimed.count === 0) continue;
+
+    const change = await prisma.change.findUnique({
+      where: { id: item.id },
+      include: {
+        monitor: {
+          include: {
+            user: { include: { subscription: true } },
+          },
+        },
+      },
+    });
+    if (!change) continue;
+
     analyzingChangeIds.add(change.id);
     try {
       await analyzeChangeRecord(change);
       processed++;
     } catch (error) {
+      await prisma.change
+        .updateMany({
+          where: { id: change.id, analysisStatus: AnalysisStatus.PROCESSING },
+          data: { analysisStatus: AnalysisStatus.PENDING },
+        })
+        .catch(() => undefined);
       monitorLogError("error", "AI analysis batch item failed (continuing)", error, {
         monitorId: change.monitorId,
         data: { changeId: change.id },
@@ -396,6 +429,15 @@ async function resolveAnalysis(
     monitorLogError("error", "AI analysis failed — using built-in summary", error, {
       monitorId: monitor.id,
       data: { changeId: change.id },
+    });
+    void trackEvent({
+      type: "ai.failed",
+      userId: monitor.userId,
+      metadata: {
+        changeId: change.id,
+        monitorId: monitor.id,
+        error: error instanceof Error ? error.message.slice(0, 160) : "unknown",
+      },
     });
     return {
       analysis: applyImportancePolicy(buildFallbackAnalysis(fallbackParams), minImportance),

@@ -16,7 +16,12 @@ export default function MonitorsPage() {
           triggerClassName="h-11 px-6 text-sm font-medium shadow-[0_0_32px_-8px_rgba(34,211,238,0.55)]"
         />
       </CommandPageHeader>
-      <MonitorList embedded showHeaderCreate={false} emptyStateShowCreate={false} />
+      <MonitorList
+        embedded
+        showHeaderCreate={false}
+        emptyStateShowCreate
+        emptyVariant="monitors"
+      />
     </div>
   );
 }

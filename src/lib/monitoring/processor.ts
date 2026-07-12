@@ -476,6 +476,17 @@ async function processMonitorInternal(monitorId: string): Promise<ProcessMonitor
       metadata: { monitorId, changeId: change.id, pendingAnalysis: true },
     });
 
+    const priorChanges = await prisma.change.count({
+      where: { monitor: { userId: monitor.userId } },
+    });
+    if (priorChanges <= 1) {
+      void trackEvent({
+        type: "alert.first",
+        userId: monitor.userId,
+        metadata: { monitorId, changeId: change.id },
+      });
+    }
+
     await cleanupOldHistory(monitor.id, plan, monitor.user);
     await releaseMonitorQueue(monitor.id, nextCheckAt);
 

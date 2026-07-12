@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import { Globe2 } from "lucide-react";
+import { CreateMonitorDialog } from "@/components/dashboard/create-monitor-dialog";
 import { getDomainFromUrl } from "@/lib/utils";
 
 export interface NetworkMonitor {
@@ -59,8 +61,8 @@ export function NetworkMap({ monitors }: { monitors: NetworkMonitor[] }) {
 
   const nodes = useMemo((): NodePosition[] => {
     const cx = 400;
-    const cy = 260;
-    const baseRadius = monitors.length <= 3 ? 140 : monitors.length <= 6 ? 170 : 200;
+    const cy = 300;
+    const baseRadius = monitors.length <= 3 ? 160 : monitors.length <= 6 ? 190 : 220;
 
     return monitors.map((m, i) => {
       const angle = hashAngle(m.id) + (i / Math.max(monitors.length, 1)) * 0.4;
@@ -78,135 +80,149 @@ export function NetworkMap({ monitors }: { monitors: NetworkMonitor[] }) {
     });
   }, [monitors, pulseId]);
 
-  const core = { x: 400, y: 260 };
+  const core = { x: 400, y: 300 };
 
   return (
-    <div className="relative h-full min-h-[360px] w-full overflow-hidden rounded-2xl border border-white/[0.06] bg-[#060606]">
+    <div className="relative min-h-[420px] w-full overflow-hidden rounded-2xl border border-white/[0.06] bg-[#060606] sm:min-h-[520px] lg:min-h-[640px]">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(34,211,238,0.06),transparent_65%)]" />
 
-      <div className="absolute left-5 top-4 z-10">
+      <div className="absolute left-4 top-4 z-10 sm:left-5">
         <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-cyan-500/70">
           Network Grid
         </p>
-        <h3 className="mt-1 text-sm font-medium text-zinc-200">Global Monitor Map</h3>
+        <h3 className="mt-1 text-sm font-medium text-zinc-200 sm:text-base">
+          Global Monitor Map
+        </h3>
       </div>
 
-      <svg
-        viewBox="0 0 800 520"
-        className="h-full w-full"
-        preserveAspectRatio="xMidYMid meet"
-      >
-        <defs>
-          <radialGradient id="coreGlow" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="rgba(34,211,238,0.35)" />
-            <stop offset="100%" stopColor="rgba(34,211,238,0)" />
-          </radialGradient>
-          <filter id="nodeGlow">
-            <feGaussianBlur stdDeviation="3" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
-
-        {/* Grid dots */}
-        {Array.from({ length: 12 }).map((_, row) =>
-          Array.from({ length: 20 }).map((__, col) => (
-            <circle
-              key={`${row}-${col}`}
-              cx={40 + col * 38}
-              cy={40 + row * 38}
-              r="0.6"
-              fill="rgba(125,211,252,0.08)"
+      {monitors.length === 0 ? (
+        <div className="relative z-10 flex min-h-[420px] flex-col items-center justify-center px-6 py-16 text-center sm:min-h-[520px] lg:min-h-[640px]">
+          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-500/10">
+            <Globe2 className="h-6 w-6 text-cyan-400/80" />
+          </div>
+          <p className="text-sm font-medium text-zinc-200">No monitored websites yet</p>
+          <p className="mt-2 max-w-sm text-xs leading-relaxed text-zinc-500">
+            Create your first monitor to see your global monitoring map.
+          </p>
+          <div className="mt-6">
+            <CreateMonitorDialog
+              variant="os"
+              triggerLabel="Create Monitor"
+              triggerClassName="h-11 px-6 text-sm"
+              onCreated={() => {
+                window.dispatchEvent(new CustomEvent("monitors-updated"));
+              }}
             />
-          ))
-        )}
-
-        {/* Connection lines */}
-        {nodes.map((node) => (
-          <g key={`line-${node.id}`}>
-            <motion.line
-              x1={core.x}
-              y1={core.y}
-              x2={node.x}
-              y2={node.y}
-              stroke={node.pulsing ? "rgba(34,211,238,0.45)" : "rgba(56,189,248,0.08)"}
-              strokeWidth={node.pulsing ? 1.5 : 0.8}
-              animate={
-                node.pulsing
-                  ? { strokeOpacity: [0.3, 0.8, 0.3] }
-                  : { strokeOpacity: 0.15 }
-              }
-              transition={{ duration: 2, repeat: Infinity }}
-            />
-            {node.pulsing && (
-              <motion.circle
-                r="3"
-                fill="#22d3ee"
-                filter="url(#nodeGlow)"
-                animate={{
-                  cx: [core.x, node.x],
-                  cy: [core.y, node.y],
-                  opacity: [0, 1, 0],
-                }}
-                transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-              />
-            )}
-          </g>
-        ))}
-
-        {/* AI Core */}
-        <motion.g
-          animate={{ scale: [1, 1.04, 1] }}
-          transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+          </div>
+        </div>
+      ) : (
+        <svg
+          viewBox="0 0 800 600"
+          className="h-full w-full min-h-[420px] sm:min-h-[520px] lg:min-h-[640px]"
+          preserveAspectRatio="xMidYMid meet"
         >
-          <circle cx={core.x} cy={core.y} r="52" fill="url(#coreGlow)" />
-          <circle
-            cx={core.x}
-            cy={core.y}
-            r="28"
-            fill="rgba(9,9,9,0.9)"
-            stroke="rgba(34,211,238,0.5)"
-            strokeWidth="1.5"
-          />
-          <circle
-            cx={core.x}
-            cy={core.y}
-            r="8"
-            fill="rgba(34,211,238,0.8)"
-          />
-          <text
-            x={core.x}
-            y={core.y + 48}
-            textAnchor="middle"
-            fill="rgba(125,211,252,0.7)"
-            fontSize="10"
-            fontFamily="monospace"
-            letterSpacing="3"
-          >
-            AI CORE
-          </text>
-        </motion.g>
+          <defs>
+            <radialGradient id="coreGlow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="rgba(34,211,238,0.35)" />
+              <stop offset="100%" stopColor="rgba(34,211,238,0)" />
+            </radialGradient>
+            <filter id="nodeGlow">
+              <feGaussianBlur stdDeviation="3" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
 
-        {/* Monitor nodes */}
-        {nodes.map((node, i) => (
+          {Array.from({ length: 14 }).map((_, row) =>
+            Array.from({ length: 20 }).map((__, col) => (
+              <circle
+                key={`${row}-${col}`}
+                cx={40 + col * 38}
+                cy={40 + row * 40}
+                r="0.6"
+                fill="rgba(125,211,252,0.08)"
+              />
+            ))
+          )}
+
+          {nodes.map((node) => (
+            <g key={`line-${node.id}`}>
+              <motion.line
+                x1={core.x}
+                y1={core.y}
+                x2={node.x}
+                y2={node.y}
+                stroke={node.pulsing ? "rgba(34,211,238,0.45)" : "rgba(56,189,248,0.08)"}
+                strokeWidth={node.pulsing ? 1.5 : 0.8}
+                animate={
+                  node.pulsing
+                    ? { strokeOpacity: [0.3, 0.8, 0.3] }
+                    : { strokeOpacity: 0.15 }
+                }
+                transition={{ duration: 2, repeat: Infinity }}
+              />
+              {node.pulsing && (
+                <motion.circle
+                  r="3"
+                  fill="#22d3ee"
+                  filter="url(#nodeGlow)"
+                  animate={{
+                    cx: [core.x, node.x],
+                    cy: [core.y, node.y],
+                    opacity: [0, 1, 0],
+                  }}
+                  transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+                />
+              )}
+            </g>
+          ))}
+
           <motion.g
-            key={node.id}
-            initial={{ opacity: 0, scale: 0 }}
-            animate={{
-              opacity: 1,
-              scale: 1,
-              y: [0, -4, 0],
-            }}
-            transition={{
-              opacity: { delay: i * 0.08 },
-              scale: { delay: i * 0.08, type: "spring" },
-              y: { duration: 3 + (i % 3), repeat: Infinity, ease: "easeInOut" },
-            }}
-            style={{ cursor: "pointer" }}
-            onClick={() => router.push(`/dashboard/monitors/${node.id}`)}
+            animate={{ scale: [1, 1.04, 1] }}
+            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
           >
+            <circle cx={core.x} cy={core.y} r="52" fill="url(#coreGlow)" />
+            <circle
+              cx={core.x}
+              cy={core.y}
+              r="28"
+              fill="rgba(9,9,9,0.9)"
+              stroke="rgba(34,211,238,0.5)"
+              strokeWidth="1.5"
+            />
+            <circle cx={core.x} cy={core.y} r="8" fill="rgba(34,211,238,0.8)" />
+            <text
+              x={core.x}
+              y={core.y + 48}
+              textAnchor="middle"
+              fill="rgba(125,211,252,0.7)"
+              fontSize="10"
+              fontFamily="monospace"
+              letterSpacing="3"
+            >
+              AI CORE
+            </text>
+          </motion.g>
+
+          {nodes.map((node, i) => (
+            <motion.g
+              key={node.id}
+              initial={{ opacity: 0, scale: 0 }}
+              animate={{
+                opacity: 1,
+                scale: 1,
+                y: [0, -4, 0],
+              }}
+              transition={{
+                opacity: { delay: i * 0.08 },
+                scale: { delay: i * 0.08, type: "spring" },
+                y: { duration: 3 + (i % 3), repeat: Infinity, ease: "easeInOut" },
+              }}
+              style={{ cursor: "pointer" }}
+              onClick={() => router.push(`/dashboard/monitors/${node.id}`)}
+            >
               {node.pulsing && (
                 <motion.circle
                   cx={node.x}
@@ -254,14 +270,9 @@ export function NetworkMap({ monitors }: { monitors: NetworkMonitor[] }) {
               >
                 {node.domain}
               </text>
-          </motion.g>
-        ))}
-      </svg>
-
-      {monitors.length === 0 && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <p className="text-sm text-zinc-600">Add monitors to populate the network</p>
-        </div>
+            </motion.g>
+          ))}
+        </svg>
       )}
     </div>
   );

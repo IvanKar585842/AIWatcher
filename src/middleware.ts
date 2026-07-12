@@ -5,8 +5,11 @@ const isPublicRoute = createRouteMatcher([
   "/",
   "/status(.*)",
   "/report(.*)",
+  "/score(.*)",
+  "/monitored-by(.*)",
   "/api/status(.*)",
   "/api/public(.*)",
+  "/api/health",
   "/api/webhooks(.*)",
   "/api/telegram/webhook",
   "/api/cron(.*)",
@@ -21,6 +24,12 @@ const isPublicRoute = createRouteMatcher([
 const hasClerk =
   process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
   !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY.includes("placeholder");
+
+if (!hasClerk && process.env.NODE_ENV !== "production") {
+  console.warn(
+    "[middleware] Clerk is not configured — protected routes are open in development only"
+  );
+}
 
 export default hasClerk
   ? clerkMiddleware(async (auth, request) => {

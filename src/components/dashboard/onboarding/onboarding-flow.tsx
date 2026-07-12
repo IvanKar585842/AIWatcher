@@ -223,10 +223,15 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                 className="space-y-5"
               >
                 <p className="text-sm leading-relaxed text-zinc-400">
-                  WatchFlowing (WatchFlowing) continuously monitors websites you care about,
-                  detects meaningful changes, and explains them with AI — so you never miss
-                  an important update.
+                  WatchFlowing watches websites you care about, detects meaningful changes,
+                  and explains them with AI — so you never miss an important update.
                 </p>
+
+                <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/[0.06] px-4 py-3 text-xs leading-relaxed text-cyan-100/80">
+                  <strong className="font-medium text-cyan-50">Your first win:</strong> create a
+                  monitor for your homepage or a competitor page. We take a baseline snapshot,
+                  then alert you when something important changes.
+                </div>
 
                 <div className="grid gap-3 sm:grid-cols-3">
                   {[

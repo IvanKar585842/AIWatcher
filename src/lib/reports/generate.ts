@@ -250,5 +250,17 @@ export async function generateWeeklyReportForUser(
     },
   });
 
+  const { trackEvent } = await import("@/lib/analytics");
+  await trackEvent({
+    type: "report_created",
+    userId,
+    metadata: {
+      reportId: report.id,
+      reportType,
+      aiUsed: payload.aiUsed,
+      totalChanges: payload.stats.totalChanges,
+    },
+  });
+
   return { report, cached: false as const };
 }

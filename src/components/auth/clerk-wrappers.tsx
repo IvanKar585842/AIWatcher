@@ -82,13 +82,21 @@ export function DashboardUserButton() {
 export function SignUpCTA({
   children,
   className,
+  href,
 }: {
   children: React.ReactNode;
   className?: string;
+  /** Optional deep-link after auth (e.g. /dashboard/billing?plan=PRO) */
+  href?: string;
 }) {
+  const signedOutHref = href
+    ? `/sign-up?redirect_url=${encodeURIComponent(href)}`
+    : "/sign-up";
+  const signedInHref = href ?? "/dashboard";
+
   if (!hasClerk) {
     return (
-      <Link href="/sign-up">
+      <Link href={signedOutHref}>
         <Button size="lg" className={className}>
           {children}
         </Button>
@@ -99,14 +107,14 @@ export function SignUpCTA({
   return (
     <>
       <SignedIn>
-        <Link href="/dashboard">
+        <Link href={signedInHref}>
           <Button size="lg" className={className}>
             {children}
           </Button>
         </Link>
       </SignedIn>
       <SignedOut>
-        <Link href="/sign-up">
+        <Link href={signedOutHref}>
           <Button size="lg" className={className}>
             {children}
           </Button>

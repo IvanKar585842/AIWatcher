@@ -23,10 +23,12 @@ import {
 } from "lucide-react";
 import type { MonitoringInterval, MonitoringMode, NotificationMethod, Plan } from "@prisma/client";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/components/ui/os-toast";
 import {
   Select,
   SelectContent,
@@ -196,12 +198,15 @@ function ToggleRow({
 
 export function MonitorSettings({ monitorId }: { monitorId: string }) {
   const router = useRouter();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [checking, setChecking] = useState(false);
   const [saved, setSaved] = useState(false);
   const [plan, setPlan] = useState<Plan>("FREE");
   const [monitor, setMonitor] = useState<MonitorData | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const [openSections, setOpenSections] = useState({
     general: true,
@@ -373,9 +378,25 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
   }
 
   async function deleteMonitor() {
-    if (!confirm("Permanently delete this monitor? This cannot be undone.")) return;
-    await fetch(`/api/monitors/${monitorId}`, { method: "DELETE" });
-    router.push("/dashboard/monitors");
+    setDeleteOpen(true);
+  }
+
+  async function confirmDeleteMonitor() {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/monitors/${monitorId}`, { method: "DELETE" });
+      if (!res.ok) {
+        toast("Could not delete monitor. Please try again.", "error");
+        return;
+      }
+      toast("Monitor deleted", "success");
+      setDeleteOpen(false);
+      router.push("/dashboard/monitors");
+    } catch {
+      toast("Could not delete monitor. Please try again.", "error");
+    } finally {
+      setDeleting(false);
+    }
   }
 
   if (loading) {
@@ -1070,6 +1091,20 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
           </div>
         )}
       </motion.div>
+
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={(open) => {
+          if (!deleting) setDeleteOpen(open);
+        }}
+        title="Delete monitor?"
+        description="Are you sure you want to delete this monitor? This action cannot be undone."
+        confirmLabel="Delete Monitor"
+        cancelLabel="Cancel"
+        tone="danger"
+        loading={deleting}
+        onConfirm={() => void confirmDeleteMonitor()}
+      />
     </div>
   );
 }

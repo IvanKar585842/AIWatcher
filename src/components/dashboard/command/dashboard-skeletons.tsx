@@ -48,16 +48,13 @@ export function CommandCenterSkeleton() {
         </div>
         <ShimmerBlock className="hidden h-9 w-28 rounded-full lg:block" />
       </div>
-      <ShimmerBlock className="h-[min(520px,62dvh)] min-h-[420px] border border-white/[0.04]" />
-      <div className="grid grid-cols-3 gap-2 lg:hidden">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <ShimmerBlock key={i} className="h-24 border border-white/[0.04]" />
-        ))}
-      </div>
-      <ShimmerBlock className="min-h-[320px] border border-white/[0.04] lg:min-h-[560px]" />
       <div className="hidden space-y-4 lg:block">
         <StatReadoutsSkeleton />
         <MonitoringHealthSkeleton />
+      </div>
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:gap-5">
+        <ShimmerBlock className="order-2 min-h-[420px] border border-white/[0.04] lg:order-1 lg:min-h-[640px]" />
+        <ShimmerBlock className="order-1 min-h-[520px] border border-white/[0.04] lg:order-2 lg:min-h-[680px]" />
       </div>
     </motion.div>
   );

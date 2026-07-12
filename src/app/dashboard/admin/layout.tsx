@@ -1,12 +1,8 @@
-import { redirect } from "next/navigation";
-import { requireAdmin } from "@/lib/admin";
-
-export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  try {
-    await requireAdmin();
-  } catch {
-    redirect("/dashboard");
-  }
-
+/** Pass-through — auth + redirect handled in page.tsx */
+export default function DashboardAdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return <>{children}</>;
 }

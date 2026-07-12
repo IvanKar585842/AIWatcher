@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import Stripe from "stripe";
 import { Prisma } from "@prisma/client";
+import { trackEvent } from "@/lib/analytics";
 import { prisma } from "@/lib/db";
 import {
   getStripe,
@@ -12,12 +13,31 @@ import {
 async function processStripeEvent(event: Stripe.Event): Promise<void> {
   switch (event.type) {
     case "customer.subscription.created":
-    case "customer.subscription.updated":
-      await handleSubscriptionUpdate(event.data.object as Stripe.Subscription);
+    case "customer.subscription.updated": {
+      const sub = event.data.object as Stripe.Subscription;
+      await handleSubscriptionUpdate(sub);
+      const userId = sub.metadata?.userId;
+      if (userId && event.type === "customer.subscription.created") {
+        void trackEvent({
+          type: "subscription.upgraded",
+          userId,
+          metadata: { status: sub.status, source: event.type },
+        });
+      }
       break;
-    case "customer.subscription.deleted":
-      await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
+    }
+    case "customer.subscription.deleted": {
+      const sub = event.data.object as Stripe.Subscription;
+      await handleSubscriptionDeleted(sub);
+      if (sub.metadata?.userId) {
+        void trackEvent({
+          type: "subscription.canceled",
+          userId: sub.metadata.userId,
+          metadata: { status: sub.status },
+        });
+      }
       break;
+    }
     case "invoice.payment_failed": {
       const invoice = event.data.object as Stripe.Invoice;
       if (invoice.subscription) {
@@ -35,6 +55,14 @@ async function processStripeEvent(event: Stripe.Event): Promise<void> {
           session.subscription as string
         );
         await handleSubscriptionUpdate(subscription);
+        void trackEvent({
+          type: "subscription.upgraded",
+          userId: session.metadata.userId,
+          metadata: {
+            plan: session.metadata.plan ?? null,
+            source: "checkout.session.completed",
+          },
+        });
       }
       break;
     }

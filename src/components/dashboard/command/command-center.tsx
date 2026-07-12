@@ -6,10 +6,8 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { AlertTriangle } from "lucide-react";
 import { CommandCenterSkeleton } from "./dashboard-skeletons";
-import { DetectionAssistantPanel } from "./detection-assistant-panel";
 import { MonitoringHealth } from "./monitoring-health";
 import { QuickActions } from "./quick-actions";
-import { RecentActivityPanel } from "./recent-activity-panel";
 import { StatReadouts } from "./stat-readouts";
 
 const NetworkMap = dynamic(
@@ -17,7 +15,16 @@ const NetworkMap = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="min-h-[280px] animate-pulse rounded-2xl border border-white/[0.06] bg-white/[0.02] lg:min-h-[360px]" />
+      <div className="min-h-[420px] animate-pulse rounded-2xl border border-white/[0.06] bg-white/[0.02] sm:min-h-[520px] lg:min-h-[640px]" />
+    ),
+  }
+);
+
+const IntelligenceCenter = dynamic(
+  () => import("./intelligence-center").then((m) => m.IntelligenceCenter),
+  {
+    loading: () => (
+      <div className="min-h-[360px] animate-pulse rounded-2xl border border-white/[0.06] bg-white/[0.02]" />
     ),
   }
 );
@@ -158,12 +165,8 @@ export function CommandCenter() {
         </div>
       </motion.div>
 
-      {/* 1. Important alerts — mobile priority */}
       {stats.importantAlerts > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
           <Link
             href="/dashboard/notifications"
             className="flex min-h-12 items-center gap-3 rounded-xl border border-amber-400/25 bg-amber-500/[0.08] px-3 py-3 transition-colors hover:border-amber-400/40 sm:px-4"
@@ -183,7 +186,6 @@ export function CommandCenter() {
         </motion.div>
       )}
 
-      {/* Desktop stats above main grid */}
       <div className="hidden space-y-4 lg:block">
         <StatReadouts
           activeMonitors={stats.activeMonitors}
@@ -202,80 +204,50 @@ export function CommandCenter() {
       </div>
 
       {/*
-        Mobile order: Assistant → status → feed → map → secondary
-        Desktop: map | sticky assistant+feed
+        Priority: 1 Map · 2 Intelligence Center · 3 Monitor list (below)
+        Equal-weight desktop columns — page scrolls, no nested sticky scroll.
       */}
-      <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-4">
-        {/* 2. AI Assistant + 4. Recent changes */}
+      <div className="grid grid-cols-1 items-stretch gap-3 lg:grid-cols-2 lg:gap-5">
         <motion.div
-          initial={{ opacity: 0, x: 12 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.08 }}
-          className="order-1 flex w-full min-w-0 flex-col gap-3 lg:order-2 lg:sticky lg:top-20"
+          initial={{ opacity: 0, scale: 0.99 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.06 }}
+          className="order-2 min-w-0 lg:order-1"
         >
-          <DetectionAssistantPanel />
+          <Suspense
+            fallback={
+              <div className="min-h-[420px] animate-pulse rounded-2xl border border-white/[0.06] bg-white/[0.02] lg:min-h-[640px]" />
+            }
+          >
+            <NetworkMap monitors={stats.monitors} />
+          </Suspense>
+        </motion.div>
 
-          {/* 3. Monitor status — compact on mobile between assistant & feed */}
-          <div className="lg:hidden">
-            <StatReadouts
-              activeMonitors={stats.activeMonitors}
-              changesToday={stats.changesToday}
-              importantAlerts={stats.importantAlerts}
-              aiAccuracy={stats.aiAccuracy}
-              monitoringHealth={stats.monitoringHealth}
-              mobilePriority
-            />
-          </div>
-
-          <RecentActivityPanel
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="order-1 min-w-0 lg:order-2"
+        >
+          <IntelligenceCenter
             changes={stats.recentChanges}
             notifications={stats.recentNotifications}
           />
         </motion.div>
-
-        {/* Network map — collapsed on mobile, primary on desktop */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.98 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.12 }}
-          className="order-3 min-w-0 lg:order-1"
-        >
-          <div className="lg:hidden">
-            <details className="group rounded-2xl border border-white/[0.06] bg-white/[0.02] open:border-cyan-500/15">
-              <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-sm text-zinc-300 [&::-webkit-details-marker]:hidden">
-                <span className="font-medium">Monitor network map</span>
-                <span className="font-mono text-[10px] text-zinc-600 group-open:hidden">
-                  Show
-                </span>
-                <span className="hidden font-mono text-[10px] text-zinc-600 group-open:inline">
-                  Hide
-                </span>
-              </summary>
-              <div className="min-h-[220px] p-2 pt-0">
-                <Suspense
-                  fallback={
-                    <div className="min-h-[220px] animate-pulse rounded-xl border border-white/[0.06] bg-white/[0.02]" />
-                  }
-                >
-                  <NetworkMap monitors={stats.monitors} />
-                </Suspense>
-              </div>
-            </details>
-          </div>
-          <div className="hidden min-h-[360px] lg:block">
-            <Suspense
-              fallback={
-                <div className="min-h-[360px] animate-pulse rounded-2xl border border-white/[0.06] bg-white/[0.02]" />
-              }
-            >
-              <NetworkMap monitors={stats.monitors} />
-            </Suspense>
-          </div>
-        </motion.div>
       </div>
 
-      {/* Secondary mobile: health + quick actions */}
-      <div className="order-4 space-y-3 lg:hidden">
+      <div className="lg:hidden">
+        <StatReadouts
+          activeMonitors={stats.activeMonitors}
+          changesToday={stats.changesToday}
+          importantAlerts={stats.importantAlerts}
+          aiAccuracy={stats.aiAccuracy}
+          monitoringHealth={stats.monitoringHealth}
+          mobilePriority
+        />
+      </div>
+
+      <div className="space-y-3 lg:hidden">
         <MonitoringHealth
           onlineMonitors={stats.activeMonitors}
           pausedMonitors={stats.pausedMonitors}

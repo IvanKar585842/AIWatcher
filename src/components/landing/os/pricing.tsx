@@ -92,6 +92,11 @@ export function OsPricing() {
 
                   <div className="mt-8">
                     <SignUpCTA
+                      href={
+                        plan.id === "free"
+                          ? "/dashboard"
+                          : `/dashboard/billing?plan=${plan.id.toUpperCase()}`
+                      }
                       className={cn(
                         "w-full !rounded-full !py-3 !text-sm",
                         isPopular

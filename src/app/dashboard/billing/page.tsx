@@ -81,6 +81,24 @@ export default function BillingPage() {
     router.replace("/dashboard/billing");
   }, [searchParams, router, toast]);
 
+  // Pricing page deep-link: /dashboard/billing?plan=PRO
+  useEffect(() => {
+    const planIntent = searchParams.get("plan");
+    if (planIntent !== "PRO" && planIntent !== "BUSINESS") return;
+    if (overviewLoading || !overview) return;
+    if (overview.plan !== "FREE") {
+      router.replace("/dashboard/billing");
+      return;
+    }
+    if (!overview.payments?.checkoutReady) {
+      toast("Select a plan below when payments are enabled.", "success");
+      router.replace("/dashboard/billing");
+      return;
+    }
+    toast(`Ready to upgrade to ${planIntent}. Confirm below to continue.`, "success");
+    router.replace("/dashboard/billing");
+  }, [searchParams, overview, overviewLoading, router, toast]);
+
   async function handleUpgrade(plan: "PRO" | "BUSINESS") {
     if (overview?.payments && !overview.payments.checkoutReady) {
       toast("Payments are not configured yet. Add Stripe keys in the environment.", "error");

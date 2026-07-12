@@ -16,7 +16,11 @@ export async function GET(request: NextRequest) {
         const query = (searchParams.get("q") ?? "").trim();
         const importanceParam = searchParams.get("importance")?.trim();
         const channelParam = searchParams.get("channel")?.trim();
-        const limit = Math.min(Number(searchParams.get("limit") ?? 50) || 50, 100);
+        const lean = searchParams.get("lean") === "1" || searchParams.get("lean") === "true";
+        const limit = Math.min(
+          Number(searchParams.get("limit") ?? (lean ? 15 : 50)) || (lean ? 15 : 50),
+          lean ? 30 : 100
+        );
 
         const importance =
           importanceParam &&
@@ -44,6 +48,45 @@ export async function GET(request: NextRequest) {
               : {}),
           },
         };
+
+        if (lean) {
+          const notifications = await prisma.notification.findMany({
+            where,
+            orderBy: { createdAt: "desc" },
+            take: limit,
+            select: {
+              id: true,
+              channel: true,
+              status: true,
+              createdAt: true,
+              change: {
+                select: {
+                  id: true,
+                  summary: true,
+                  emoji: true,
+                  importance: true,
+                  category: true,
+                  createdAt: true,
+                  monitor: { select: { name: true, url: true, mode: true } },
+                },
+              },
+            },
+          });
+
+          return NextResponse.json({
+            success: true,
+            notifications: notifications.map((n) => ({
+              ...n,
+              change: {
+                ...n.change,
+                recommendedAction: defaultRecommendedAction(
+                  n.change.importance,
+                  n.change.category
+                ),
+              },
+            })),
+          });
+        }
 
         const notifications = await prisma.notification.findMany({
           where,
