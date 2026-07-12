@@ -6,12 +6,12 @@ export const SITE_URL = (
 ).replace("http://localhost:3000", "https://watchflowing.com");
 
 export const siteConfig = {
-  name: "WatchFlow",
-  shortName: "WatchFlow",
+  name: "WatchFlowing",
+  shortName: "WatchFlowing",
   productName: "WatchFlowing",
   tagline: "AI Website Monitoring & Intelligence Platform",
   description:
-    "WatchFlow uses AI to monitor websites, detect important changes, analyze updates and deliver intelligent alerts.",
+    "WatchFlowing uses AI to monitor websites, detect important changes, analyze updates and deliver intelligent alerts.",
   url: SITE_URL,
   ogImage: "/og-image.png",
   locale: "en_US",
@@ -82,7 +82,7 @@ export const defaultMetadata: Metadata = {
         url: siteConfig.ogImage,
         width: 1200,
         height: 630,
-        alt: "WatchFlow — AI website monitoring and intelligence platform",
+        alt: "WatchFlowing — AI website monitoring and intelligence platform",
       },
     ],
   },
@@ -95,7 +95,7 @@ export const defaultMetadata: Metadata = {
     images: [
       {
         url: siteConfig.ogImage,
-        alt: "WatchFlow — AI website monitoring and intelligence platform",
+        alt: "WatchFlowing — AI website monitoring and intelligence platform",
       },
     ],
   },
@@ -118,8 +118,7 @@ export const defaultMetadata: Metadata = {
 export const structuredData = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  name: "WatchFlow",
-  alternateName: "WatchFlowing",
+  name: "WatchFlowing",
   applicationCategory: "BusinessApplication",
   applicationSubCategory: "Website Monitoring",
   operatingSystem: "Web",
@@ -164,7 +163,7 @@ export const structuredData = {
   ],
   publisher: {
     "@type": "Organization",
-    name: "WatchFlow",
+    name: "WatchFlowing",
     url: siteConfig.url,
     logo: `${siteConfig.url}/icons/icon-512.png`,
   },

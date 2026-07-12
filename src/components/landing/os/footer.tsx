@@ -108,7 +108,7 @@ export function OsFooter() {
 
         <div className="flex flex-col items-center justify-between gap-6 border-t border-white/[0.04] pt-8 md:flex-row">
           <p className="font-mono text-[10px] tracking-widest text-zinc-600">
-            WatchFlow © {new Date().getFullYear()} · watchflowing.com
+            WatchFlowing © {new Date().getFullYear()} · watchflowing.com
           </p>
           <div className="flex gap-8">
             {[

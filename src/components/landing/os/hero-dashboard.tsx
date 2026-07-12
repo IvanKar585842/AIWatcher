@@ -131,7 +131,7 @@ export function HeroDashboard() {
             <span className="font-normal text-cyan-300">that explains every change.</span>
           </h1>
           <p className="mt-5 max-w-xl text-base leading-relaxed text-zinc-500">
-            WatchFlow is an AI website tracker and intelligence platform — detect important updates,
+            WatchFlowing is an AI website tracker and intelligence platform — detect important updates,
             analyze what changed, and get smart website alerts without the noise.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-4">

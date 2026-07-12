@@ -4,7 +4,7 @@ import { siteConfig } from "@/lib/seo";
 export const metadata: Metadata = {
   title: "Create account",
   description:
-    "Start free AI website monitoring with WatchFlow. Detect changes, get intelligent alerts, and track competitors.",
+    "Start free AI website monitoring with WatchFlowing. Detect changes, get intelligent alerts, and track competitors.",
   alternates: { canonical: `${siteConfig.url}/sign-up` },
 };
 

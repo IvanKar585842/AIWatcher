@@ -1,7 +1,14 @@
 import { MonitoringMode } from "@prisma/client";
 import { fetchWithSafeRedirects } from "@/lib/security/url";
 
-const BOT_ALIASES = new Set(["*", "watchflowing", "WatchFlowing", "WatchFlowAI", "watchflowai"]);
+const BOT_ALIASES = new Set([
+  "*",
+  "watchflowing",
+  "WatchFlowing",
+  "WatchFlowingAI",
+  "WatchFlowAI",
+  "watchflowai",
+]);
 
 interface RobotsRule {
   type: "allow" | "disallow";

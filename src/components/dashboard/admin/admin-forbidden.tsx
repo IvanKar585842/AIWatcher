@@ -17,7 +17,7 @@ export function AdminForbidden() {
         </p>
         <h1 className="mt-2 text-xl font-semibold text-zinc-100">Admin access required</h1>
         <p className="mt-2 text-sm leading-relaxed text-zinc-500">
-          You do not have permission to view the WatchFlow admin console.
+          You do not have permission to view the WatchFlowing admin console.
         </p>
         <Link
           href="/dashboard"

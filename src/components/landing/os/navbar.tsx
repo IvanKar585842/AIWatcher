@@ -14,11 +14,11 @@ export function OsNavbar() {
       className="fixed top-0 z-50 w-full border-b border-white/[0.04] bg-[#090909]/70 backdrop-blur-xl"
     >
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
-        <Link href="/" className="group flex items-center gap-2.5" aria-label="WatchFlow home">
+        <Link href="/" className="group flex items-center gap-2.5" aria-label="WatchFlowing home">
           <span className="relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg border border-cyan-500/30 bg-cyan-500/5">
             <Image
               src="/favicon.svg"
-              alt="WatchFlow — AI website monitoring"
+              alt="WatchFlowing — AI website monitoring"
               width={32}
               height={32}
               className="h-8 w-8"
@@ -31,7 +31,7 @@ export function OsNavbar() {
             />
           </span>
           <span className="text-sm font-medium tracking-wide text-zinc-200">
-            Watch<span className="text-cyan-400">Flow</span>
+            Watch<span className="text-cyan-400">Flowing</span>
           </span>
         </Link>
 

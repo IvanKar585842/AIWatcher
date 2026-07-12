@@ -6,11 +6,11 @@ import { useState } from "react";
 
 const FAQS = [
   {
-    q: "How is WatchFlow different from basic website change detection tools?",
-    a: "Most website monitoring tools only tell you that something changed. WatchFlow’s AI explains what changed, classifies it, and rates importance — like an analyst watching every page.",
+    q: "How is WatchFlowing different from basic website change detection tools?",
+    a: "Most website monitoring tools only tell you that something changed. WatchFlowing’s AI explains what changed, classifies it, and rates importance — like an analyst watching every page.",
   },
   {
-    q: "Can I use WatchFlow for competitor monitoring?",
+    q: "Can I use WatchFlowing for competitor monitoring?",
     a: "Yes. Track competitor pricing pages, careers, policies, and product updates. You get intelligent website alerts when something meaningful moves.",
   },
   {
@@ -43,7 +43,7 @@ export function OsFaq() {
           <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.35em] text-cyan-500/70">Intel</p>
           <h2 className="text-3xl font-light text-zinc-100">FAQ</h2>
           <p className="mx-auto mt-3 max-w-lg text-sm text-zinc-500">
-            Common questions about AI website monitoring, alerts, and how WatchFlow works.
+            Common questions about AI website monitoring, alerts, and how WatchFlowing works.
           </p>
         </motion.div>
 

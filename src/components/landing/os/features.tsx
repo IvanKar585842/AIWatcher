@@ -45,7 +45,7 @@ export function OsFeatures() {
             <span className="text-zinc-500">One AI intelligence layer.</span>
           </h2>
           <p className="mt-4 max-w-xl text-sm leading-relaxed text-zinc-500">
-            From competitor monitoring to SEO-sensitive pages — WatchFlow tracks what matters and
+            From competitor monitoring to SEO-sensitive pages — WatchFlowing tracks what matters and
             filters noise before you see an alert.
           </p>
         </motion.div>
