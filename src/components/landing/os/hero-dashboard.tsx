@@ -123,22 +123,23 @@ export function HeroDashboard() {
           className="mb-10 flex flex-col items-center text-center"
         >
           <p className="mb-4 font-mono text-[11px] uppercase tracking-[0.35em] text-cyan-400/70">
-            Observation Layer · Online
+            AI Website Monitoring · Online
           </p>
           <h1 className="max-w-4xl text-4xl font-light tracking-tight text-zinc-100 sm:text-5xl md:text-6xl">
-            The internet moves.
+            AI website monitoring
             <br />
-            <span className="font-normal text-cyan-300">WatchFlowing sees everything.</span>
+            <span className="font-normal text-cyan-300">that explains every change.</span>
           </h1>
           <p className="mt-5 max-w-xl text-base leading-relaxed text-zinc-500">
-            An AI operating system that watches pages for you — then explains what changed and why it matters.
+            WatchFlow is an AI website tracker and intelligence platform — detect important updates,
+            analyze what changed, and get smart website alerts without the noise.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
             <SignUpCTA className="!rounded-full !border-cyan-400/30 !bg-cyan-500/10 !px-8 !py-3 !text-cyan-50 hover:!border-cyan-300/50">
-              Initialize WatchFlowing
+              Start free monitoring
             </SignUpCTA>
             <MagneticButton variant="ghost" onClick={() => document.getElementById("os-features")?.scrollIntoView({ behavior: "smooth" })}>
-              Explore the system
+              Explore capabilities
             </MagneticButton>
           </div>
         </motion.div>

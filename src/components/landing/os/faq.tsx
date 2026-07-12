@@ -6,24 +6,24 @@ import { useState } from "react";
 
 const FAQS = [
   {
-    q: "How is WatchFlowing different from change detectors?",
-    a: "Most tools alert you that something changed. WatchFlowing's AI explains what changed, classifies it, and rates its importance — like having an analyst watching every page.",
+    q: "How is WatchFlow different from basic website change detection tools?",
+    a: "Most website monitoring tools only tell you that something changed. WatchFlow’s AI explains what changed, classifies it, and rates importance — like an analyst watching every page.",
   },
   {
-    q: "What can it monitor?",
+    q: "Can I use WatchFlow for competitor monitoring?",
+    a: "Yes. Track competitor pricing pages, careers, policies, and product updates. You get intelligent website alerts when something meaningful moves.",
+  },
+  {
+    q: "What can this website monitoring tool watch?",
     a: "Entire pages, CSS selectors, XPath targets, prices, keywords, tables, job listings, or AI Smart Mode where the system decides what matters.",
   },
   {
     q: "How does noise filtering work?",
-    a: "Before comparison, we strip ads, trackers, dynamic timestamps, cookies, and random IDs. Only meaningful content reaches the AI.",
-  },
-  {
-    q: "Which AI models are supported?",
-    a: "OpenAI, Claude, and Gemini — switchable via a single environment variable with no code changes.",
+    a: "Before comparison, we strip ads, trackers, dynamic timestamps, cookies, and random IDs. Only meaningful content reaches the AI monitoring assistant.",
   },
   {
     q: "How fast can it check pages?",
-    a: "Free tier: every 12 hours. Pro and Business: as fast as every 5 minutes.",
+    a: "Free tier: every 12 hours. Pro and Business: as fast as every 5 minutes — ideal when timing matters for SEO monitoring or price tracking.",
   },
 ];
 
@@ -41,7 +41,10 @@ export function OsFaq() {
           className="mb-12 text-center"
         >
           <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.35em] text-cyan-500/70">Intel</p>
-          <h2 className="text-3xl font-light text-zinc-100">Questions</h2>
+          <h2 className="text-3xl font-light text-zinc-100">FAQ</h2>
+          <p className="mx-auto mt-3 max-w-lg text-sm text-zinc-500">
+            Common questions about AI website monitoring, alerts, and how WatchFlow works.
+          </p>
         </motion.div>
 
         <div className="space-y-2">

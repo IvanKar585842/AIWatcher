@@ -26,8 +26,8 @@ export function OsPricing() {
             Pay for clarity, not just more monitors
           </h2>
           <p className="mx-auto mt-3 max-w-xl text-sm text-zinc-500">
-            Every plan unlocks smarter detection, faster checks, and better alerts — so you know
-            what changed and why it matters.
+            Every plan unlocks smarter website change detection, faster checks, and better
+            alerts — so you know what changed and why it matters.
           </p>
         </motion.div>
 

@@ -27,8 +27,16 @@ export function OsDashboardShowcase() {
           animate={inView ? { opacity: 1, y: 0 } : {}}
           className="mb-16 text-center"
         >
-          <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.35em] text-cyan-500/70">Command Center</p>
-          <h2 className="text-3xl font-light text-zinc-100 md:text-4xl">Your observation deck</h2>
+          <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.35em] text-cyan-500/70">
+            Website intelligence platform
+          </p>
+          <h2 className="text-3xl font-light text-zinc-100 md:text-4xl">
+            Your monitoring command center
+          </h2>
+          <p className="mx-auto mt-3 max-w-xl text-sm text-zinc-500">
+            See detections, importance scores, and AI summaries in one place — built for teams that
+            need clarity, not just change logs.
+          </p>
         </motion.div>
 
         <motion.div

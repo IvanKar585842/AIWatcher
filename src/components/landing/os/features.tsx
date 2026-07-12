@@ -36,12 +36,18 @@ export function OsFeatures() {
           transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
           className="mb-20 max-w-2xl"
         >
-          <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.35em] text-cyan-500/70">Capabilities</p>
+          <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.35em] text-cyan-500/70">
+            Website change detection
+          </p>
           <h2 className="text-3xl font-light tracking-tight text-zinc-100 md:text-5xl">
-            Eight lenses.
+            Eight monitoring modes.
             <br />
-            <span className="text-zinc-500">One intelligence.</span>
+            <span className="text-zinc-500">One AI intelligence layer.</span>
           </h2>
+          <p className="mt-4 max-w-xl text-sm leading-relaxed text-zinc-500">
+            From competitor monitoring to SEO-sensitive pages — WatchFlow tracks what matters and
+            filters noise before you see an alert.
+          </p>
         </motion.div>
 
         <div id="os-features" className="grid gap-px overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.03] md:grid-cols-2 lg:grid-cols-4">

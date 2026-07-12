@@ -124,16 +124,21 @@ curl -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook" \
 7. Set Customer Portal in Stripe Dashboard → Settings → Billing → Customer portal
 8. Restart the app; open **Dashboard → Billing** and upgrade with a test card (`4242…`)
 
-### Cron Fallback
+### Cron / monitoring schedule
 
-If not using Trigger.dev, set up a cron job to hit:
+**Vercel Hobby** only allows cron jobs **once per day**. In `vercel.json`, `/api/cron/monitoring` is set to `0 6 * * *` (06:00 UTC) so deploys succeed on Hobby.
+
+For checks every few minutes (recommended in production):
+
+1. **Upgrade to Vercel Pro** and change the schedule to `*/5 * * * *`, or
+2. Use an external cron (cron-job.org, EasyCron, GitHub Actions) every 5 minutes:
 
 ```
-POST /api/cron/monitoring
+POST https://watchflowing.com/api/cron/monitoring
 Authorization: Bearer <CRON_SECRET>
 ```
 
-Recommended interval: every 5 minutes.
+Also works with `GET` and the same `Authorization` header.
 
 ## Project Structure
 

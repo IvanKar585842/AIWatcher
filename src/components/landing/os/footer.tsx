@@ -94,28 +94,36 @@ export function OsFooter() {
           className="mb-16 text-center"
         >
           <h2 className="text-2xl font-light text-zinc-200 md:text-3xl">
-            Start observing the web
+            Start AI website monitoring today
           </h2>
-          <p className="mt-3 text-sm text-zinc-600">Deploy your first monitor in under 60 seconds.</p>
+          <p className="mt-3 text-sm text-zinc-600">
+            Deploy your first monitor in under 60 seconds — free plan included.
+          </p>
           <div className="mt-6 flex justify-center">
             <SignUpCTA className="!rounded-full !border-cyan-400/30 !bg-cyan-500/10 !px-8 !text-cyan-100">
-              Initialize WatchFlowing
+              Create free account
             </SignUpCTA>
           </div>
         </motion.div>
 
         <div className="flex flex-col items-center justify-between gap-6 border-t border-white/[0.04] pt-8 md:flex-row">
           <p className="font-mono text-[10px] tracking-widest text-zinc-600">
-            WatchFlowing © {new Date().getFullYear()}
+            WatchFlow © {new Date().getFullYear()} · watchflowing.com
           </p>
           <div className="flex gap-8">
-            {["Features", "Pricing", "FAQ", "Dashboard"].map((l) => (
+            {[
+              { label: "Features", href: "#features" },
+              { label: "Pricing", href: "#pricing" },
+              { label: "FAQ", href: "#faq" },
+              { label: "Score", href: "/score" },
+              { label: "Dashboard", href: "/dashboard" },
+            ].map((l) => (
               <Link
-                key={l}
-                href={l === "Dashboard" ? "/dashboard" : `#${l.toLowerCase()}`}
+                key={l.href}
+                href={l.href}
                 className="text-xs uppercase tracking-[0.15em] text-zinc-600 transition-colors hover:text-cyan-500/80"
               >
-                {l}
+                {l.label}
               </Link>
             ))}
           </div>
