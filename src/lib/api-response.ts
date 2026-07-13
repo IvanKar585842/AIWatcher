@@ -64,10 +64,23 @@ export function apiFailureFromError(error: unknown): NextResponse<ApiFailure> {
           metadata: { status: error.status },
         })
       );
-      return apiFailure("Internal server error", 500);
+      // Preserve intentional billing / infra messages (not opaque "Internal server error")
+      return apiFailure(error.message, error.status);
     }
     return apiFailure(error.message, error.status);
   }
+
+  // Stripe SDK errors that escaped route wrappers
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "type" in error &&
+    typeof (error as { type?: unknown }).type === "string" &&
+    "rawType" in error
+  ) {
+    return apiFailure("Unable to create checkout session", 502);
+  }
+
   console.error("API error:", error);
   const safeName = error instanceof Error ? error.name : "UnknownError";
   void trackEvent({

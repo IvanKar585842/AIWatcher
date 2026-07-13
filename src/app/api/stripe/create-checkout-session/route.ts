@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import { trackEvent } from "@/lib/analytics";
 import { apiErrorResponse } from "@/lib/api-response";
-import { parseJsonBody } from "@/lib/errors";
+import { ApiError, parseJsonBody } from "@/lib/errors";
 import { withRateLimit } from "@/lib/rate-limit";
 import {
   createBillingPortalSession,
@@ -11,6 +11,7 @@ import {
   hasActiveStripeSubscription,
 } from "@/lib/stripe";
 import { isStripeSecretConfigured } from "@/lib/stripe-config";
+import { toStripeClientError } from "@/lib/stripe-errors";
 
 const checkoutSchema = z.object({
   plan: z.enum(["PRO", "BUSINESS"]),
@@ -24,23 +25,45 @@ const checkoutSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     const user = await requireUser();
-    return withRateLimit(
+    return await withRateLimit(
       "stripe-checkout",
       async () => {
         if (!isStripeSecretConfigured()) {
           return NextResponse.json(
-            {
-              success: false,
-              error:
-                "Payments are not configured yet. Add Stripe keys in environment variables.",
-            },
+            { success: false, error: "Stripe configuration error" },
             { status: 503 }
           );
         }
 
-        const body = await parseJsonBody(request);
-        const parsed = checkoutSchema.safeParse(body);
+        if (!user?.id || !user.email) {
+          return NextResponse.json(
+            { success: false, error: "Unable to create checkout session" },
+            { status: 400 }
+          );
+        }
 
+        // Ensure Subscription row exists before Stripe customer create
+        if (!user.subscription) {
+          const { prisma } = await import("@/lib/db");
+          const { Plan } = await import("@prisma/client");
+          await prisma.subscription.upsert({
+            where: { userId: user.id },
+            update: {},
+            create: { userId: user.id, plan: Plan.FREE, status: "active" },
+          });
+        }
+
+        let body: unknown;
+        try {
+          body = await parseJsonBody(request);
+        } catch {
+          return NextResponse.json(
+            { success: false, error: "Invalid plan. Choose PRO or BUSINESS." },
+            { status: 400 }
+          );
+        }
+
+        const parsed = checkoutSchema.safeParse(body);
         if (!parsed.success) {
           return NextResponse.json(
             { success: false, error: "Invalid plan. Choose PRO or BUSINESS." },
@@ -48,45 +71,54 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        // Existing subscribers change plans via Customer Portal (no fake plan upgrades)
-        if (hasActiveStripeSubscription(user.subscription)) {
-          const customerId = user.subscription?.stripeCustomerId;
-          if (!customerId) {
-            return NextResponse.json(
-              { success: false, error: "Billing account missing. Contact support." },
-              { status: 400 }
-            );
+        try {
+          // Existing subscribers change plans via Customer Portal
+          if (hasActiveStripeSubscription(user.subscription)) {
+            const customerId = user.subscription?.stripeCustomerId;
+            if (!customerId) {
+              return NextResponse.json(
+                {
+                  success: false,
+                  error: "Billing account missing. Contact support.",
+                },
+                { status: 400 }
+              );
+            }
+            const portal = await createBillingPortalSession(customerId);
+            return NextResponse.json({
+              success: true,
+              url: portal.url,
+              mode: "portal",
+            });
           }
-          const portal = await createBillingPortalSession(customerId);
+
+          const session = await createCheckoutSession(
+            user.id,
+            user.email,
+            parsed.data.plan
+          );
+
+          void trackEvent({
+            type: "checkout.started",
+            userId: user.id,
+            metadata: { plan: parsed.data.plan, sessionId: session.id },
+          });
+
           return NextResponse.json({
             success: true,
-            url: portal.url,
-            mode: "portal",
+            url: session.url,
+            sessionId: session.id,
           });
+        } catch (error) {
+          throw error instanceof ApiError ? error : toStripeClientError(error);
         }
-
-        const session = await createCheckoutSession(
-          user.id,
-          user.email,
-          parsed.data.plan
-        );
-
-        void trackEvent({
-          type: "checkout.started",
-          userId: user.id,
-          metadata: { plan: parsed.data.plan, sessionId: session.id },
-        });
-
-        return NextResponse.json({
-          success: true,
-          url: session.url,
-          sessionId: session.id,
-        });
       },
       user.id,
       "sensitive"
     );
   } catch (error) {
-    return apiErrorResponse(error);
+    return apiErrorResponse(
+      error instanceof ApiError ? error : toStripeClientError(error)
+    );
   }
 }

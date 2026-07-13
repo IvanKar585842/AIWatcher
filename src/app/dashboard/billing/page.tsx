@@ -136,12 +136,18 @@ export default function BillingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (data.url) {
         window.location.href = data.url;
         return;
       }
-      toast(data.error || "Could not start checkout. Try again.", "error");
+      toast(
+        data.error ||
+          (res.status >= 500
+            ? "Payment system is temporarily unavailable"
+            : "Unable to create checkout session"),
+        "error"
+      );
     } catch {
       toast("Could not start checkout. Check your connection.", "error");
     } finally {

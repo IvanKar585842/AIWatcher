@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import { trackEvent } from "@/lib/analytics";
 import { apiErrorResponse } from "@/lib/api-response";
-import { parseJsonBody } from "@/lib/errors";
+import { ApiError, parseJsonBody } from "@/lib/errors";
 import { withRateLimit } from "@/lib/rate-limit";
 import {
   createBillingPortalSession,
@@ -11,6 +11,7 @@ import {
   hasActiveStripeSubscription,
 } from "@/lib/stripe";
 import { isStripePaymentsEnabled, isStripeSecretConfigured } from "@/lib/stripe-config";
+import { toStripeClientError } from "@/lib/stripe-errors";
 
 const checkoutSchema = z.object({
   plan: z.enum(["PRO", "BUSINESS"]),
@@ -19,17 +20,20 @@ const checkoutSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     const user = await requireUser();
-    return withRateLimit(
+    return await withRateLimit(
       "billing-checkout",
       async () => {
         if (!isStripeSecretConfigured()) {
           return NextResponse.json(
-            {
-              success: false,
-              error:
-                "Payments are not configured yet. Add Stripe keys in environment variables.",
-            },
+            { success: false, error: "Stripe configuration error" },
             { status: 503 }
+          );
+        }
+
+        if (!user?.id || !user.email) {
+          return NextResponse.json(
+            { success: false, error: "Unable to create checkout session" },
+            { status: 400 }
           );
         }
 
@@ -43,60 +47,66 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        if (hasActiveStripeSubscription(user.subscription)) {
-          const customerId = user.subscription?.stripeCustomerId;
-          if (!customerId) {
-            return NextResponse.json(
-              { success: false, error: "Billing account missing. Contact support." },
-              { status: 400 }
-            );
+        try {
+          if (hasActiveStripeSubscription(user.subscription)) {
+            const customerId = user.subscription?.stripeCustomerId;
+            if (!customerId) {
+              return NextResponse.json(
+                {
+                  success: false,
+                  error: "Billing account missing. Contact support.",
+                },
+                { status: 400 }
+              );
+            }
+            const portal = await createBillingPortalSession(customerId);
+            return NextResponse.json({
+              success: true,
+              url: portal.url,
+              mode: "portal",
+            });
           }
-          const portal = await createBillingPortalSession(customerId);
+
+          const session = await createCheckoutSession(
+            user.id,
+            user.email,
+            parsed.data.plan
+          );
+
+          void trackEvent({
+            type: "checkout.started",
+            userId: user.id,
+            metadata: { plan: parsed.data.plan, sessionId: session.id },
+          });
+
           return NextResponse.json({
             success: true,
-            url: portal.url,
-            mode: "portal",
+            url: session.url,
+            sessionId: session.id,
           });
+        } catch (error) {
+          throw error instanceof ApiError ? error : toStripeClientError(error);
         }
-
-        const session = await createCheckoutSession(
-          user.id,
-          user.email,
-          parsed.data.plan
-        );
-
-        void trackEvent({
-          type: "checkout.started",
-          userId: user.id,
-          metadata: { plan: parsed.data.plan, sessionId: session.id },
-        });
-
-        return NextResponse.json({
-          success: true,
-          url: session.url,
-          sessionId: session.id,
-        });
       },
       user.id,
       "sensitive"
     );
   } catch (error) {
-    return apiErrorResponse(error);
+    return apiErrorResponse(
+      error instanceof ApiError ? error : toStripeClientError(error)
+    );
   }
 }
 
 export async function GET() {
   try {
     const user = await requireUser();
-    return withRateLimit(
+    return await withRateLimit(
       "billing-portal",
       async () => {
         if (!isStripeSecretConfigured()) {
           return NextResponse.json(
-            {
-              success: false,
-              error: "Payments are not configured yet.",
-            },
+            { success: false, error: "Stripe configuration error" },
             { status: 503 }
           );
         }
@@ -113,13 +123,19 @@ export async function GET() {
           );
         }
 
-        const session = await createBillingPortalSession(customerId);
-        return NextResponse.json({ success: true, url: session.url });
+        try {
+          const session = await createBillingPortalSession(customerId);
+          return NextResponse.json({ success: true, url: session.url });
+        } catch (error) {
+          throw error instanceof ApiError ? error : toStripeClientError(error);
+        }
       },
       user.id
     );
   } catch (error) {
-    return apiErrorResponse(error);
+    return apiErrorResponse(
+      error instanceof ApiError ? error : toStripeClientError(error)
+    );
   }
 }
 

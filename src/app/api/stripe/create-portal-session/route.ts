@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { apiErrorResponse } from "@/lib/api-response";
+import { ApiError } from "@/lib/errors";
 import { withRateLimit } from "@/lib/rate-limit";
 import { createBillingPortalSession } from "@/lib/stripe";
 import { isStripeSecretConfigured } from "@/lib/stripe-config";
+import { toStripeClientError } from "@/lib/stripe-errors";
 
 /**
  * POST /api/stripe/create-portal-session
@@ -12,12 +14,12 @@ import { isStripeSecretConfigured } from "@/lib/stripe-config";
 export async function POST() {
   try {
     const user = await requireUser();
-    return withRateLimit(
+    return await withRateLimit(
       "stripe-portal",
       async () => {
         if (!isStripeSecretConfigured()) {
           return NextResponse.json(
-            { success: false, error: "Payments are not configured yet." },
+            { success: false, error: "Stripe configuration error" },
             { status: 503 }
           );
         }
@@ -33,12 +35,18 @@ export async function POST() {
           );
         }
 
-        const session = await createBillingPortalSession(customerId);
-        return NextResponse.json({ success: true, url: session.url });
+        try {
+          const session = await createBillingPortalSession(customerId);
+          return NextResponse.json({ success: true, url: session.url });
+        } catch (error) {
+          throw error instanceof ApiError ? error : toStripeClientError(error);
+        }
       },
       user.id
     );
   } catch (error) {
-    return apiErrorResponse(error);
+    return apiErrorResponse(
+      error instanceof ApiError ? error : toStripeClientError(error)
+    );
   }
 }
