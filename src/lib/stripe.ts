@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { ApiError } from "@/lib/errors";
 import {
   assertStripeCheckoutReady,
+  getStripeCatalogId,
   getStripePriceId,
   isStripeSecretConfigured,
   type StripePlanKey,
@@ -32,6 +33,41 @@ function appBaseUrl(): string {
     "http://localhost:3000";
   const withProtocol = raw.startsWith("http") ? raw : `https://${raw}`;
   return withProtocol.replace(/\/$/, "");
+}
+
+/**
+ * Resolve Vercel STRIPE_*_PRICE_ID to a Stripe Price id.
+ * Accepts price_… directly, or prod_… (uses first active recurring price).
+ */
+export async function resolveStripePriceId(plan: StripePlanKey): Promise<string> {
+  const catalogId = getStripeCatalogId(plan);
+  if (!catalogId) {
+    throw new ApiError("Stripe configuration error", 503);
+  }
+
+  if (catalogId.startsWith("price_")) {
+    return catalogId;
+  }
+
+  if (catalogId.startsWith("prod_")) {
+    const prices = await getStripe().prices.list({
+      product: catalogId,
+      active: true,
+      limit: 20,
+    });
+    const recurring =
+      prices.data.find((p) => p.type === "recurring" && p.recurring?.interval === "month") ??
+      prices.data.find((p) => p.type === "recurring") ??
+      prices.data[0];
+
+    if (!recurring?.id) {
+      console.error("[stripe] no active price for product", catalogId, plan);
+      throw new ApiError("Stripe configuration error", 503);
+    }
+    return recurring.id;
+  }
+
+  throw new ApiError("Stripe configuration error", 503);
 }
 
 export async function getOrCreateStripeCustomer(userId: string, email: string) {
@@ -96,7 +132,7 @@ export async function createCheckoutSession(
   }
 
   const customerId = await getOrCreateStripeCustomer(userId, email);
-  const priceId = getStripePriceId(plan);
+  const priceId = await resolveStripePriceId(plan);
   const appUrl = appBaseUrl();
 
   try {
@@ -112,9 +148,9 @@ export async function createCheckoutSession(
       billing_address_collection: "auto",
       success_url: `${appUrl}/dashboard/billing?success=true&plan=${plan}`,
       cancel_url: `${appUrl}/dashboard/billing?canceled=true`,
-      metadata: { userId, plan },
+      metadata: { userId, plan, priceId },
       subscription_data: {
-        metadata: { userId, plan },
+        metadata: { userId, plan, priceId },
       },
     });
 
@@ -201,20 +237,43 @@ export function hasActiveStripeSubscription(
 
 function planFromPriceId(priceId: string | undefined): Plan {
   if (!priceId) return Plan.FREE;
-  if (priceId === getStripePriceId("PRO")) return Plan.PRO;
-  if (priceId === getStripePriceId("BUSINESS")) return Plan.BUSINESS;
+  const proId = getStripePriceId("PRO");
+  const businessId = getStripePriceId("BUSINESS");
+  // Direct price match
+  if (priceId === proId) return Plan.PRO;
+  if (priceId === businessId) return Plan.BUSINESS;
+  // Product id stored in env — match via retrieved price's product later; metadata preferred
   return Plan.FREE;
 }
 
 /**
  * Maps Stripe subscription → DB plan.
- * Incomplete / unpaid / canceled never grant Pro/Business.
+ * Prefers subscription metadata.plan; falls back to price/product env match.
  */
 export function planFromStripeSubscription(subscription: Stripe.Subscription): Plan {
   if (!PAID_ACCESS_STATUSES.has(subscription.status)) {
     return Plan.FREE;
   }
-  const priceId = subscription.items.data[0]?.price.id;
+
+  const metaPlan = subscription.metadata?.plan?.toUpperCase();
+  if (metaPlan === "PRO") return Plan.PRO;
+  if (metaPlan === "BUSINESS") return Plan.BUSINESS;
+
+  const price = subscription.items.data[0]?.price;
+  const priceId = price?.id;
+  const productId =
+    typeof price?.product === "string" ? price.product : price?.product?.id;
+
+  const proCatalog = getStripeCatalogId("PRO");
+  const businessCatalog = getStripeCatalogId("BUSINESS");
+
+  if (priceId && (priceId === proCatalog || productId === proCatalog)) {
+    return Plan.PRO;
+  }
+  if (priceId && (priceId === businessCatalog || productId === businessCatalog)) {
+    return Plan.BUSINESS;
+  }
+
   return planFromPriceId(priceId);
 }
 

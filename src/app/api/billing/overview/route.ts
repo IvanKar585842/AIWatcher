@@ -8,8 +8,8 @@ import { toUserSubscriptionView } from "@/lib/subscription";
 import { getUserUsage } from "@/lib/usage";
 import {
   getMissingStripeEnvKeys,
+  isStripeCheckoutReady,
   isStripePaymentsEnabled,
-  isStripeSecretConfigured,
 } from "@/lib/stripe-config";
 
 export async function GET() {
@@ -34,13 +34,18 @@ export async function GET() {
         const storageMb = Math.round(changeCount * 0.12 * 10) / 10;
         const activeFeatures = listActiveFeatures(plan);
         const paymentsEnabled = isStripePaymentsEnabled();
+        const checkoutReady = isStripeCheckoutReady();
 
         return apiSuccess({
           plan,
           isAdmin: admin,
           payments: {
             enabled: paymentsEnabled,
-            checkoutReady: isStripeSecretConfigured(),
+            checkoutReady,
+            plans: {
+              PRO: isStripeCheckoutReady("PRO"),
+              BUSINESS: isStripeCheckoutReady("BUSINESS"),
+            },
             missingEnv: paymentsEnabled ? [] : getMissingStripeEnvKeys(),
           },
           subscription: subscription ? toUserSubscriptionView(subscription) : null,

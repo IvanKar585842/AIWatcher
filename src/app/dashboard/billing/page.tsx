@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Check, Crown, ExternalLink, Loader2, Sparkles, Zap } from "lucide-react";
@@ -30,6 +30,7 @@ interface BillingOverview {
   payments?: {
     enabled: boolean;
     checkoutReady: boolean;
+    plans?: { PRO: boolean; BUSINESS: boolean };
     missingEnv: string[];
   };
   subscription?: {
@@ -76,6 +77,7 @@ export default function BillingPage() {
   const [portalLoading, setPortalLoading] = useState(false);
   const [overview, setOverview] = useState<BillingOverview | null>(null);
   const [overviewLoading, setOverviewLoading] = useState(true);
+  const autoCheckoutRef = useRef(false);
 
   useEffect(() => {
     fetchApi<BillingOverview>("/api/billing/overview").then((result) => {
@@ -91,7 +93,6 @@ export default function BillingPage() {
 
     if (success === "true") {
       toast("Payment successful — your plan will update in a moment.", "success");
-      // Poll briefly for webhook to land
       const refresh = () =>
         fetchApi<BillingOverview>("/api/billing/overview").then((result) => {
           if (result.success) setOverview(result.data);
@@ -106,26 +107,10 @@ export default function BillingPage() {
     router.replace("/dashboard/billing");
   }, [searchParams, router, toast]);
 
-  useEffect(() => {
-    const planIntent = searchParams.get("plan");
-    if (planIntent !== "PRO" && planIntent !== "BUSINESS") return;
-    if (overviewLoading || !overview) return;
-    if (overview.plan !== "FREE") {
-      router.replace("/dashboard/billing");
-      return;
-    }
-    if (!overview.payments?.checkoutReady) {
-      toast("Select a plan below when payments are enabled.", "success");
-      router.replace("/dashboard/billing");
-      return;
-    }
-    toast(`Ready to upgrade to ${planIntent}. Confirm below to continue.`, "success");
-    router.replace("/dashboard/billing");
-  }, [searchParams, overview, overviewLoading, router, toast]);
-
-  async function handleUpgrade(plan: "PRO" | "BUSINESS") {
-    if (overview?.payments && !overview.payments.checkoutReady) {
-      toast("Payments are not configured yet. Add Stripe keys in the environment.", "error");
+  async function startCheckout(plan: "PRO" | "BUSINESS") {
+    const planReady = overview?.payments?.plans?.[plan] ?? overview?.payments?.checkoutReady;
+    if (overview?.payments && !planReady) {
+      toast("Payments are not configured yet. Add Stripe price IDs in Vercel.", "error");
       return;
     }
 
@@ -155,6 +140,37 @@ export default function BillingPage() {
     }
   }
 
+  // Deep-link from pricing cards: /dashboard/billing?plan=PRO|BUSINESS → Stripe Checkout
+  useEffect(() => {
+    const planIntent = searchParams.get("plan")?.toUpperCase();
+    if (planIntent !== "PRO" && planIntent !== "BUSINESS") return;
+    if (overviewLoading || !overview) return;
+    if (autoCheckoutRef.current) return;
+    if (searchParams.get("success") || searchParams.get("canceled")) return;
+
+    if (overview.plan === planIntent) {
+      router.replace("/dashboard/billing");
+      return;
+    }
+
+    const planReady =
+      overview.payments?.plans?.[planIntent] ?? overview.payments?.checkoutReady;
+    if (!planReady) {
+      toast("Stripe price ID for this plan is missing in Vercel.", "error");
+      router.replace("/dashboard/billing");
+      return;
+    }
+
+    autoCheckoutRef.current = true;
+    router.replace("/dashboard/billing");
+    void startCheckout(planIntent);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- start once per plan deep-link
+  }, [searchParams, overview, overviewLoading, router, toast]);
+
+  async function handleUpgrade(plan: "PRO" | "BUSINESS") {
+    await startCheckout(plan);
+  }
+
   async function openPortal() {
     setPortalLoading(true);
     try {
@@ -176,6 +192,8 @@ export default function BillingPage() {
 
   const currentPlan = overview?.plan ?? "FREE";
   const paymentsReady = overview?.payments?.checkoutReady ?? false;
+  const proReady = overview?.payments?.plans?.PRO ?? paymentsReady;
+  const businessReady = overview?.payments?.plans?.BUSINESS ?? paymentsReady;
   const displayStatus: DisplayStatus =
     overview?.subscription?.displayStatus ??
     (currentPlan === "FREE" ? "Inactive" : "Active");
@@ -426,8 +444,9 @@ export default function BillingPage() {
                     }
                     disabled={
                       loading === plan.plan ||
-                      (!paymentsReady && !isCurrent) ||
-                      (isCurrent && !canManage)
+                      (isCurrent && !canManage) ||
+                      (!isCurrent &&
+                        !(plan.plan === "PRO" ? proReady : businessReady))
                     }
                     variant={isCurrent ? "outline" : "default"}
                   >
@@ -436,7 +455,7 @@ export default function BillingPage() {
                     )}
                     {isCurrent
                       ? "Manage subscription"
-                      : !paymentsReady
+                      : !(plan.plan === "PRO" ? proReady : businessReady)
                         ? "Payments soon"
                         : `Upgrade to ${plan.name}`}
                   </Button>

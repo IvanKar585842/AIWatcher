@@ -95,7 +95,9 @@ export function OsPricing() {
                       href={
                         plan.id === "free"
                           ? "/dashboard"
-                          : `/dashboard/billing?plan=${plan.id.toUpperCase()}`
+                          : plan.id === "pro"
+                            ? "/dashboard/billing?plan=PRO"
+                            : "/dashboard/billing?plan=BUSINESS"
                       }
                       className={cn(
                         "w-full !rounded-full !py-3 !text-sm",

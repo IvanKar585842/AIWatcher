@@ -1,13 +1,8 @@
 /**
  * Stripe environment configuration.
- * Fill these in `.env.local` (local) and Vercel (production). Never commit real keys.
- *
- * Required for payments:
- * - STRIPE_SECRET_KEY
- * - NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
- * - STRIPE_WEBHOOK_SECRET
- * - STRIPE_PRO_PRICE_ID
- * - STRIPE_BUSINESS_PRICE_ID
+ * Vercel env (server-only except publishable key):
+ * - STRIPE_PRO_PRICE_ID      → Price id (price_…) or Product id (prod_…) for Pro
+ * - STRIPE_BUSINESS_PRICE_ID → Price id (price_…) or Product id (prod_…) for Business
  */
 
 import { ApiError } from "@/lib/errors";
@@ -51,9 +46,30 @@ export function isStripeSecretConfigured(): boolean {
   return Boolean(key) && !key.includes("...") && key.startsWith("sk_");
 }
 
-export function getStripePriceId(plan: StripePlanKey): string {
+/** Raw env value for a plan — may be price_… or prod_… */
+export function getStripeCatalogId(plan: StripePlanKey): string {
   const env = getStripeEnv();
   return plan === "PRO" ? env.STRIPE_PRO_PRICE_ID : env.STRIPE_BUSINESS_PRICE_ID;
+}
+
+/** @deprecated use getStripeCatalogId — kept for existing imports */
+export function getStripePriceId(plan: StripePlanKey): string {
+  return getStripeCatalogId(plan);
+}
+
+export function isStripeCatalogIdConfigured(plan: StripePlanKey): boolean {
+  const id = getStripeCatalogId(plan);
+  if (!id || id.includes("...")) return false;
+  return id.startsWith("price_") || id.startsWith("prod_");
+}
+
+/** Checkout can start when secret + plan catalog ids are set (webhook not required). */
+export function isStripeCheckoutReady(plan?: StripePlanKey): boolean {
+  if (!isStripeSecretConfigured()) return false;
+  if (plan) return isStripeCatalogIdConfigured(plan);
+  return (
+    isStripeCatalogIdConfigured("PRO") && isStripeCatalogIdConfigured("BUSINESS")
+  );
 }
 
 export function getStripePublishableKey(): string {
@@ -64,8 +80,7 @@ export function assertStripeCheckoutReady(plan: StripePlanKey): void {
   if (!isStripeSecretConfigured()) {
     throw new ApiError("Stripe configuration error", 503);
   }
-  const priceId = getStripePriceId(plan);
-  if (!priceId || priceId.includes("...") || !priceId.startsWith("price_")) {
+  if (!isStripeCatalogIdConfigured(plan)) {
     throw new ApiError("Stripe configuration error", 503);
   }
 
