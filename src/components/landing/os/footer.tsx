@@ -1,25 +1,30 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { SignUpCTA } from "@/components/auth/clerk-wrappers";
+import { usePrefersReducedMotion } from "@/components/landing/os/mouse-parallax";
 
 function NetworkCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const reducedMotion = usePrefersReducedMotion();
 
   useEffect(() => {
+    if (reducedMotion) return;
+    if (typeof window !== "undefined" && window.innerWidth < 768) return;
+
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     let id = 0;
-    const nodes = Array.from({ length: 40 }, () => ({
+    const nodes = Array.from({ length: 24 }, () => ({
       x: Math.random(),
       y: Math.random(),
-      vx: (Math.random() - 0.5) * 0.0004,
-      vy: (Math.random() - 0.5) * 0.0004,
+      vx: (Math.random() - 0.5) * 0.00035,
+      vy: (Math.random() - 0.5) * 0.00035,
     }));
 
     const canvasEl = canvas;
@@ -47,8 +52,8 @@ function NetworkCanvas() {
           const dx = (a.x - b.x) * canvasEl.width;
           const dy = (a.y - b.y) * canvasEl.height;
           const d = Math.sqrt(dx * dx + dy * dy);
-          if (d < 120) {
-            context.strokeStyle = `rgba(56,189,248,${0.06 * (1 - d / 120)})`;
+          if (d < 100) {
+            context.strokeStyle = `rgba(56,189,248,${0.05 * (1 - d / 100)})`;
             context.beginPath();
             context.moveTo(a.x * canvasEl.width, a.y * canvasEl.height);
             context.lineTo(b.x * canvasEl.width, b.y * canvasEl.height);
@@ -60,7 +65,7 @@ function NetworkCanvas() {
       for (const n of nodes) {
         context.beginPath();
         context.arc(n.x * canvasEl.width, n.y * canvasEl.height, 1.2, 0, Math.PI * 2);
-        context.fillStyle = "rgba(125,211,252,0.35)";
+        context.fillStyle = "rgba(125,211,252,0.3)";
         context.fill();
       }
 
@@ -74,23 +79,52 @@ function NetworkCanvas() {
       cancelAnimationFrame(id);
       window.removeEventListener("resize", resize);
     };
-  }, []);
+  }, [reducedMotion]);
 
-  return <canvas ref={canvasRef} className="absolute inset-0 h-full w-full opacity-60" />;
+  if (reducedMotion) return null;
+  return (
+    <canvas
+      ref={canvasRef}
+      className="absolute inset-0 h-full w-full opacity-50"
+      aria-hidden
+    />
+  );
 }
 
 export function OsFooter() {
+  const [showCanvas, setShowCanvas] = useState(false);
+
+  useEffect(() => {
+    const el = document.getElementById("os-footer");
+    if (!el || typeof IntersectionObserver === "undefined") {
+      setShowCanvas(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setShowCanvas(true);
+          io.disconnect();
+        }
+      },
+      { rootMargin: "120px" }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   return (
-    <footer className="relative overflow-hidden border-t border-white/[0.04] bg-[#090909]">
-      <div className="relative h-48">
-        <NetworkCanvas />
-      </div>
+    <footer
+      id="os-footer"
+      className="relative overflow-hidden border-t border-white/[0.04] bg-[#090909]"
+    >
+      <div className="relative h-36 md:h-48">{showCanvas ? <NetworkCanvas /> : null}</div>
 
       <div className="relative mx-auto max-w-7xl px-4 pb-16 pt-8">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 16 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
+          viewport={{ once: true, margin: "-40px" }}
           className="mb-16 text-center"
         >
           <h2 className="text-2xl font-light text-zinc-200 md:text-3xl">
@@ -112,7 +146,7 @@ export function OsFooter() {
           </p>
           <div className="flex gap-8">
             {[
-              { label: "Features", href: "#features" },
+              { label: "Features", href: "#os-features" },
               { label: "Pricing", href: "#pricing" },
               { label: "FAQ", href: "#faq" },
               { label: "Score", href: "/score" },

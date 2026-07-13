@@ -10,7 +10,15 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: "2mb",
     },
-    optimizePackageImports: ["lucide-react", "framer-motion"],
+    optimizePackageImports: [
+      "lucide-react",
+      "framer-motion",
+      "@radix-ui/react-dialog",
+      "@radix-ui/react-select",
+      "@radix-ui/react-tabs",
+      "@radix-ui/react-switch",
+      "@radix-ui/react-scroll-area",
+    ],
   },
   images: {
     remotePatterns: [
@@ -19,21 +27,26 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "www.google.com" },
     ],
     formats: ["image/avif", "image/webp"],
+    minimumCacheTTL: 60 * 60 * 24 * 30,
   },
-  // Keep Chromium / Playwright out of the webpack bundle so binaries are not relocated
   serverExternalPackages: [
     "playwright",
     "playwright-core",
     "@sparticuz/chromium",
     "@sparticuz/chromium-min",
   ],
-  // Only attach Chromium binaries to routes that actually launch a browser
   outputFileTracingIncludes: {
     "/api/monitors/[id]/check": chromiumIncludes,
     "/api/cron/monitoring": chromiumIncludes,
   },
   poweredByHeader: false,
   compress: true,
+  compiler: {
+    removeConsole:
+      process.env.NODE_ENV === "production"
+        ? { exclude: ["error", "warn"] }
+        : false,
+  },
 };
 
 export default nextConfig;

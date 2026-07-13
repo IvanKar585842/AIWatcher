@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { apiErrorResponse } from "@/lib/api-response";
-import { safeClientErrorMessage } from "@/lib/errors";
+import { classifyMonitoringError } from "@/lib/monitoring/error-messages";
 import { processMonitor } from "@/lib/monitoring/processor";
 import { processPendingAnalyses } from "@/lib/monitoring/ai-processor";
 import { withRateLimit } from "@/lib/rate-limit";
@@ -34,19 +34,32 @@ export async function POST(
             result,
           });
         } catch (error) {
+          const monitoringError = classifyMonitoringError(error);
           securityLog({
             type: "failsafe.activated",
             message: "Manual monitor check failed safely",
             userId: user.id,
             resourceId: id,
-            metadata: { error: error instanceof Error ? error.message : String(error) },
+            metadata: {
+              kind: monitoringError.kind,
+              technical: monitoringError.technical,
+              error: error instanceof Error ? error.message : String(error),
+            },
           });
           return NextResponse.json(
             {
               success: false,
-              error: safeClientErrorMessage(error, "Check failed. Please try again."),
+              error: monitoringError.title,
+              monitoringError: {
+                kind: monitoringError.kind,
+                title: monitoringError.title,
+                description: monitoringError.description,
+                suggestions: monitoringError.suggestions,
+                statusLabel: monitoringError.statusLabel,
+                technical: monitoringError.technical,
+              },
             },
-            { status: 500 }
+            { status: 422 }
           );
         }
       },

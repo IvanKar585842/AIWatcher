@@ -1,58 +1,31 @@
 import type { MonitoringMode } from "@prisma/client";
 import type { LucideIcon } from "lucide-react";
 import {
-  Activity,
-  ArrowRightLeft,
-  AtSign,
-  BadgePercent,
   BookOpen,
-  Brain,
-  Briefcase,
-  Building2,
-  Code,
-  Cookie,
-  Download,
+  Code2,
   Eye,
   FileText,
-  FormInput,
+  GitBranch,
   Globe,
-  GraduationCap,
-  Hash,
+  Heading,
   Image,
-  Landmark,
   Layers,
-  Lock,
-  Mail,
+  Link2,
   Megaphone,
-  MousePointerClick,
   Newspaper,
   Package,
-  Phone,
-  Rss,
-  Scale,
   Search,
-  Server,
-  Share2,
-  Shield,
-  ShoppingCart,
   Sparkles,
-  Table,
   Target,
-  Timer,
   Type,
-  Zap,
 } from "lucide-react";
 
 export type MonitorTypeCategory =
-  | "General"
-  | "Visual"
-  | "Content"
-  | "E-commerce"
-  | "Jobs & Education"
-  | "Technical"
-  | "Legal & Compliance"
-  | "SEO & Meta"
-  | "AI";
+  | "Website Monitoring"
+  | "Competitor Intelligence"
+  | "Developer Monitoring"
+  | "SEO Monitoring"
+  | "Business Monitoring";
 
 export type AccentColor =
   | "cyan"
@@ -72,9 +45,15 @@ export interface MonitorTypeDefinition {
   category: MonitorTypeCategory;
   accent: AccentColor;
   mode: MonitoringMode;
+  /** Short concrete example shown in the create UI */
+  exampleUsage: string;
+  /** Who this option is best for */
+  recommendedUsers: string;
   requiresSelector?: boolean;
   requiresKeywords?: boolean;
   requiresAiPrompt?: boolean;
+  /** Prefill AI prompt when this type is selected */
+  defaultAiPrompt?: string;
   recommended?: boolean;
   tooltip?: string;
 }
@@ -134,157 +113,271 @@ export const ACCENT_STYLES: Record<
 };
 
 export const MONITOR_TYPE_CATEGORIES: MonitorTypeCategory[] = [
-  "General",
-  "Visual",
-  "Content",
-  "E-commerce",
-  "Jobs & Education",
-  "Technical",
-  "Legal & Compliance",
-  "SEO & Meta",
-  "AI",
+  "Website Monitoring",
+  "Competitor Intelligence",
+  "Developer Monitoring",
+  "SEO Monitoring",
+  "Business Monitoring",
 ];
 
-/** Primary create-flow options — beginner-first order */
+/** Recommended create-flow options — Website Monitoring first */
 export const PRIMARY_MONITOR_TYPE_IDS = [
-  "entire-website",
-  "visual-changes",
-  "text-changes",
+  "full-page",
   "specific-section",
-  "price-tracking",
-  "keyword-detection",
-  "api-response",
-  "ai-smart",
+  "text-changes",
+  "image-changes",
+  "link-changes",
 ] as const;
 
 export const MONITOR_TYPE_CATALOG: MonitorTypeDefinition[] = [
+  // —— Website Monitoring ——
   {
-    id: "entire-website",
+    id: "full-page",
     label: "Full Page Monitoring",
-    description: "Monitor the entire page and detect important changes automatically.",
-    tooltip: "Best for beginners. Watches the whole page and filters noise automatically.",
+    description: "Watch the whole public page and surface meaningful changes automatically.",
+    exampleUsage: "https://example.com/pricing",
+    recommendedUsers: "Founders, marketers, site owners",
+    tooltip: "Best default. Works on most public pages without selectors.",
     icon: Globe,
-    category: "General",
+    category: "Website Monitoring",
     accent: "cyan",
     mode: "ENTIRE_PAGE",
     recommended: true,
   },
   {
-    id: "visual-changes",
-    label: "Visual Changes Monitoring",
-    description: "Detect layout, design, and visual structure shifts.",
-    tooltip: "Use when appearance matters more than text — redesigns, banners, UI changes.",
-    icon: Eye,
-    category: "Visual",
-    accent: "blue",
-    mode: "VISUAL_CHANGES",
-  },
-  {
-    id: "text-changes",
-    label: "Text Changes Monitoring",
-    description: "Focus on readable text updates and ignore most HTML noise.",
-    tooltip: "Ideal for articles, announcements, and copy changes.",
-    icon: Type,
-    category: "Content",
-    accent: "cyan",
-    mode: "TEXT_CHANGES",
-  },
-  {
     id: "specific-section",
-    label: "Specific Element Monitoring",
-    description: "Watch one section or element using a CSS selector.",
-    tooltip: "Paste a CSS selector for the exact block you care about.",
+    label: "Specific Section Monitoring",
+    description: "Track one block or element with a CSS selector.",
+    exampleUsage: "main .pricing-table or #announcements",
+    recommendedUsers: "Operators watching a single widget or module",
+    tooltip: "Paste a CSS selector for the exact section you care about.",
     icon: Layers,
-    category: "Content",
+    category: "Website Monitoring",
     accent: "blue",
     mode: "CSS_SELECTOR",
     requiresSelector: true,
   },
   {
-    id: "price-tracking",
-    label: "Price Monitoring",
-    description: "Track price drops and increases on product pages.",
-    tooltip: "Best for product and pricing pages with clear price text.",
+    id: "text-changes",
+    label: "Text Change Monitoring",
+    description: "Focus on readable copy updates and ignore most HTML noise.",
+    exampleUsage: "Blog posts, help articles, policy pages",
+    recommendedUsers: "Content and communications teams",
+    tooltip: "Ideal when wording matters more than layout.",
+    icon: Type,
+    category: "Website Monitoring",
+    accent: "cyan",
+    mode: "TEXT_CHANGES",
+  },
+  {
+    id: "image-changes",
+    label: "Image Change Monitoring",
+    description: "Detect visual and image shifts such as banners, heroes, and media swaps.",
+    exampleUsage: "Homepage hero, campaign banners, gallery pages",
+    recommendedUsers: "Design and brand teams",
+    tooltip: "Use when visual appearance is the signal.",
+    icon: Image,
+    category: "Website Monitoring",
+    accent: "violet",
+    mode: "VISUAL_CHANGES",
+  },
+  {
+    id: "link-changes",
+    label: "Link Change Monitoring",
+    description: "Alert when important links, navigation, or destinations change.",
+    exampleUsage: "Footer links, CTA destinations, download URLs",
+    recommendedUsers: "SEO, growth, and web ops teams",
+    tooltip: "AI focuses on href and navigation changes.",
+    icon: Link2,
+    category: "Website Monitoring",
+    accent: "sky",
+    mode: "AI_SMART",
+    requiresAiPrompt: true,
+    defaultAiPrompt:
+      "Notify me when important links, navigation items, or href destinations change. Ignore cosmetic layout shifts.",
+  },
+
+  // —— Competitor Intelligence ——
+  {
+    id: "competitor-pricing",
+    label: "Pricing Page",
+    description: "Monitor a competitor’s public pricing page for plan or price updates.",
+    exampleUsage: "competitor.com/pricing",
+    recommendedUsers: "Product, sales, and pricing teams",
     icon: Target,
-    category: "E-commerce",
+    category: "Competitor Intelligence",
     accent: "emerald",
     mode: "PRICE_DETECTION",
   },
   {
-    id: "keyword-detection",
-    label: "Keyword Monitoring",
-    description: "Alert when specific keywords appear or disappear.",
-    tooltip: "Enter words like “sale”, “in stock”, or “remote”.",
-    icon: Hash,
-    category: "Content",
+    id: "competitor-features",
+    label: "Features Page",
+    description: "Watch feature lists and capability pages for competitive moves.",
+    exampleUsage: "competitor.com/features",
+    recommendedUsers: "Product managers and competitive intel",
+    icon: Sparkles,
+    category: "Competitor Intelligence",
+    accent: "violet",
+    mode: "TEXT_CHANGES",
+  },
+  {
+    id: "competitor-product",
+    label: "Product Page",
+    description: "Track public product pages for positioning and offer changes.",
+    exampleUsage: "competitor.com/product/…",
+    recommendedUsers: "Product marketing and founders",
+    icon: Package,
+    category: "Competitor Intelligence",
     accent: "amber",
-    mode: "KEYWORD_DETECTION",
-    requiresKeywords: true,
+    mode: "ENTIRE_PAGE",
   },
   {
-    id: "api-response",
-    label: "API Monitoring",
-    description: "Monitor JSON or XML API endpoint responses.",
-    tooltip: "Point at an API URL to detect response body changes.",
-    icon: Server,
-    category: "Technical",
+    id: "competitor-landing",
+    label: "Landing Page",
+    description: "Detect messaging and offer changes on competitor landing pages.",
+    exampleUsage: "competitor.com/ or campaign landers",
+    recommendedUsers: "Growth and marketing teams",
+    icon: Megaphone,
+    category: "Competitor Intelligence",
+    accent: "orange",
+    mode: "ENTIRE_PAGE",
+  },
+  {
+    id: "competitor-announcements",
+    label: "Announcements",
+    description: "Catch new competitor announcements, launches, and press updates.",
+    exampleUsage: "competitor.com/blog or /news",
+    recommendedUsers: "Strategy and competitive intel",
+    icon: Newspaper,
+    category: "Competitor Intelligence",
+    accent: "rose",
+    mode: "TEXT_CHANGES",
+  },
+
+  // —— Developer Monitoring ——
+  {
+    id: "github-releases",
+    label: "GitHub Releases",
+    description: "Monitor release pages or feeds for new versions and notes.",
+    exampleUsage: "github.com/org/repo/releases",
+    recommendedUsers: "Engineers and DevRel teams",
+    icon: GitBranch,
+    category: "Developer Monitoring",
+    accent: "violet",
+    mode: "TEXT_CHANGES",
+  },
+  {
+    id: "documentation-updates",
+    label: "Documentation Updates",
+    description: "Track public docs, guides, and changelog pages.",
+    exampleUsage: "docs.example.com/getting-started",
+    recommendedUsers: "Developers and technical writers",
+    icon: BookOpen,
+    category: "Developer Monitoring",
+    accent: "sky",
+    mode: "DOCUMENTATION_CHANGES",
+  },
+  {
+    id: "api-documentation",
+    label: "API Documentation",
+    description: "Watch public API reference pages for endpoint or schema changes.",
+    exampleUsage: "docs.example.com/api or OpenAPI hubs",
+    recommendedUsers: "API consumers and platform teams",
+    icon: Code2,
+    category: "Developer Monitoring",
     accent: "cyan",
-    mode: "API_RESPONSE",
+    mode: "DOCUMENTATION_CHANGES",
+  },
+
+  // —— SEO Monitoring ——
+  {
+    id: "seo-title",
+    label: "Title Changes",
+    description: "Alert when the page title (or title tag content) changes.",
+    exampleUsage: "Homepage and key landing URLs",
+    recommendedUsers: "SEO specialists and content owners",
+    icon: Type,
+    category: "SEO Monitoring",
+    accent: "cyan",
+    mode: "AI_SMART",
+    requiresAiPrompt: true,
+    defaultAiPrompt:
+      "Notify me only when the page title or <title> content changes in a meaningful way.",
   },
   {
-    id: "ai-smart",
-    label: "AI Monitoring",
-    description: "Describe what matters in plain language and let AI decide.",
-    tooltip: "Write instructions like “Notify me only when the price drops below €100”.",
-    icon: Brain,
-    category: "AI",
+    id: "seo-meta-description",
+    label: "Meta Description Changes",
+    description: "Track updates to meta description and related SEO snippets.",
+    exampleUsage: "High-traffic marketing pages",
+    recommendedUsers: "SEO and content teams",
+    icon: FileText,
+    category: "SEO Monitoring",
+    accent: "blue",
+    mode: "AI_SMART",
+    requiresAiPrompt: true,
+    defaultAiPrompt:
+      "Notify me when the meta description or search snippet text changes. Ignore unrelated body copy.",
+  },
+  {
+    id: "seo-headings",
+    label: "Heading Changes",
+    description: "Detect H1–H3 and outline structure changes that affect SEO.",
+    exampleUsage: "Category and article pages",
+    recommendedUsers: "SEO specialists",
+    icon: Heading,
+    category: "SEO Monitoring",
     accent: "violet",
     mode: "AI_SMART",
     requiresAiPrompt: true,
+    defaultAiPrompt:
+      "Notify me when H1, H2, or H3 headings change. Ignore navigation chrome and footer text.",
   },
-  { id: "screenshot-comparison", label: "Screenshot Comparison", description: "Pixel-level visual diff between captures", icon: Image, category: "Visual", accent: "sky", mode: "SCREENSHOT_DIFF" },
-  { id: "html-changes", label: "HTML Changes", description: "Precise HTML structure comparison", icon: Code, category: "Visual", accent: "cyan", mode: "HTML_DIFF" },
-  { id: "css-selector", label: "CSS Selector", description: "Target any element with a CSS selector", icon: MousePointerClick, category: "Content", accent: "cyan", mode: "CSS_SELECTOR", requiresSelector: true },
-  { id: "xpath", label: "XPath", description: "Target elements using XPath expressions", icon: Search, category: "Content", accent: "violet", mode: "XPATH", requiresSelector: true },
-  { id: "discount-tracking", label: "Discount Tracking", description: "Alert when sales or discounts appear", icon: BadgePercent, category: "E-commerce", accent: "amber", mode: "PRICE_DETECTION" },
-  { id: "stock-availability", label: "Stock Availability", description: "Detect in-stock and out-of-stock changes", icon: Package, category: "E-commerce", accent: "emerald", mode: "PRODUCT_AVAILABILITY" },
-  { id: "product-availability", label: "Product Availability", description: "Know when products become purchasable", icon: ShoppingCart, category: "E-commerce", accent: "cyan", mode: "PRODUCT_AVAILABILITY" },
-  { id: "table-changes", label: "Table Changes", description: "Track rows and cells in HTML tables", icon: Table, category: "Content", accent: "blue", mode: "TABLE_DETECTION" },
-  { id: "news-detection", label: "News Detection", description: "Catch breaking news and headline updates", icon: Newspaper, category: "Content", accent: "rose", mode: "TEXT_CHANGES" },
-  { id: "blog-updates", label: "Blog Updates", description: "Monitor blog posts and article feeds", icon: BookOpen, category: "Content", accent: "violet", mode: "TEXT_CHANGES" },
-  { id: "documentation-updates", label: "Documentation Updates", description: "Track docs, changelogs, and guides", icon: FileText, category: "Content", accent: "sky", mode: "DOCUMENTATION_CHANGES" },
-  { id: "rss-feed", label: "RSS Feed", description: "Track new items in RSS and Atom feeds", icon: Rss, category: "Content", accent: "orange", mode: "RSS_FEED" },
-  { id: "job-listings", label: "Job Listings", description: "Monitor career pages for new positions", icon: Briefcase, category: "Jobs & Education", accent: "blue", mode: "JOB_LISTINGS" },
-  { id: "scholarships", label: "Scholarships", description: "Track scholarship deadlines and eligibility", icon: GraduationCap, category: "Jobs & Education", accent: "emerald", mode: "AI_SMART", requiresAiPrompt: true },
-  { id: "university-admissions", label: "University Admissions", description: "Watch admission requirements and dates", icon: Building2, category: "Jobs & Education", accent: "violet", mode: "AI_SMART", requiresAiPrompt: true },
-  { id: "government-changes", label: "Government Website Changes", description: "Monitor official portals and announcements", icon: Landmark, category: "Legal & Compliance", accent: "sky", mode: "AI_SMART", requiresAiPrompt: true },
-  { id: "legal-document-changes", label: "Legal Document Changes", description: "Track contracts, policies, and legal text", icon: Scale, category: "Legal & Compliance", accent: "rose", mode: "DOCUMENTATION_CHANGES" },
-  { id: "competitor-monitoring", label: "Competitor Monitoring", description: "Watch competitor pages for strategic shifts", icon: Megaphone, category: "General", accent: "amber", mode: "ENTIRE_PAGE" },
-  { id: "seo-metadata", label: "SEO Metadata Changes", description: "Detect SEO-related tag and meta updates", icon: Sparkles, category: "SEO & Meta", accent: "violet", mode: "AI_SMART", requiresAiPrompt: true },
-  { id: "title-changes", label: "Title Changes", description: "Alert when the page title changes", icon: Type, category: "SEO & Meta", accent: "cyan", mode: "AI_SMART", requiresAiPrompt: true },
-  { id: "meta-description", label: "Meta Description Changes", description: "Track meta description updates", icon: FileText, category: "SEO & Meta", accent: "blue", mode: "AI_SMART", requiresAiPrompt: true },
-  { id: "opengraph-changes", label: "OpenGraph Changes", description: "Monitor social preview metadata", icon: Share2, category: "SEO & Meta", accent: "sky", mode: "AI_SMART", requiresAiPrompt: true },
-  { id: "download-links", label: "Download Links", description: "Track new or changed download URLs", icon: Download, category: "Content", accent: "amber", mode: "KEYWORD_DETECTION", requiresKeywords: true },
-  { id: "pdf-changes", label: "PDF Changes", description: "Detect when linked PDFs are updated", icon: FileText, category: "Content", accent: "rose", mode: "AI_SMART", requiresAiPrompt: true },
-  { id: "image-changes", label: "Image Changes", description: "Spot new or replaced images on the page", icon: Image, category: "Visual", accent: "violet", mode: "VISUAL_CHANGES" },
-  { id: "form-changes", label: "Form Changes", description: "Monitor form fields and structure", icon: FormInput, category: "Content", accent: "cyan", mode: "CSS_SELECTOR", requiresSelector: true },
-  { id: "button-changes", label: "Button Changes", description: "Track CTA and button label changes", icon: MousePointerClick, category: "Content", accent: "blue", mode: "CSS_SELECTOR", requiresSelector: true },
-  { id: "contact-information", label: "Contact Information", description: "Watch addresses and contact blocks", icon: Mail, category: "Content", accent: "emerald", mode: "TEXT_CHANGES" },
-  { id: "email-changes", label: "Email Changes", description: "Alert when email addresses change", icon: AtSign, category: "Content", accent: "sky", mode: "KEYWORD_DETECTION", requiresKeywords: true },
-  { id: "phone-changes", label: "Phone Number Changes", description: "Track phone number updates", icon: Phone, category: "Content", accent: "cyan", mode: "KEYWORD_DETECTION", requiresKeywords: true },
-  { id: "social-media-links", label: "Social Media Links", description: "Monitor social profile URL changes", icon: Share2, category: "Content", accent: "violet", mode: "KEYWORD_DETECTION", requiresKeywords: true },
-  { id: "cookie-policy", label: "Cookie Policy", description: "Track cookie policy text changes", icon: Cookie, category: "Legal & Compliance", accent: "amber", mode: "DOCUMENTATION_CHANGES" },
-  { id: "privacy-policy", label: "Privacy Policy", description: "Monitor privacy policy updates", icon: Shield, category: "Legal & Compliance", accent: "blue", mode: "DOCUMENTATION_CHANGES" },
-  { id: "terms-of-service", label: "Terms of Service", description: "Watch terms and conditions changes", icon: Scale, category: "Legal & Compliance", accent: "rose", mode: "DOCUMENTATION_CHANGES" },
-  { id: "custom-javascript", label: "Custom JavaScript Detection", description: "Use AI to interpret custom page behavior", icon: Code, category: "Technical", accent: "violet", mode: "AI_SMART", requiresAiPrompt: true },
-  { id: "redirect-detection", label: "Redirect Detection", description: "Detect unexpected URL redirects", icon: ArrowRightLeft, category: "Technical", accent: "orange", mode: "API_RESPONSE" },
-  { id: "status-code", label: "Status Code Monitoring", description: "Alert on HTTP status code changes", icon: Activity, category: "Technical", accent: "rose", mode: "API_RESPONSE" },
-  { id: "ssl-certificate", label: "SSL Certificate", description: "Monitor certificate expiry and changes", icon: Lock, category: "Technical", accent: "emerald", mode: "API_RESPONSE" },
-  { id: "dns-changes", label: "DNS Changes", description: "Track DNS-related endpoint responses", icon: Globe, category: "Technical", accent: "sky", mode: "API_RESPONSE" },
-  { id: "performance", label: "Performance Monitoring", description: "Watch page performance metrics shifts", icon: Zap, category: "Technical", accent: "amber", mode: "AI_SMART", requiresAiPrompt: true },
-  { id: "response-time", label: "Response Time", description: "Alert when response time degrades", icon: Timer, category: "Technical", accent: "cyan", mode: "API_RESPONSE" },
-  { id: "uptime", label: "Uptime", description: "Know immediately when a site goes down", icon: Activity, category: "Technical", accent: "emerald", mode: "API_RESPONSE" },
-  { id: "custom-ai-prompt", label: "Custom AI Prompt", description: "Full control with a custom AI instruction", icon: Brain, category: "AI", accent: "violet", mode: "AI_SMART", requiresAiPrompt: true },
+  {
+    id: "seo-content",
+    label: "Content Changes",
+    description: "Monitor primary on-page content for SEO-relevant rewrites.",
+    exampleUsage: "Pillar pages and service descriptions",
+    recommendedUsers: "SEO, content, and editorial teams",
+    icon: Search,
+    category: "SEO Monitoring",
+    accent: "emerald",
+    mode: "TEXT_CHANGES",
+  },
+
+  // —— Business Monitoring ——
+  {
+    id: "business-news",
+    label: "News Pages",
+    description: "Watch public news rooms and press pages for new stories.",
+    exampleUsage: "company.com/news or /press",
+    recommendedUsers: "PR, comms, and executives",
+    icon: Newspaper,
+    category: "Business Monitoring",
+    accent: "rose",
+    mode: "TEXT_CHANGES",
+  },
+  {
+    id: "business-blog",
+    label: "Blog Updates",
+    description: "Detect new or updated public blog posts.",
+    exampleUsage: "company.com/blog",
+    recommendedUsers: "Content marketers and analysts",
+    icon: BookOpen,
+    category: "Business Monitoring",
+    accent: "violet",
+    mode: "TEXT_CHANGES",
+  },
+  {
+    id: "business-announcements",
+    label: "Public Announcements",
+    description: "Track official announcement pages for company or product news.",
+    exampleUsage: "company.com/announcements",
+    recommendedUsers: "Business ops, founders, and partners",
+    icon: Megaphone,
+    category: "Business Monitoring",
+    accent: "amber",
+    mode: "TEXT_CHANGES",
+  },
 ];
 
 export function getPrimaryMonitorTypes(): MonitorTypeDefinition[] {
@@ -302,7 +395,62 @@ export function getMonitorTypeById(id: string): MonitorTypeDefinition | undefine
   return MONITOR_TYPE_CATALOG.find((t) => t.id === id);
 }
 
-export function getMonitorTypesByCategory(category: MonitorTypeCategory | "All"): MonitorTypeDefinition[] {
+export function getMonitorTypesByCategory(
+  category: MonitorTypeCategory | "All"
+): MonitorTypeDefinition[] {
   if (category === "All") return MONITOR_TYPE_CATALOG;
   return MONITOR_TYPE_CATALOG.filter((t) => t.category === category);
+}
+
+/** Hosts / patterns that commonly block automated monitoring */
+const PROTECTED_HOST_PATTERNS = [
+  /(^|\.)amazon\./i,
+  /(^|\.)amzn\./i,
+  /(^|\.)ebay\./i,
+  /(^|\.)instagram\.com$/i,
+  /(^|\.)tiktok\.com$/i,
+  /(^|\.)facebook\.com$/i,
+  /(^|\.)fb\.com$/i,
+  /(^|\.)fbcdn\.net$/i,
+  /(^|\.)twitter\.com$/i,
+  /(^|\.)x\.com$/i,
+  /(^|\.)linkedin\.com$/i,
+  /(^|\.)threads\.net$/i,
+  /(^|\.)snapchat\.com$/i,
+  /(^|\.)pinterest\.com$/i,
+  /(^|\.)reddit\.com$/i,
+  /(^|\.)walmart\.com$/i,
+  /(^|\.)aliexpress\./i,
+  /(^|\.)alibaba\./i,
+];
+
+const PRIVATE_PATH_HINT =
+  /\/(login|signin|sign-in|signup|sign-up|account|dashboard|app|portal|auth|oauth|checkout|cart)(\/|$)/i;
+
+export const PROTECTED_SITE_WARNING =
+  "This website may block automated monitoring. WatchFlowing works best with public pages without strong bot protection.";
+
+/**
+ * Returns a user-facing warning when the URL looks like a protected /
+ * marketplace / social / private page. Does not block creation.
+ */
+export function getProtectedSiteWarning(url: string): string | null {
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed.includes("://") ? trimmed : `https://${trimmed}`);
+  } catch {
+    return null;
+  }
+
+  const host = parsed.hostname.replace(/^www\./i, "");
+  if (PROTECTED_HOST_PATTERNS.some((re) => re.test(host))) {
+    return PROTECTED_SITE_WARNING;
+  }
+  if (PRIVATE_PATH_HINT.test(parsed.pathname)) {
+    return PROTECTED_SITE_WARNING;
+  }
+  return null;
 }

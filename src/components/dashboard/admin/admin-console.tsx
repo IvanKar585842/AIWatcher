@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { CommandPageHeader } from "@/components/dashboard/command/command-page-header";
 import { OsInput } from "@/components/dashboard/os/os-primitives";
+import { classifyMonitoringError } from "@/lib/monitoring/error-messages";
 import { cn, formatDate, formatRelativeTime } from "@/lib/utils";
 
 type Tab = "dashboard" | "users" | "system";
@@ -468,8 +469,16 @@ export function AdminConsole() {
                     <p className="text-sm font-medium text-zinc-200">{m.name}</p>
                     <p className="mt-0.5 truncate text-xs text-zinc-600">{m.url}</p>
                     <p className="mt-2 line-clamp-2 text-xs text-red-300/80">
-                      {m.errorMessage ?? "Unknown error"}
+                      {m.errorMessage
+                        ? classifyMonitoringError(m.errorMessage).title
+                        : "Unknown error"}
                     </p>
+                    {m.errorMessage && (
+                      <p className="mt-1 line-clamp-1 font-mono text-[10px] text-zinc-600">
+                        {classifyMonitoringError(m.errorMessage).technical ??
+                          classifyMonitoringError(m.errorMessage).kind}
+                      </p>
+                    )}
                     <p className="mt-1 text-[10px] text-zinc-600">
                       {m.user.email} · {m.errorCount} failures
                     </p>
@@ -652,7 +661,9 @@ export function AdminConsole() {
                       <p className="text-sm text-zinc-200">{m.name}</p>
                       <p className="truncate text-xs text-zinc-600">{m.url}</p>
                       <p className="mt-1 line-clamp-2 text-xs text-red-300/80">
-                        {m.errorMessage ?? "Unknown"}
+                        {m.errorMessage
+                          ? classifyMonitoringError(m.errorMessage).title
+                          : "Unknown"}
                       </p>
                       <p className="mt-1 text-[10px] text-zinc-600">
                         {m.user.email} · {m.errorCount} failures

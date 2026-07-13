@@ -35,6 +35,8 @@ export async function GET() {
           process.env.UPSTASH_REDIS_REST_TOKEN?.trim()
       ),
       cronSecret: Boolean(process.env.CRON_SECRET?.trim()),
+      telegram: Boolean(process.env.TELEGRAM_BOT_TOKEN?.trim()),
+      telegramWebhook: Boolean(process.env.TELEGRAM_WEBHOOK_SECRET?.trim()),
       latencyMs: Date.now() - started,
       timestamp: new Date().toISOString(),
     },

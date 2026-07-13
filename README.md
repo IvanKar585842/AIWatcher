@@ -87,10 +87,11 @@ npm run trigger:deploy
 
 1. Create a bot via [@BotFather](https://t.me/BotFather) (production bot: `WatchFlowAlertsBot`)
 2. Set environment variables (never hardcode the token):
-   - `TELEGRAM_BOT_TOKEN` — bot token from BotFather
+   - `TELEGRAM_BOT_TOKEN` — bot token from BotFather (**must be valid**; invalid tokens return Telegram 401)
    - `TELEGRAM_BOT_USERNAME=WatchFlowAlertsBot`
    - `TELEGRAM_WEBHOOK_SECRET` — random secret for webhook validation
-3. Set the webhook (include the same secret):
+   - `NEXT_PUBLIC_APP_URL=https://your-domain.com` — public HTTPS URL (localhost cannot receive webhooks)
+3. Register the webhook (include the same secret), either:
 
 ```bash
 curl -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook" \
@@ -98,8 +99,23 @@ curl -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook" \
   -d "{\"url\":\"https://YOUR_DOMAIN/api/telegram/webhook\",\"secret_token\":\"$TELEGRAM_WEBHOOK_SECRET\"}"
 ```
 
+or via the app (admin / cron secret):
+
+```bash
+curl -X POST "https://YOUR_DOMAIN/api/telegram/setup?force=1" \
+  -H "Authorization: Bearer $CRON_SECRET"
+```
+
 4. In the app: Dashboard → Settings → Notifications → Connect Telegram
 5. Users open `https://t.me/WatchFlowAlertsBot?start=USER_ID` and press Start
+6. Bot replies: “Your WatchFlowing account is connected successfully.” and Settings shows **Connected**
+
+Troubleshoot:
+- **Missing token** — `TELEGRAM_BOT_TOKEN` empty
+- **Invalid bot configuration** — token revoked/wrong (BotFather → revoke & issue new token)
+- **Telegram webhook is not configured** — set `TELEGRAM_WEBHOOK_SECRET` and register webhook
+- **User not connected** — open Connect link and press `/start` in Telegram
+- **Message sending failed** — check server logs `[telegram]` and notification history
 
 ### Stripe Setup (payments)
 

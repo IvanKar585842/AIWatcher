@@ -3,6 +3,7 @@ import { sendTelegramMessage } from "@/lib/notifications/telegram";
 import { INTERVAL_LABELS, MODE_LABELS } from "@/lib/constants";
 import { formatRelativeTime } from "@/lib/utils";
 import { verifyTelegramLinkCode } from "@/lib/telegram/link-token";
+import { telegramLog } from "@/lib/telegram/config";
 
 interface TelegramUpdate {
   message?: {
@@ -13,13 +14,14 @@ interface TelegramUpdate {
 }
 
 const CONNECTED_MESSAGE =
-  "✅ WatchFlowing Telegram notifications connected successfully.";
+  "✅ Your WatchFlowing account is connected successfully.";
 
 export async function handleTelegramUpdate(update: TelegramUpdate) {
   const message = update.message;
   if (!message?.text) return;
 
   const chatId = String(message.chat.id);
+  const telegramUserId = message.from?.id != null ? String(message.from.id) : chatId;
   const text = message.text.trim();
   const [command, ...args] = text.split(/\s+/);
   const cmd = command.toLowerCase().split("@")[0];
@@ -35,12 +37,13 @@ export async function handleTelegramUpdate(update: TelegramUpdate) {
         const linked = await tryLinkTelegramAccount({
           payload,
           chatId,
+          telegramUserId,
           username: message.from?.username ?? message.chat.username ?? null,
         });
         if (linked) return;
       }
 
-      if (user?.telegramConnected) {
+      if (user?.telegramConnected || user?.telegramChatId) {
         await sendTelegramMessage(
           chatId,
           `${CONNECTED_MESSAGE}\n\n` +
@@ -57,7 +60,7 @@ export async function handleTelegramUpdate(update: TelegramUpdate) {
       await sendTelegramMessage(
         chatId,
         "👋 <b>Welcome to WatchFlowing!</b>\n\n" +
-          "To connect notifications, open Dashboard → Settings → Notifications and tap <b>Connect Telegram</b>.\n\n" +
+          "To connect notifications, open Dashboard → Settings → Notifications and tap <b>Connect Telegram</b>, then press /start from that link.\n\n" +
           "<b>Commands:</b>\n" +
           "/list — View your monitors\n" +
           "/pause [id] — Pause a monitor\n" +
@@ -72,7 +75,7 @@ export async function handleTelegramUpdate(update: TelegramUpdate) {
       if (!user) {
         await sendTelegramMessage(
           chatId,
-          "❌ Account not linked. Connect from Dashboard → Settings → Notifications."
+          "❌ Telegram account is not connected. Connect from Dashboard → Settings → Notifications."
         );
         return;
       }
@@ -101,7 +104,7 @@ export async function handleTelegramUpdate(update: TelegramUpdate) {
 
     case "/pause": {
       if (!user) {
-        await sendTelegramMessage(chatId, "❌ Account not linked.");
+        await sendTelegramMessage(chatId, "❌ Telegram account is not connected.");
         return;
       }
       const monitorId = await resolveMonitorId(user.id, args[0]);
@@ -119,7 +122,7 @@ export async function handleTelegramUpdate(update: TelegramUpdate) {
 
     case "/resume": {
       if (!user) {
-        await sendTelegramMessage(chatId, "❌ Account not linked.");
+        await sendTelegramMessage(chatId, "❌ Telegram account is not connected.");
         return;
       }
       const monitorId = await resolveMonitorId(user.id, args[0]);
@@ -137,7 +140,7 @@ export async function handleTelegramUpdate(update: TelegramUpdate) {
 
     case "/delete": {
       if (!user) {
-        await sendTelegramMessage(chatId, "❌ Account not linked.");
+        await sendTelegramMessage(chatId, "❌ Telegram account is not connected.");
         return;
       }
       const monitorId = await resolveMonitorId(user.id, args[0]);
@@ -152,7 +155,7 @@ export async function handleTelegramUpdate(update: TelegramUpdate) {
 
     case "/latest": {
       if (!user) {
-        await sendTelegramMessage(chatId, "❌ Account not linked.");
+        await sendTelegramMessage(chatId, "❌ Telegram account is not connected.");
         return;
       }
       const monitorId = await resolveMonitorId(user.id, args[0]);
@@ -199,10 +202,12 @@ export async function handleTelegramUpdate(update: TelegramUpdate) {
 async function tryLinkTelegramAccount(params: {
   payload: string;
   chatId: string;
+  telegramUserId: string;
   username: string | null;
 }): Promise<boolean> {
   const userId = resolveStartPayloadUserId(params.payload);
   if (!userId) {
+    telegramLog("link_invalid_payload", { chatId: params.chatId });
     await sendTelegramMessage(
       params.chatId,
       "⚠️ Invalid or expired connection link. Open Dashboard → Settings → Notifications and tap Connect Telegram again."
@@ -212,6 +217,7 @@ async function tryLinkTelegramAccount(params: {
 
   const linkUser = await prisma.user.findUnique({ where: { id: userId } });
   if (!linkUser) {
+    telegramLog("link_user_not_found", { userId, chatId: params.chatId });
     await sendTelegramMessage(
       params.chatId,
       "⚠️ WatchFlowing account not found for this connection link."
@@ -220,6 +226,7 @@ async function tryLinkTelegramAccount(params: {
   }
 
   if (linkUser.telegramChatId && linkUser.telegramChatId !== params.chatId) {
+    telegramLog("link_already_linked_other_chat", { userId, chatId: params.chatId });
     await sendTelegramMessage(
       params.chatId,
       "⚠️ This WatchFlowing account is already linked to another Telegram chat. Disconnect it in dashboard settings first."
@@ -231,6 +238,7 @@ async function tryLinkTelegramAccount(params: {
     where: { telegramChatId: params.chatId, NOT: { id: userId } },
   });
   if (existing) {
+    telegramLog("link_chat_taken", { userId, chatId: params.chatId });
     await sendTelegramMessage(
       params.chatId,
       "⚠️ This Telegram account is already linked to another WatchFlowing user."
@@ -238,6 +246,7 @@ async function tryLinkTelegramAccount(params: {
     return true;
   }
 
+  // Persist Telegram user/chat id + connected status on the WatchFlowing user
   await prisma.user.update({
     where: { id: userId },
     data: {
@@ -245,10 +254,23 @@ async function tryLinkTelegramAccount(params: {
       telegramUsername: params.username,
       telegramConnected: true,
       telegramConnectedAt: new Date(),
+      telegramNotificationsEnabled: true,
     },
   });
 
-  await sendTelegramMessage(params.chatId, CONNECTED_MESSAGE);
+  telegramLog("link_success", {
+    userId,
+    telegramUserId: params.telegramUserId,
+    chatId: params.chatId,
+  });
+
+  const send = await sendTelegramMessage(params.chatId, CONNECTED_MESSAGE);
+  if (!send.ok) {
+    telegramLog("link_confirm_send_failed", {
+      userId,
+      error: send.error,
+    });
+  }
   return true;
 }
 

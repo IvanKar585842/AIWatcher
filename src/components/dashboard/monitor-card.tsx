@@ -19,6 +19,7 @@ import {
   getFaviconUrl,
 } from "@/lib/utils";
 import type { Monitor } from "@prisma/client";
+import { MonitorErrorBanner } from "@/components/dashboard/monitor-error-banner";
 
 interface MonitorWithCount extends Monitor {
   _count: { changes: number };
@@ -193,9 +194,7 @@ export function MonitorCard({
         </div>
 
         {monitor.errorMessage && (
-          <p className="mt-3 truncate rounded-lg border border-red-500/20 bg-red-500/[0.06] px-3 py-2 text-[11px] text-red-300/80">
-            {monitor.errorMessage}
-          </p>
+          <MonitorErrorBanner errorMessage={monitor.errorMessage} compact />
         )}
 
         {/* Actions */}

@@ -154,28 +154,35 @@ export async function GET() {
             ? 100
             : Math.min(99, Math.round((successfulChecks / activeMonitors) * 100));
 
-        return NextResponse.json({
-          stats: {
-            totalMonitors,
-            activeMonitors,
-            pausedMonitors,
-            errorMonitors,
-            changesToday,
-            importantAlerts,
-            aiAccuracy,
-            monitoringHealth,
-            mostActiveWebsite,
-            recentChanges,
-            recentNotifications,
-            monitors,
-            analytics: {
-              ...analytics,
-              activeMonitors: analytics.activeMonitors || activeMonitors,
-              changesDetected: analytics.changesDetected || changesToday,
+        return NextResponse.json(
+          {
+            stats: {
+              totalMonitors,
+              activeMonitors,
+              pausedMonitors,
+              errorMonitors,
+              changesToday,
+              importantAlerts,
+              aiAccuracy,
+              monitoringHealth,
+              mostActiveWebsite,
+              recentChanges,
+              recentNotifications,
+              monitors,
+              analytics: {
+                ...analytics,
+                activeMonitors: analytics.activeMonitors || activeMonitors,
+                changesDetected: analytics.changesDetected || changesToday,
+              },
+              avgResponseTime: analytics.avgAiResponseMs,
             },
-            avgResponseTime: analytics.avgAiResponseMs,
           },
-        });
+          {
+            headers: {
+              "Cache-Control": "private, max-age=15, stale-while-revalidate=30",
+            },
+          }
+        );
       },
       user.id
     );

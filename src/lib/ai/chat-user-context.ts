@@ -1,5 +1,6 @@
 import { ChangeImportance, NotificationChannel } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { monitorErrorSummary } from "@/lib/monitoring/error-messages";
 import { truncateToChars } from "./chat-tokens";
 
 /** Hard cap so we never dump the database into the prompt */
@@ -156,7 +157,9 @@ async function buildUserMonitoringContextUncached(userId: string): Promise<strin
           return m.url.slice(0, 40);
         }
       })();
-      const err = m.errorMessage ? ` err=${truncateToChars(m.errorMessage, 60)}` : "";
+      const err = m.errorMessage
+        ? ` err=${truncateToChars(monitorErrorSummary(m.errorMessage) ?? m.errorMessage, 60)}`
+        : "";
       lines.push(
         `- ${m.name} (${domain}) status=${m.status} changes=${m._count.changes}${err}`
       );
@@ -194,7 +197,13 @@ async function buildUserMonitoringContextUncached(userId: string): Promise<strin
   if (needsAttention.length > 0) {
     lines.push("Needs attention:");
     for (const m of needsAttention) {
-      lines.push(`- ${m.name}: ${m.status}${m.errorMessage ? ` — ${truncateToChars(m.errorMessage, 80)}` : ""}`);
+      lines.push(
+        `- ${m.name}: ${m.status}${
+          m.errorMessage
+            ? ` — ${truncateToChars(monitorErrorSummary(m.errorMessage) ?? "", 80)}`
+            : ""
+        }`
+      );
     }
   }
 

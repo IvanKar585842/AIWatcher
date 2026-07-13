@@ -1,3 +1,5 @@
+import { telegramLog } from "@/lib/telegram/config";
+
 const TELEGRAM_API = "https://api.telegram.org/bot";
 
 export type TelegramSendResult =
@@ -5,26 +7,31 @@ export type TelegramSendResult =
   | { ok: false; error: string; blocked?: boolean; invalidChat?: boolean };
 
 function getBotToken(): string {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  if (!token) throw new Error("TELEGRAM_BOT_TOKEN is not configured");
+  const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
+  if (!token) {
+    telegramLog("config_missing", { reason: "TELEGRAM_BOT_TOKEN missing" });
+    throw new Error("Missing token");
+  }
   return token;
 }
 
 async function telegramRequest(
   method: string,
-  body: Record<string, unknown>
+  body?: Record<string, unknown>
 ): Promise<TelegramSendResult> {
   try {
-    const response = await fetch(`${TELEGRAM_API}${getBotToken()}/${method}`, {
+    const token = getBotToken();
+    const response = await fetch(`${TELEGRAM_API}${token}/${method}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify(body ?? {}),
     });
 
     const data = (await response.json()) as {
       ok?: boolean;
       description?: string;
       error_code?: number;
+      result?: unknown;
     };
 
     if (!data.ok) {
@@ -36,14 +43,26 @@ async function telegramRequest(
         data.error_code === 400 ||
         /chat not found|invalid chat/i.test(description);
 
+      telegramLog("api_error", {
+        method,
+        errorCode: data.error_code,
+        description,
+        blocked,
+        invalidChat,
+      });
+
       return { ok: false, error: description, blocked, invalidChat };
     }
 
     return { ok: true, data };
   } catch (error) {
+    const message = error instanceof Error ? error.message : "Telegram request failed";
+    telegramLog("request_failed", { method, error: message });
     return {
       ok: false,
-      error: error instanceof Error ? error.message : "Telegram request failed",
+      error: message === "Missing token"
+        ? "Telegram bot is not configured"
+        : "Unable to send Telegram notification",
     };
   }
 }
@@ -59,7 +78,12 @@ export async function sendTelegramNotification(
   }
 ): Promise<TelegramSendResult> {
   if (!chatId?.trim()) {
-    return { ok: false, error: "Invalid chat ID", invalidChat: true };
+    return { ok: false, error: "Telegram account is not connected", invalidChat: true };
+  }
+
+  if (!process.env.TELEGRAM_BOT_TOKEN?.trim()) {
+    telegramLog("send_skipped", { reason: "Missing token" });
+    return { ok: false, error: "Telegram bot is not configured" };
   }
 
   return telegramRequest("sendMessage", {
@@ -71,17 +95,20 @@ export async function sendTelegramNotification(
   });
 }
 
-/** @deprecated Prefer sendTelegramNotification — kept for bot command handlers. */
+/** Bot command helper — logs failures instead of crashing the webhook. */
 export async function sendTelegramMessage(
   chatId: string,
   text: string,
   parseMode = "HTML"
-) {
+): Promise<TelegramSendResult> {
   const result = await sendTelegramNotification(chatId, text, { parseMode });
   if (!result.ok) {
-    throw new Error(result.error);
+    telegramLog("message_send_failed", {
+      chatId,
+      error: result.error,
+    });
   }
-  return result.data;
+  return result;
 }
 
 interface ChangeNotificationParams {
@@ -97,56 +124,43 @@ interface ChangeNotificationParams {
   changeId?: string;
 }
 
-function getHostname(url: string): string {
-  try {
-    return new URL(url).hostname;
-  } catch {
-    return url;
-  }
-}
-
 export async function sendTelegramChangeNotification(
   params: ChangeNotificationParams
 ): Promise<TelegramSendResult> {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const dashboardUrl = params.changeId
+  const appUrl = (
+    process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://watchflowing.com"
+  ).replace(/\/$/, "");
+  const dashboardUrl = `${appUrl}/dashboard`;
+  const changeDetailUrl = params.changeId
     ? `${appUrl}/dashboard/changes/${params.changeId}`
-    : `${appUrl}/dashboard`;
-  const hostname = getHostname(params.url);
+    : dashboardUrl;
+
   const changeLine =
     params.bulletPoints[0]?.trim() ||
     params.summary.split(/[.!?]/)[0]?.trim() ||
     "A meaningful page change was detected.";
-  const recommendation =
-    params.recommendedAction?.trim() ||
-    (params.importance === "HIGH" || params.importance === "CRITICAL"
-      ? "Open the full analysis and decide next steps."
-      : "Review when convenient.");
 
   const text = [
     `🚨 <b>WatchFlowing Alert</b>`,
     ``,
-    `<b>Website:</b>`,
-    escapeHtml(hostname),
+    `<b>Monitor:</b>`,
+    escapeHtml(params.monitorName),
     ``,
     `<b>Change detected:</b>`,
     escapeHtml(changeLine),
     ``,
-    `<b>AI Analysis:</b>`,
-    `"${escapeHtml(params.summary)}"`,
+    `<b>AI Summary:</b>`,
+    escapeHtml(params.summary || "The monitored page was updated."),
     ``,
-    `<b>Importance:</b>`,
-    escapeHtml(params.importance),
-    ``,
-    `<b>Recommended action:</b>`,
-    escapeHtml(recommendation),
+    `<b>Open Dashboard:</b>`,
+    escapeHtml(dashboardUrl),
   ].join("\n");
 
   return sendTelegramNotification(params.chatId, text, {
     parseMode: "HTML",
     disableWebPagePreview: true,
     replyMarkup: {
-      inline_keyboard: [[{ text: "Open Dashboard", url: dashboardUrl }]],
+      inline_keyboard: [[{ text: "Open Dashboard", url: changeDetailUrl }]],
     },
   });
 }
@@ -161,10 +175,16 @@ function escapeHtml(text: string): string {
 export async function setTelegramWebhook(url: string, secretToken?: string) {
   return telegramRequest("setWebhook", {
     url,
+    allowed_updates: ["message"],
+    drop_pending_updates: false,
     ...(secretToken ? { secret_token: secretToken } : {}),
   });
 }
 
 export async function getTelegramBotInfo() {
-  return telegramRequest("getMe", {});
+  return telegramRequest("getMe");
+}
+
+export async function getTelegramWebhookInfo() {
+  return telegramRequest("getWebhookInfo");
 }

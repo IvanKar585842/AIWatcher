@@ -9,7 +9,7 @@ import {
   NotificationMethod,
   type Monitor,
 } from "@prisma/client";
-import { ArrowLeft, ArrowRight, HelpCircle, Loader2, Plus, Search, Sparkles } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, HelpCircle, Loader2, Plus, Search, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -35,9 +35,10 @@ import {
 } from "@/lib/monitor-config";
 import {
   ACCENT_STYLES,
-  getAdvancedMonitorTypes,
   getMonitorTypeById,
+  getMonitorTypesByCategory,
   getPrimaryMonitorTypes,
+  getProtectedSiteWarning,
   MONITOR_TYPE_CATEGORIES,
   MONITOR_TYPE_CATALOG,
   type MonitorTypeCategory,
@@ -133,7 +134,7 @@ export function CreateMonitorDialog({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState(DEFAULT_FORM);
-  const [selectedTypeId, setSelectedTypeId] = useState("entire-website");
+  const [selectedTypeId, setSelectedTypeId] = useState("full-page");
   const [typeFilter, setTypeFilter] = useState<MonitorTypeCategory | "All">("All");
   const [typeSearch, setTypeSearch] = useState("");
   const [showAdvancedTypes, setShowAdvancedTypes] = useState(false);
@@ -159,7 +160,7 @@ export function CreateMonitorDialog({
       setError("");
       setTypeSearch("");
       setTypeFilter("All");
-      setSelectedTypeId("entire-website");
+      setSelectedTypeId("full-page");
       setShowAdvancedTypes(false);
     }
   }, [open]);
@@ -170,8 +171,40 @@ export function CreateMonitorDialog({
     [selectedTypeId]
   );
 
-  const primaryTypes = useMemo(() => getPrimaryMonitorTypes(), []);
-  const advancedTypes = useMemo(() => getAdvancedMonitorTypes(), []);
+  const protectedWarning = useMemo(
+    () => getProtectedSiteWarning(form.url),
+    [form.url]
+  );
+
+  const primaryTypes = useMemo(() => {
+    const all = getPrimaryMonitorTypes();
+    if (
+      form.category &&
+      MONITOR_TYPE_CATEGORIES.includes(form.category as MonitorTypeCategory)
+    ) {
+      const scoped = getMonitorTypesByCategory(form.category as MonitorTypeCategory);
+      // Keep website primaries when category is Website; otherwise show category types as main grid
+      if (form.category === "Website Monitoring") return all;
+      return scoped.length > 0 ? scoped : all;
+    }
+    return all;
+  }, [form.category]);
+
+  const advancedTypes = useMemo(() => {
+    const primaryIds = new Set(primaryTypes.map((t) => t.id));
+    let list = MONITOR_TYPE_CATALOG.filter((t) => !primaryIds.has(t.id));
+    if (
+      form.category &&
+      MONITOR_TYPE_CATEGORIES.includes(form.category as MonitorTypeCategory) &&
+      form.category !== "Website Monitoring"
+    ) {
+      // Extra options outside the selected focus category
+      list = MONITOR_TYPE_CATALOG.filter(
+        (t) => !primaryIds.has(t.id) && t.category !== form.category
+      );
+    }
+    return list;
+  }, [form.category, primaryTypes]);
 
   const filteredAdvancedTypes = useMemo(() => {
     const q = typeSearch.trim().toLowerCase();
@@ -181,7 +214,9 @@ export function CreateMonitorDialog({
       return (
         t.label.toLowerCase().includes(q) ||
         t.description.toLowerCase().includes(q) ||
-        t.category.toLowerCase().includes(q)
+        t.category.toLowerCase().includes(q) ||
+        t.exampleUsage.toLowerCase().includes(q) ||
+        t.recommendedUsers.toLowerCase().includes(q)
       );
     });
   }, [advancedTypes, typeFilter, typeSearch]);
@@ -222,6 +257,12 @@ export function CreateMonitorDialog({
     setForm((prev) => ({
       ...prev,
       mode: typeDef.mode,
+      category: prev.category || typeDef.category,
+      aiPrompt: typeDef.defaultAiPrompt
+        ? typeDef.defaultAiPrompt
+        : typeDef.requiresAiPrompt
+          ? prev.aiPrompt
+          : prev.aiPrompt,
       respectRobots:
         typeDef.mode === MonitoringMode.VISUAL_CHANGES ||
         typeDef.mode === MonitoringMode.SCREENSHOT_DIFF
@@ -346,7 +387,7 @@ export function CreateMonitorDialog({
                 className="space-y-4"
               >
                 <div>
-                  <FieldLabel hint="The page you want WatchFlowing to check for changes.">
+                  <FieldLabel hint="The public page you want WatchFlowing to check for changes.">
                     Website URL
                   </FieldLabel>
                   <OsInput
@@ -356,6 +397,12 @@ export function CreateMonitorDialog({
                     onChange={(e) => setForm({ ...form, url: e.target.value })}
                     autoFocus
                   />
+                  {protectedWarning && (
+                    <div className="mt-2 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/[0.08] px-3 py-2.5 text-xs leading-relaxed text-amber-100/90">
+                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-300" />
+                      <p>{protectedWarning}</p>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <FieldLabel hint="A short name you’ll recognize in your dashboard.">
@@ -451,7 +498,7 @@ export function CreateMonitorDialog({
                           whileTap={{ scale: 0.99 }}
                           onClick={() => selectMonitorType(typeDef.id)}
                           className={cn(
-                            "relative flex min-h-[108px] flex-col items-start gap-2.5 rounded-xl border p-3.5 text-left transition-all sm:min-h-[116px]",
+                            "relative flex min-h-[132px] flex-col items-start gap-2.5 rounded-xl border p-3.5 text-left transition-all sm:min-h-[140px]",
                             active
                               ? cn(accent.border, accent.bg, accent.glow, "ring-1 ring-cyan-400/30")
                               : "border-white/[0.06] bg-black/30 hover:border-cyan-500/20 hover:bg-white/[0.03]"
@@ -487,6 +534,13 @@ export function CreateMonitorDialog({
                             </p>
                             <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-zinc-500 sm:text-xs">
                               {typeDef.description}
+                            </p>
+                            <p className="mt-2 line-clamp-1 text-[10px] text-zinc-600">
+                              <span className="text-zinc-500">Example:</span> {typeDef.exampleUsage}
+                            </p>
+                            <p className="mt-0.5 line-clamp-1 text-[10px] text-zinc-600">
+                              <span className="text-zinc-500">Best for:</span>{" "}
+                              {typeDef.recommendedUsers}
                             </p>
                           </div>
                         </motion.button>
@@ -600,6 +654,12 @@ export function CreateMonitorDialog({
                                     </p>
                                     <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-zinc-500">
                                       {typeDef.description}
+                                    </p>
+                                    <p className="mt-1.5 line-clamp-1 text-[9px] text-zinc-600">
+                                      Example: {typeDef.exampleUsage}
+                                    </p>
+                                    <p className="line-clamp-1 text-[9px] text-zinc-600">
+                                      Best for: {typeDef.recommendedUsers}
                                     </p>
                                   </div>
                                 </motion.button>
@@ -734,8 +794,11 @@ export function CreateMonitorDialog({
                     <p className="mt-0.5 text-[11px] text-zinc-500">
                       {(form.mode === MonitoringMode.VISUAL_CHANGES ||
                         form.mode === MonitoringMode.SCREENSHOT_DIFF)
-                        ? "Usually leave this off for visual checks on social sites."
+                        ? "Usually leave this off for visual / image checks."
                         : "Leave on unless the site blocks monitoring."}
+                    </p>
+                    <p className="mt-1 text-[11px] leading-snug text-zinc-600">
+                      Prefer public pages. Marketplaces and social networks often block automated monitoring.
                     </p>
                   </div>
                   <Switch

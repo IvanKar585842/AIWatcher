@@ -105,7 +105,7 @@ If no AI API key is configured, a built-in fallback still produces a useful text
 - **API endpoint** → API Response
 - **Main article/content focus** → AI Smart
 
-For social sites like Facebook, use **Visual Changes** (robots.txt is skipped for visual modes).`,
+For public marketing, docs, and competitor pages, start with **Full Page Monitoring**. Avoid marketplaces and social networks — they often block automation.`,
   },
   {
     patterns: [

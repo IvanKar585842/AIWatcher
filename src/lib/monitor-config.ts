@@ -3,24 +3,20 @@ import {
   BookOpen,
   Brain,
   Briefcase,
-  Building2,
   Code,
   Diff,
   Eye,
   FileText,
   Globe,
-  GraduationCap,
   Hash,
   Image,
-  Landmark,
-  List,
+  Megaphone,
   Newspaper,
   Package,
   Rss,
   Search,
-  ShoppingCart,
+  Sparkles,
   Table,
-  Tag,
   Target,
   Type,
   type LucideIcon,
@@ -57,16 +53,13 @@ export const DEFAULT_MONITOR_CONFIG: Required<
   notificationFrequency: "INSTANT",
 };
 
+/** Soft organization tags for monitors (create + settings) */
 export const MONITOR_CATEGORIES = [
-  "E-commerce",
-  "Jobs & Careers",
-  "News & Media",
-  "Documentation",
-  "Pricing",
-  "Government",
-  "Education",
-  "Scholarships",
-  "Products",
+  "Website Monitoring",
+  "Competitor Intelligence",
+  "Developer Monitoring",
+  "SEO Monitoring",
+  "Business Monitoring",
   "Other",
 ] as const;
 
@@ -79,16 +72,48 @@ export interface CategoryDefinition {
 }
 
 export const MONITOR_CATEGORY_DEFS: CategoryDefinition[] = [
-  { id: "E-commerce", label: "E-commerce", description: "Prices, stock, and product pages", icon: ShoppingCart, accent: "emerald" },
-  { id: "Jobs & Careers", label: "Jobs & Careers", description: "Hiring pages and role listings", icon: Briefcase, accent: "blue" },
-  { id: "News & Media", label: "News & Media", description: "Headlines, articles, and feeds", icon: Newspaper, accent: "rose" },
-  { id: "Documentation", label: "Documentation", description: "Docs, APIs, and changelogs", icon: BookOpen, accent: "sky" },
-  { id: "Pricing", label: "Pricing", description: "Plans, tiers, and billing pages", icon: Tag, accent: "amber" },
-  { id: "Government", label: "Government", description: "Official portals and regulations", icon: Landmark, accent: "cyan" },
-  { id: "Education", label: "Education", description: "Courses, admissions, and programs", icon: Building2, accent: "violet" },
-  { id: "Scholarships", label: "Scholarships", description: "Grants, deadlines, and eligibility", icon: GraduationCap, accent: "emerald" },
-  { id: "Products", label: "Products", description: "SaaS, hardware, and launches", icon: Package, accent: "orange" },
-  { id: "Other", label: "Other", description: "General-purpose monitoring", icon: Globe, accent: "cyan" },
+  {
+    id: "Website Monitoring",
+    label: "Website Monitoring",
+    description: "Public pages, sections, text, images, and links",
+    icon: Globe,
+    accent: "cyan",
+  },
+  {
+    id: "Competitor Intelligence",
+    label: "Competitor Intelligence",
+    description: "Pricing, features, products, landers, announcements",
+    icon: Megaphone,
+    accent: "amber",
+  },
+  {
+    id: "Developer Monitoring",
+    label: "Developer Monitoring",
+    description: "Releases, docs, and API references",
+    icon: Code,
+    accent: "violet",
+  },
+  {
+    id: "SEO Monitoring",
+    label: "SEO Monitoring",
+    description: "Titles, meta, headings, and content",
+    icon: Sparkles,
+    accent: "sky",
+  },
+  {
+    id: "Business Monitoring",
+    label: "Business Monitoring",
+    description: "News, blogs, and public announcements",
+    icon: Newspaper,
+    accent: "rose",
+  },
+  {
+    id: "Other",
+    label: "Other",
+    description: "General-purpose monitoring",
+    icon: BookOpen,
+    accent: "blue",
+  },
 ];
 
 export interface ModeDefinition {
@@ -102,8 +127,15 @@ export interface ModeDefinition {
   recommended?: boolean;
   tooltip?: string;
   primary?: boolean;
+  /** When false, hide from create/settings pickers (existing monitors still work). */
+  selectable?: boolean;
 }
 
+/**
+ * Engine modes available in product UX.
+ * Marketplace / private-page oriented modes stay in the enum for existing monitors
+ * but are not selectable for new setups.
+ */
 export const MONITORING_MODES: ModeDefinition[] = [
   {
     mode: "ENTIRE_PAGE",
@@ -115,24 +147,8 @@ export const MONITORING_MODES: ModeDefinition[] = [
     primary: true,
   },
   {
-    mode: "VISUAL_CHANGES",
-    label: "Visual Changes Monitoring",
-    description: "Detect layout, design, and visual structure shifts.",
-    tooltip: "Best when appearance matters more than text.",
-    icon: Eye,
-    primary: true,
-  },
-  {
-    mode: "TEXT_CHANGES",
-    label: "Text Changes Monitoring",
-    description: "Focus on readable text updates and ignore most HTML noise.",
-    tooltip: "Ideal for articles, announcements, and copy changes.",
-    icon: Type,
-    primary: true,
-  },
-  {
     mode: "CSS_SELECTOR",
-    label: "Specific Element Monitoring",
+    label: "Specific Section Monitoring",
     description: "Watch one section or element using a CSS selector.",
     tooltip: "Requires a CSS selector for the exact element.",
     icon: Code,
@@ -140,28 +156,35 @@ export const MONITORING_MODES: ModeDefinition[] = [
     primary: true,
   },
   {
+    mode: "TEXT_CHANGES",
+    label: "Text Change Monitoring",
+    description: "Focus on readable text updates and ignore most HTML noise.",
+    tooltip: "Ideal for articles, announcements, and copy changes.",
+    icon: Type,
+    primary: true,
+  },
+  {
+    mode: "VISUAL_CHANGES",
+    label: "Image Change Monitoring",
+    description: "Detect layout, design, and visual / image shifts.",
+    tooltip: "Best when appearance or imagery matters more than text.",
+    icon: Eye,
+    primary: true,
+  },
+  {
     mode: "PRICE_DETECTION",
-    label: "Price Monitoring",
-    description: "Track price drops and increases on product pages.",
-    tooltip: "Best for product and pricing pages.",
+    label: "Pricing Page Monitoring",
+    description: "Track price and plan changes on public pricing pages.",
+    tooltip: "Best for competitor pricing pages — not marketplaces.",
     icon: Target,
     primary: true,
   },
   {
-    mode: "KEYWORD_DETECTION",
-    label: "Keyword Monitoring",
-    description: "Alert when specific keywords appear or disappear.",
-    tooltip: "Enter the words you want to watch for.",
-    icon: Hash,
-    requiresKeywords: true,
-    primary: true,
-  },
-  {
-    mode: "API_RESPONSE",
-    label: "API Monitoring",
-    description: "Monitor JSON or XML API endpoint responses.",
-    tooltip: "Point at an API URL to detect response changes.",
-    icon: Code,
+    mode: "DOCUMENTATION_CHANGES",
+    label: "Documentation Monitoring",
+    description: "Track docs, changelogs, and API reference pages.",
+    tooltip: "Ideal for developer documentation.",
+    icon: FileText,
     primary: true,
   },
   {
@@ -173,38 +196,106 @@ export const MONITORING_MODES: ModeDefinition[] = [
     requiresAiPrompt: true,
     primary: true,
   },
-  { mode: "XPATH", label: "XPath Selector", description: "Monitor a specific element by XPath", icon: Search, requiresSelector: true },
-  { mode: "TABLE_DETECTION", label: "Table Monitoring", description: "Track changes in HTML tables", icon: Table },
-  { mode: "PRODUCT_AVAILABILITY", label: "Product Availability", description: "Detect in-stock / out-of-stock changes", icon: Package },
-  { mode: "JOB_LISTINGS", label: "Job Listings", description: "Monitor career pages for new positions", icon: List },
-  { mode: "DOCUMENTATION_CHANGES", label: "Documentation Changes", description: "Track docs, changelogs, and guides", icon: FileText },
-  { mode: "RSS_FEED", label: "RSS Feed", description: "Track new items in RSS/Atom feeds", icon: Rss },
-  { mode: "HTML_DIFF", label: "HTML Diff", description: "Precise HTML structure comparison", icon: Diff },
-  { mode: "SCREENSHOT_DIFF", label: "Screenshot Diff", description: "Visual pixel-level comparison", icon: Image },
+  {
+    mode: "KEYWORD_DETECTION",
+    label: "Keyword Monitoring",
+    description: "Alert when specific keywords appear or disappear.",
+    tooltip: "Enter the words you want to watch for.",
+    icon: Hash,
+    requiresKeywords: true,
+  },
+  {
+    mode: "API_RESPONSE",
+    label: "API Monitoring",
+    description: "Monitor JSON or XML API endpoint responses.",
+    tooltip: "Point at a public API URL to detect response changes.",
+    icon: Code,
+  },
+  {
+    mode: "RSS_FEED",
+    label: "RSS Feed",
+    description: "Track new items in RSS/Atom feeds.",
+    icon: Rss,
+  },
+  {
+    mode: "XPATH",
+    label: "XPath Selector",
+    description: "Monitor a specific element by XPath.",
+    icon: Search,
+    requiresSelector: true,
+  },
+  {
+    mode: "TABLE_DETECTION",
+    label: "Table Monitoring",
+    description: "Track changes in HTML tables.",
+    icon: Table,
+  },
+  {
+    mode: "HTML_DIFF",
+    label: "HTML Diff",
+    description: "Precise HTML structure comparison.",
+    icon: Diff,
+  },
+  {
+    mode: "SCREENSHOT_DIFF",
+    label: "Screenshot Diff",
+    description: "Visual pixel-level comparison.",
+    icon: Image,
+  },
+  // Kept for existing monitors only — not offered in create UX
+  {
+    mode: "PRODUCT_AVAILABILITY",
+    label: "Product Availability",
+    description: "Detect in-stock / out-of-stock changes (legacy).",
+    icon: Package,
+    selectable: false,
+  },
+  {
+    mode: "JOB_LISTINGS",
+    label: "Job Listings",
+    description: "Monitor career pages for new positions (legacy).",
+    icon: Briefcase,
+    selectable: false,
+  },
 ];
 
-export const CREATE_MONITORING_MODES: ModeDefinition[] = MONITORING_MODES.filter((m) => m.primary);
+export const CREATE_MONITORING_MODES: ModeDefinition[] = MONITORING_MODES.filter(
+  (m) => m.primary && m.selectable !== false
+);
 
 export const PRIMARY_MONITORING_MODES = CREATE_MONITORING_MODES;
-export const ADVANCED_MONITORING_MODES = MONITORING_MODES.filter((m) => !m.primary);
+export const ADVANCED_MONITORING_MODES = MONITORING_MODES.filter(
+  (m) => !m.primary && m.selectable !== false
+);
+
+/** Modes shown in settings pickers, plus current mode if legacy */
+export function getSelectableMonitoringModes(
+  currentMode?: MonitoringMode
+): ModeDefinition[] {
+  const selectable = MONITORING_MODES.filter((m) => m.selectable !== false);
+  if (currentMode && !selectable.some((m) => m.mode === currentMode)) {
+    const legacy = MONITORING_MODES.find((m) => m.mode === currentMode);
+    if (legacy) return [...selectable, legacy];
+  }
+  return selectable;
+}
 
 export const CREATE_AI_PROMPT_EXAMPLES = [
-  "Notify me only when the price drops below €700.",
-  "Ignore advertisements.",
-  "Ignore layout changes.",
-  "Notify only if scholarship information changes.",
-  "Notify when a new Frontend Developer job appears.",
-  "Notify when RTX 5090 becomes available.",
+  "Notify me only when pricing or plan names change.",
+  "Ignore advertisements and cookie banners.",
+  "Ignore layout and styling-only changes.",
+  "Notify when documentation or API examples change.",
+  "Notify when the page title or meta description changes.",
   "Notify only when important information changes.",
 ];
 
 export const AI_PROMPT_EXAMPLES = [
-  "Notify me only if the price drops below €700.",
-  "Notify when a new Frontend Developer job appears.",
+  "Notify me only when pricing or plan names change.",
+  "Notify when documentation pages are updated.",
   "Ignore layout changes.",
   "Ignore advertisements.",
-  "Only notify if scholarship information changes.",
-  "Notify when product becomes available.",
+  "Notify when the page title or headings change.",
+  "Notify only when important information changes.",
 ];
 
 export function parseMonitorConfig(raw: unknown): MonitorConfig {

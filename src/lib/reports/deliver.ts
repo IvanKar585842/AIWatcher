@@ -83,17 +83,21 @@ export async function deliverWeeklyReport(reportId: string): Promise<{
         report.executiveSummary.slice(0, 280),
       ].join("\n");
 
-      await sendTelegramNotification(report.user.telegramChatId, text, {
+      const sent = await sendTelegramNotification(report.user.telegramChatId, text, {
         parseMode: "HTML",
         replyMarkup: {
           inline_keyboard: [[{ text: "View report", url: reportUrl }]],
         },
       });
-      telegram = true;
-      await prisma.weeklyReport.update({
-        where: { id: reportId },
-        data: { telegramSentAt: new Date() },
-      });
+      if (!sent.ok) {
+        console.error("[weekly-report] telegram failed", sent.error);
+      } else {
+        telegram = true;
+        await prisma.weeklyReport.update({
+          where: { id: reportId },
+          data: { telegramSentAt: new Date() },
+        });
+      }
     } catch (err) {
       console.error("[weekly-report] telegram failed", err);
     }

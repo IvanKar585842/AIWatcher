@@ -93,6 +93,13 @@ export default function SettingsPage() {
     email?: string;
     telegramNotificationsEnabled?: boolean;
     emailNotificationsEnabled?: boolean;
+    botConfigured?: boolean;
+    webhookConfigured?: boolean;
+    publicAppUrlConfigured?: boolean;
+    botUsername?: string;
+    configError?: string | null;
+    userMessage?: string | null;
+    statusLabel?: string | null;
   } | null>(null);
   const [telegramLoading, setTelegramLoading] = useState(true);
   const [telegramError, setTelegramError] = useState(false);
@@ -139,6 +146,13 @@ export default function SettingsPage() {
       email?: string;
       telegramNotificationsEnabled?: boolean;
       emailNotificationsEnabled?: boolean;
+      botConfigured?: boolean;
+      webhookConfigured?: boolean;
+      publicAppUrlConfigured?: boolean;
+      botUsername?: string;
+      configError?: string | null;
+      userMessage?: string | null;
+      statusLabel?: string | null;
     };
 
     function applyTelegramData(data: TelegramStatus) {
@@ -183,6 +197,32 @@ export default function SettingsPage() {
               typeof raw.emailNotificationsEnabled === "boolean"
                 ? raw.emailNotificationsEnabled
                 : undefined,
+            botConfigured:
+              typeof raw.botConfigured === "boolean" ? raw.botConfigured : undefined,
+            webhookConfigured:
+              typeof raw.webhookConfigured === "boolean"
+                ? raw.webhookConfigured
+                : undefined,
+            publicAppUrlConfigured:
+              typeof raw.publicAppUrlConfigured === "boolean"
+                ? raw.publicAppUrlConfigured
+                : undefined,
+            botUsername:
+              typeof raw.botUsername === "string" ? raw.botUsername : undefined,
+            configError:
+              typeof raw.configError === "string"
+                ? raw.configError
+                : raw.configError === null
+                  ? null
+                  : undefined,
+            userMessage:
+              typeof raw.userMessage === "string"
+                ? raw.userMessage
+                : raw.userMessage === null
+                  ? null
+                  : undefined,
+            statusLabel:
+              typeof raw.statusLabel === "string" ? raw.statusLabel : undefined,
           });
         });
     }
@@ -476,22 +516,24 @@ export default function SettingsPage() {
                     <Loader2 className="h-4 w-4 animate-spin text-cyan-400" />
                   ) : telegram?.linked || telegram?.connected ? (
                     <Badge className="border-emerald-500/30 bg-emerald-500/10 text-emerald-300">
-                      ✓ Connected
+                      ✅ Telegram Connected
                     </Badge>
                   ) : (
                     <Badge className="border-zinc-500/30 bg-zinc-500/10 text-zinc-400">
-                      Not connected
+                      Not Connected
                     </Badge>
                   )}
                 </div>
                 {(telegram?.linked || telegram?.connected) && telegram.telegramUsername ? (
                   <p className="mb-3 text-xs text-zinc-500">@{telegram.telegramUsername}</p>
                 ) : (
-                  <p className="mb-3 text-xs text-zinc-500">WatchFlowAlertsBot</p>
+                  <p className="mb-3 text-xs text-zinc-500">
+                    {telegram?.botUsername || "WatchFlowAlertsBot"}
+                  </p>
                 )}
                 <SettingRow
                   title="Telegram notifications"
-                  description="Instant alerts through Telegram"
+                  description="Instant alerts through Telegram when monitors detect changes"
                 >
                   <Switch
                     checked={settings.telegramNotifications}
@@ -502,36 +544,52 @@ export default function SettingsPage() {
                 </SettingRow>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {telegramLoading ? null : telegramError ? (
-                    <p className="text-sm text-red-400">Failed to load Telegram settings.</p>
-                  ) : telegram?.linked || telegram?.connected ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={unlinkTelegram}
-                      disabled={unlinking}
-                      className="rounded-full border-white/[0.08] bg-transparent text-zinc-400 hover:text-red-300"
-                    >
-                      {unlinking ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <Unlink className="mr-2 h-4 w-4" />
-                      )}
-                      Disconnect Telegram
-                    </Button>
-                  ) : telegram?.linkUrl ? (
-                    <a href={telegram.linkUrl} target="_blank" rel="noopener noreferrer">
-                      <Button
-                        size="sm"
-                        className="rounded-full bg-cyan-500 text-black hover:bg-cyan-400"
-                      >
-                        <ExternalLink className="mr-2 h-4 w-4" />
-                        Connect Telegram
-                      </Button>
-                    </a>
-                  ) : (
-                    <p className="text-sm text-amber-400/90">
-                      Telegram linking is not configured on this server.
+                    <p className="text-sm text-red-400">
+                      Unable to load Telegram settings. Please try again.
                     </p>
+                  ) : telegram?.linked || telegram?.connected ? (
+                    <div className="w-full space-y-2">
+                      <p className="text-sm text-emerald-300/90">✅ Telegram Connected</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={unlinkTelegram}
+                        disabled={unlinking}
+                        className="rounded-full border-white/[0.08] bg-transparent text-zinc-400 hover:text-red-300"
+                      >
+                        {unlinking ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Unlink className="mr-2 h-4 w-4" />
+                        )}
+                        Disconnect
+                      </Button>
+                    </div>
+                  ) : telegram?.botConfigured === false || !telegram?.linkUrl ? (
+                    <p className="text-sm text-amber-400/90">
+                      {telegram?.userMessage ||
+                        telegram?.configError ||
+                        "Telegram bot is not configured"}
+                    </p>
+                  ) : (
+                    <div className="w-full space-y-2">
+                      <a href={telegram.linkUrl!} target="_blank" rel="noopener noreferrer">
+                        <Button
+                          size="sm"
+                          className="rounded-full bg-cyan-500 text-black hover:bg-cyan-400"
+                        >
+                          <ExternalLink className="mr-2 h-4 w-4" />
+                          Connect Telegram
+                        </Button>
+                      </a>
+                      <p className="text-xs text-zinc-500">
+                        {telegram.webhookConfigured === false
+                          ? "Telegram webhook is not configured — ask an admin to finish webhook setup."
+                          : telegram.publicAppUrlConfigured === false
+                            ? "Webhook needs a public HTTPS URL (https://watchflowing.com)."
+                            : "Open the bot and press /start to finish connecting."}
+                      </p>
+                    </div>
                   )}
                 </div>
               </div>
@@ -636,7 +694,11 @@ export default function SettingsPage() {
                   <SelectValue />
                 </OsSelectTrigger>
                 <SelectContent>
-                  {Object.entries(MODE_LABELS).map(([value, label]) => (
+                  {Object.entries(MODE_LABELS)
+                    .filter(([value]) =>
+                      value !== "PRODUCT_AVAILABILITY" && value !== "JOB_LISTINGS"
+                    )
+                    .map(([value, label]) => (
                     <SelectItem key={value} value={value}>
                       {label}
                     </SelectItem>

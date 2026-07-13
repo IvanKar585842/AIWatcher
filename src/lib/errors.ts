@@ -1,3 +1,5 @@
+import { classifyMonitoringError } from "@/lib/monitoring/error-messages";
+
 export class UnauthorizedError extends Error {
   constructor(message = "Unauthorized") {
     super(message);
@@ -34,6 +36,28 @@ export function safeClientErrorMessage(
   }
   if (error instanceof Error) {
     const msg = error.message;
+    // Never leak stacks / Prisma / JSON blobs to clients
+    if (
+      msg.includes("\n") ||
+      msg.includes("Prisma") ||
+      msg.includes("ECONNREFUSED") ||
+      msg.trim().startsWith("{") ||
+      msg.trim().startsWith("[") ||
+      /at\s+\S+\s+\(/.test(msg)
+    ) {
+      return fallback;
+    }
+    // Monitoring HTTP / fetch failures → product copy
+    if (
+      /\bHTTP\s+\d{3}\b/i.test(msg) ||
+      /loading page/i.test(msg) ||
+      /selector not found/i.test(msg) ||
+      /robots\.txt/i.test(msg) ||
+      /navigation returned no response/i.test(msg) ||
+      /timed?\s*out/i.test(msg)
+    ) {
+      return classifyMonitoringError(msg).title;
+    }
     // Allow known user-facing validation / URL policy messages only
     if (
       msg.startsWith("Invalid") ||

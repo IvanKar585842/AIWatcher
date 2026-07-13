@@ -634,12 +634,11 @@ async function sendNotifications(
     monitor.user.emailNotificationsEnabled !== false &&
     (monitor.notificationMethod === NotificationMethod.EMAIL ||
       monitor.notificationMethod === NotificationMethod.BOTH);
+  // If Telegram is connected + enabled, always send alerts (even when monitor defaults to EMAIL).
   const wantsTelegram =
-    monitor.user.telegramConnected === true &&
-    monitor.user.telegramNotificationsEnabled !== false &&
     Boolean(monitor.user.telegramChatId) &&
-    (monitor.notificationMethod === NotificationMethod.TELEGRAM ||
-      monitor.notificationMethod === NotificationMethod.BOTH);
+    monitor.user.telegramConnected === true &&
+    monitor.user.telegramNotificationsEnabled !== false;
 
   if (!emailAllowed && (monitor.notificationMethod === NotificationMethod.EMAIL ||
       monitor.notificationMethod === NotificationMethod.BOTH)) {
@@ -759,7 +758,7 @@ async function sendNotifications(
           });
 
           if (!result.ok) {
-            throw new Error(result.error);
+            throw new Error(result.error || "Unable to send Telegram notification");
           }
 
           await recordAlertDelivery(monitor.userId, changeId, NotificationChannel.TELEGRAM, "SENT");
@@ -769,18 +768,21 @@ async function sendNotifications(
             metadata: { changeId },
           });
         } catch (err) {
+          const errMsg =
+            err instanceof Error ? err.message : "Unable to send Telegram notification";
           await recordAlertDelivery(
             monitor.userId,
             changeId,
             NotificationChannel.TELEGRAM,
             "FAILED",
-            err instanceof Error ? err.message : "Send failed"
+            errMsg
           );
           securityLog({
             type: "failsafe.activated",
             message: "Telegram send failed — logged and continued",
             userId: monitor.userId,
             resourceId: changeId,
+            metadata: { error: errMsg },
           });
         }
       })()

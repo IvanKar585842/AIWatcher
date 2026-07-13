@@ -87,7 +87,7 @@ function buildPrefill(intent: OnboardingIntent): MonitorPrefill {
       return {
         ...base,
         name: "Competitor website",
-        category: "Other",
+        category: "Competitor Intelligence",
         description: "Track competitor page changes",
         mode: MonitoringMode.ENTIRE_PAGE,
       };
@@ -95,16 +95,16 @@ function buildPrefill(intent: OnboardingIntent): MonitorPrefill {
       return {
         ...base,
         name: "Important page",
-        category: "Other",
+        category: "Website Monitoring",
         description: "Watch a critical page for updates",
         mode: MonitoringMode.TEXT_CHANGES,
       };
     case "price-changes":
       return {
         ...base,
-        name: "Price tracker",
-        category: "Pricing",
-        description: "Alert me when the price changes",
+        name: "Competitor pricing",
+        category: "Competitor Intelligence",
+        description: "Alert me when competitor pricing changes",
         mode: MonitoringMode.PRICE_DETECTION,
       };
     case "my-website":
@@ -112,7 +112,7 @@ function buildPrefill(intent: OnboardingIntent): MonitorPrefill {
       return {
         ...base,
         name: "My website",
-        category: "Other",
+        category: "Website Monitoring",
         description: "Monitor my website for important changes",
         mode: MonitoringMode.ENTIRE_PAGE,
       };

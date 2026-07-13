@@ -154,6 +154,7 @@ model User {
   @@index([role])
   @@index([username])
   @@index([referralCode])
+  @@index([telegramChatId])
 }
 
 model Subscription {

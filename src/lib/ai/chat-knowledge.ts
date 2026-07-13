@@ -118,7 +118,7 @@ const KNOWLEDGE_CHUNKS: KnowledgeChunk[] = [
       "не работ",
       "почему",
     ],
-    content: `Troubleshooting: No notification — check History for change; monitor paused/ERROR; spam folder; Telegram linked (Pro); notification method. Monitor ERROR — robots.txt (disable for visual modes); invalid selector; run playwright:install locally. Facebook/social — use Visual Changes. AI pending — needs OPENAI/GEMINI key; fallback summary still works.`,
+    content: `Troubleshooting: No notification — check History for change; monitor paused/ERROR; spam folder; Telegram linked (Pro); notification method. Monitor ERROR — robots.txt (try Visual/Image mode or disable respect robots if allowed); invalid selector; run playwright:install locally. Marketplaces (Amazon/eBay) and social networks (Instagram, TikTok, Facebook, X) often block automation — prefer public product/docs/marketing pages. AI pending — needs OPENAI/GEMINI key; fallback summary still works.`,
   },
   {
     id: "detection",

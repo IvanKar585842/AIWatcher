@@ -2,8 +2,22 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
-import { CommandCenter } from "@/components/dashboard/command/command-center";
 import { Skeleton } from "@/components/ui/skeleton";
+
+const CommandCenter = dynamic(
+  () =>
+    import("@/components/dashboard/command/command-center").then(
+      (m) => m.CommandCenter
+    ),
+  {
+    loading: () => (
+      <div className="space-y-4 p-1">
+        <Skeleton className="h-28 w-full rounded-2xl bg-white/[0.04]" />
+        <Skeleton className="min-h-[320px] w-full rounded-2xl bg-white/[0.04]" />
+      </div>
+    ),
+  }
+);
 
 const MonitorList = dynamic(
   () => import("@/components/dashboard/monitor-list").then((m) => m.MonitorList),

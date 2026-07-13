@@ -23,6 +23,7 @@ import {
   releaseCheckSlot,
   releaseMonitorLock,
 } from "./lock";
+import { classifyMonitoringError, serializeMonitorError } from "./error-messages";
 import { monitorLog, monitorLogError } from "./logger";
 import {
   claimDueMonitors,
@@ -492,7 +493,11 @@ async function processMonitorInternal(monitorId: string): Promise<ProcessMonitor
 
     return { status: "change_detected", changeId: change.id };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const classified = classifyMonitoringError(error);
+    const errorMessage = serializeMonitorError(classified);
+    const technical =
+      classified.technical ??
+      (error instanceof Error ? error.message : "Unknown error");
     const errorCount = monitor.errorCount + 1;
     const retryAt = computeNextCheckAt(monitor.interval);
 
@@ -500,7 +505,14 @@ async function processMonitorInternal(monitorId: string): Promise<ProcessMonitor
       monitorId,
       url: monitor.url,
       mode: monitor.mode,
-      data: { errorCount, maxRetries, willDisable: errorCount >= maxRetries },
+      data: {
+        errorCount,
+        maxRetries,
+        willDisable: errorCount >= maxRetries,
+        kind: classified.kind,
+        title: classified.title,
+        technical,
+      },
     });
 
     await prisma.monitor.update({
@@ -520,7 +532,12 @@ async function processMonitorInternal(monitorId: string): Promise<ProcessMonitor
       step: "database_updated",
       monitorId,
       message: "Error state persisted",
-      data: { errorCount, errorMessage, nextCheckAt: retryAt.toISOString() },
+      data: {
+        errorCount,
+        kind: classified.kind,
+        title: classified.title,
+        nextCheckAt: retryAt.toISOString(),
+      },
     });
 
     await trackEvent({
@@ -529,7 +546,8 @@ async function processMonitorInternal(monitorId: string): Promise<ProcessMonitor
       metadata: {
         monitorId,
         errorCount,
-        message: errorMessage.slice(0, 200),
+        kind: classified.kind,
+        message: classified.title.slice(0, 200),
       },
     });
 

@@ -21,6 +21,7 @@ import {
   Send,
   Trash2,
 } from "lucide-react";
+import { MonitorErrorBanner } from "@/components/dashboard/monitor-error-banner";
 import type { MonitoringInterval, MonitoringMode, NotificationMethod, Plan } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -43,14 +44,14 @@ import {
 } from "@/lib/constants";
 import {
   AI_PROMPT_EXAMPLES,
-  ADVANCED_MONITORING_MODES,
   DEFAULT_MONITOR_CONFIG,
+  getSelectableMonitoringModes,
   MONITOR_CATEGORIES,
-  PRIMARY_MONITORING_MODES,
   MONITORING_MODES,
   parseMonitorConfig,
   type MonitorConfig,
 } from "@/lib/monitor-config";
+import { getProtectedSiteWarning } from "@/lib/monitor-types";
 import { cn, formatRelativeTime, getDomainFromUrl, getFaviconUrl } from "@/lib/utils";
 
 interface MonitorChange {
@@ -283,6 +284,24 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
     [form.mode]
   );
 
+  const selectableModes = useMemo(
+    () => getSelectableMonitoringModes(form.mode),
+    [form.mode]
+  );
+  const primaryModes = useMemo(
+    () => selectableModes.filter((m) => m.primary),
+    [selectableModes]
+  );
+  const advancedModes = useMemo(
+    () => selectableModes.filter((m) => !m.primary),
+    [selectableModes]
+  );
+
+  const protectedUrlWarning = useMemo(
+    () => getProtectedSiteWarning(form.url),
+    [form.url]
+  );
+
   const allowedIntervals = useMemo(() => getAllowedIntervals(plan), [plan]);
 
   function toggleSection(key: keyof typeof openSections) {
@@ -473,10 +492,12 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
       </motion.div>
 
       {monitor.errorMessage && (
-        <div className="flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          {monitor.errorMessage}
-        </div>
+        <MonitorErrorBanner
+          errorMessage={monitor.errorMessage}
+          monitorId={monitorId}
+          onRetry={checkNow}
+          retrying={checking}
+        />
       )}
 
       {isArchived && (
@@ -503,6 +524,12 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
             <div className="sm:col-span-2">
               <FieldLabel>Website URL</FieldLabel>
               <OsInput value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} />
+              {protectedUrlWarning && (
+                <div className="mt-2 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/[0.08] px-3 py-2 text-xs leading-relaxed text-amber-100/90">
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-300" />
+                  <p>{protectedUrlWarning}</p>
+                </div>
+              )}
             </div>
             <div>
               <FieldLabel>Monitoring Type</FieldLabel>
@@ -514,10 +541,11 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {MONITORING_MODES.map((modeDef) => (
+                  {selectableModes.map((modeDef) => (
                     <SelectItem key={modeDef.mode} value={modeDef.mode}>
                       {modeDef.label}
                       {modeDef.recommended ? " · Recommended" : ""}
+                      {modeDef.selectable === false ? " · Legacy" : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -553,6 +581,10 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
                       {cat}
                     </SelectItem>
                   ))}
+                  {form.category &&
+                    !(MONITOR_CATEGORIES as readonly string[]).includes(form.category) && (
+                      <SelectItem value={form.category}>{form.category} (legacy)</SelectItem>
+                    )}
                 </SelectContent>
               </Select>
             </div>
@@ -595,7 +627,7 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
           accent="from-violet-500/10 to-cyan-500/5"
         >
           <div className="grid gap-2 sm:grid-cols-2">
-            {PRIMARY_MONITORING_MODES.map((modeDef) => {
+            {primaryModes.map((modeDef) => {
               const Icon = modeDef.icon;
               const active = form.mode === modeDef.mode;
               return (
@@ -650,7 +682,7 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
           >
             <span>{showAdvancedModes ? "Hide advanced modes" : "Show advanced modes"}</span>
             <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-600">
-              {ADVANCED_MONITORING_MODES.length} more
+              {advancedModes.length} more
             </span>
           </button>
 
@@ -663,7 +695,7 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
                 className="overflow-hidden"
               >
                 <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {ADVANCED_MONITORING_MODES.map((modeDef) => {
+                  {advancedModes.map((modeDef) => {
                     const Icon = modeDef.icon;
                     const active = form.mode === modeDef.mode;
                     return (
@@ -866,7 +898,7 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
               label="Follow website access rules"
               description={
                 form.mode === "VISUAL_CHANGES" || form.mode === "SCREENSHOT_DIFF"
-                  ? "Usually leave off for visual checks on social sites"
+                  ? "Usually leave off for visual / image checks"
                   : "Leave on unless the site blocks monitoring"
               }
               checked={form.respectRobots}
