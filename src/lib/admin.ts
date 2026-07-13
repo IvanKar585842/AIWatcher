@@ -10,7 +10,7 @@ const DEV_FALLBACK_ADMIN_EMAILS = ["karpenkoivanb@gmail.com"];
 export type AdminUserLike = {
   email: string;
   role?: string | null;
-  subscription?: { plan: Plan } | null;
+  subscription?: { plan: Plan; status?: string | null } | null;
   referralProUntil?: Date | string | null;
   referralBonusMonitors?: number | null;
 };
@@ -44,9 +44,20 @@ export function isAdminUser(user: AdminUserLike | null | undefined): boolean {
   return isAdminEmail(user.email);
 }
 
+const PAID_ACCESS_STATUSES = new Set(["active", "trialing", "past_due"]);
+
 export function getEffectivePlan(user: AdminUserLike): Plan {
   if (isAdminUser(user)) return Plan.BUSINESS;
-  const base = user.subscription?.plan ?? Plan.FREE;
+
+  const sub = user.subscription;
+  const status = (sub?.status ?? "active").toLowerCase();
+  const storedPlan = sub?.plan ?? Plan.FREE;
+  // Only grant paid plan when Stripe status is valid (webhook is source of truth)
+  const base =
+    storedPlan !== Plan.FREE && PAID_ACCESS_STATUSES.has(status)
+      ? storedPlan
+      : Plan.FREE;
+
   if (base !== Plan.FREE) return base;
   const until = user.referralProUntil ? new Date(user.referralProUntil) : null;
   if (until && until.getTime() > Date.now()) return Plan.PRO;

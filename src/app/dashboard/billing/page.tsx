@@ -12,6 +12,8 @@ import { PRICING_PLANS } from "@/lib/constants";
 import { fetchApi } from "@/lib/fetch-api";
 import { cn } from "@/lib/utils";
 
+type DisplayStatus = "Active" | "Cancelled" | "Expired" | "Past due" | "Inactive";
+
 interface BillingOverview {
   plan: "FREE" | "PRO" | "BUSINESS";
   limits: { maxMonitors: number | null; aiSummaries: boolean; telegram: boolean };
@@ -32,8 +34,11 @@ interface BillingOverview {
   };
   subscription?: {
     status: string;
+    displayStatus?: DisplayStatus;
     renewalDate: string | null;
+    subscriptionEndsAt?: string | null;
     cancelAtPeriodEnd: boolean;
+    canManageBilling?: boolean;
   } | null;
   activeFeatures?: Array<{ name: string; label: string }>;
   comparison?: Array<{
@@ -46,6 +51,21 @@ interface BillingOverview {
     historyDays: number | null;
     chatDailyMessages: number;
   };
+}
+
+function statusBadgeClass(status: DisplayStatus): string {
+  switch (status) {
+    case "Active":
+      return "border-emerald-400/30 bg-emerald-500/15 text-emerald-200";
+    case "Cancelled":
+      return "border-amber-400/30 bg-amber-500/15 text-amber-100";
+    case "Past due":
+      return "border-orange-400/30 bg-orange-500/15 text-orange-100";
+    case "Expired":
+      return "border-zinc-500/30 bg-zinc-500/15 text-zinc-300";
+    default:
+      return "border-white/10 bg-white/[0.04] text-zinc-400";
+  }
 }
 
 export default function BillingPage() {
@@ -71,9 +91,14 @@ export default function BillingPage() {
 
     if (success === "true") {
       toast("Payment successful — your plan will update in a moment.", "success");
-      fetchApi<BillingOverview>("/api/billing/overview").then((result) => {
-        if (result.success) setOverview(result.data);
-      });
+      // Poll briefly for webhook to land
+      const refresh = () =>
+        fetchApi<BillingOverview>("/api/billing/overview").then((result) => {
+          if (result.success) setOverview(result.data);
+        });
+      refresh();
+      setTimeout(refresh, 2000);
+      setTimeout(refresh, 5000);
     } else if (canceled === "true") {
       toast("Checkout canceled. No charge was made.", "error");
     }
@@ -81,7 +106,6 @@ export default function BillingPage() {
     router.replace("/dashboard/billing");
   }, [searchParams, router, toast]);
 
-  // Pricing page deep-link: /dashboard/billing?plan=PRO
   useEffect(() => {
     const planIntent = searchParams.get("plan");
     if (planIntent !== "PRO" && planIntent !== "BUSINESS") return;
@@ -107,7 +131,7 @@ export default function BillingPage() {
 
     setLoading(plan);
     try {
-      const res = await fetch("/api/billing/checkout", {
+      const res = await fetch("/api/stripe/create-checkout-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan }),
@@ -128,7 +152,9 @@ export default function BillingPage() {
   async function openPortal() {
     setPortalLoading(true);
     try {
-      const res = await fetch("/api/billing/checkout");
+      const res = await fetch("/api/stripe/create-portal-session", {
+        method: "POST",
+      });
       const data = await res.json();
       if (data.url) {
         window.location.href = data.url;
@@ -144,6 +170,14 @@ export default function BillingPage() {
 
   const currentPlan = overview?.plan ?? "FREE";
   const paymentsReady = overview?.payments?.checkoutReady ?? false;
+  const displayStatus: DisplayStatus =
+    overview?.subscription?.displayStatus ??
+    (currentPlan === "FREE" ? "Inactive" : "Active");
+  const canManage =
+    overview?.subscription?.canManageBilling ?? currentPlan !== "FREE";
+  const endsAt =
+    overview?.subscription?.subscriptionEndsAt ?? overview?.subscription?.renewalDate;
+
   const planCopy =
     currentPlan === "FREE"
       ? "You're exploring WatchFlowing. Upgrade when you want AI clarity, faster checks, and richer alerts."
@@ -161,7 +195,7 @@ export default function BillingPage() {
         <Button
           variant="outline"
           onClick={openPortal}
-          disabled={portalLoading || currentPlan === "FREE"}
+          disabled={portalLoading || !canManage || !paymentsReady}
           className="rounded-full border-white/[0.08] bg-white/[0.02] text-zinc-300 hover:border-cyan-500/30 hover:bg-cyan-500/10 hover:text-cyan-100"
         >
           {portalLoading ? (
@@ -169,7 +203,7 @@ export default function BillingPage() {
           ) : (
             <ExternalLink className="mr-2 h-4 w-4" />
           )}
-          Manage billing
+          Manage subscription
         </Button>
       </CommandPageHeader>
 
@@ -245,21 +279,57 @@ export default function BillingPage() {
               <p className="font-mono text-[10px] uppercase tracking-widest text-zinc-500">
                 Current plan
               </p>
-              <p className="text-2xl font-semibold text-zinc-100">{currentPlan}</p>
+              <p className="text-2xl font-semibold text-zinc-100">
+                {currentPlan === "FREE"
+                  ? "Free"
+                  : currentPlan === "PRO"
+                    ? "Pro"
+                    : "Business"}
+              </p>
             </div>
           </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <span
+              className={cn(
+                "rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider",
+                statusBadgeClass(displayStatus)
+              )}
+            >
+              {displayStatus}
+            </span>
+            {overview?.subscription?.status && currentPlan !== "FREE" && (
+              <span className="font-mono text-[10px] text-zinc-600">
+                Stripe: {overview.subscription.status}
+              </span>
+            )}
+          </div>
+
           <p className="mt-4 text-sm leading-relaxed text-zinc-500">{planCopy}</p>
 
-          {overview?.subscription?.renewalDate && currentPlan !== "FREE" && (
+          {endsAt && currentPlan !== "FREE" && (
             <p className="mt-3 text-xs text-zinc-600">
-              {overview.subscription.cancelAtPeriodEnd
-                ? "Cancels on "
+              {overview?.subscription?.cancelAtPeriodEnd || displayStatus === "Cancelled"
+                ? "Access until "
                 : "Renews on "}
-              {new Date(overview.subscription.renewalDate).toLocaleDateString()}
-              {overview.subscription.status
-                ? ` · Status: ${overview.subscription.status}`
-                : ""}
+              {new Date(endsAt).toLocaleDateString()}
             </p>
+          )}
+
+          {canManage && paymentsReady && (
+            <Button
+              variant="outline"
+              onClick={openPortal}
+              disabled={portalLoading}
+              className="mt-5 w-full rounded-full border-white/[0.08] bg-white/[0.02] text-zinc-300"
+            >
+              {portalLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <ExternalLink className="mr-2 h-4 w-4" />
+              )}
+              Manage subscription
+            </Button>
           )}
 
           {overview?.activeFeatures && overview.activeFeatures.length > 0 && (
@@ -290,6 +360,7 @@ export default function BillingPage() {
           {PRICING_PLANS.map((plan, i) => {
             const isCurrent = plan.plan === currentPlan;
             const isPopular = plan.popular;
+            const isPaid = plan.id !== "free";
 
             return (
               <motion.div
@@ -334,7 +405,7 @@ export default function BillingPage() {
                   ))}
                 </ul>
 
-                {plan.id !== "free" && (
+                {isPaid && (
                   <Button
                     className={cn(
                       "mt-6 w-full rounded-full",
@@ -342,15 +413,23 @@ export default function BillingPage() {
                         ? "border border-cyan-400/30 bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/15"
                         : "bg-cyan-500 text-black hover:bg-cyan-400"
                     )}
-                    onClick={() => handleUpgrade(plan.plan as "PRO" | "BUSINESS")}
-                    disabled={loading === plan.plan || isCurrent || !paymentsReady}
+                    onClick={() =>
+                      isCurrent && canManage
+                        ? openPortal()
+                        : handleUpgrade(plan.plan as "PRO" | "BUSINESS")
+                    }
+                    disabled={
+                      loading === plan.plan ||
+                      (!paymentsReady && !isCurrent) ||
+                      (isCurrent && !canManage)
+                    }
                     variant={isCurrent ? "outline" : "default"}
                   >
                     {loading === plan.plan && (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     )}
                     {isCurrent
-                      ? "Active plan"
+                      ? "Manage subscription"
                       : !paymentsReady
                         ? "Payments soon"
                         : `Upgrade to ${plan.name}`}

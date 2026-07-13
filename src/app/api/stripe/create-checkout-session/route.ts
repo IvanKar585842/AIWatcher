@@ -10,17 +10,22 @@ import {
   createCheckoutSession,
   hasActiveStripeSubscription,
 } from "@/lib/stripe";
-import { isStripePaymentsEnabled, isStripeSecretConfigured } from "@/lib/stripe-config";
+import { isStripeSecretConfigured } from "@/lib/stripe-config";
 
 const checkoutSchema = z.object({
   plan: z.enum(["PRO", "BUSINESS"]),
 });
 
+/**
+ * POST /api/stripe/create-checkout-session
+ * Body: { plan: "PRO" | "BUSINESS" }
+ * Returns: { url } → Stripe Checkout
+ */
 export async function POST(request: NextRequest) {
   try {
     const user = await requireUser();
     return withRateLimit(
-      "billing-checkout",
+      "stripe-checkout",
       async () => {
         if (!isStripeSecretConfigured()) {
           return NextResponse.json(
@@ -43,6 +48,7 @@ export async function POST(request: NextRequest) {
           );
         }
 
+        // Existing subscribers change plans via Customer Portal (no fake plan upgrades)
         if (hasActiveStripeSubscription(user.subscription)) {
           const customerId = user.subscription?.stripeCustomerId;
           if (!customerId) {
@@ -83,49 +89,4 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     return apiErrorResponse(error);
   }
-}
-
-export async function GET() {
-  try {
-    const user = await requireUser();
-    return withRateLimit(
-      "billing-portal",
-      async () => {
-        if (!isStripeSecretConfigured()) {
-          return NextResponse.json(
-            {
-              success: false,
-              error: "Payments are not configured yet.",
-            },
-            { status: 503 }
-          );
-        }
-
-        const customerId = user.subscription?.stripeCustomerId;
-
-        if (!customerId) {
-          return NextResponse.json(
-            {
-              success: false,
-              error: "No billing account yet. Upgrade to a paid plan first.",
-            },
-            { status: 400 }
-          );
-        }
-
-        const session = await createBillingPortalSession(customerId);
-        return NextResponse.json({ success: true, url: session.url });
-      },
-      user.id
-    );
-  } catch (error) {
-    return apiErrorResponse(error);
-  }
-}
-
-/** Lightweight readiness probe used by billing UI. */
-export async function HEAD() {
-  return new NextResponse(null, {
-    status: isStripePaymentsEnabled() ? 204 : 503,
-  });
 }

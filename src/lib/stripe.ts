@@ -121,11 +121,43 @@ async function resolveUserIdFromSubscription(
   return existing?.userId ?? null;
 }
 
+/** Stripe statuses that keep paid entitlements. */
+const PAID_ACCESS_STATUSES = new Set([
+  "active",
+  "trialing",
+  "past_due",
+]);
+
+export function hasActiveStripeSubscription(
+  subscription:
+    | {
+        stripeSubscriptionId?: string | null;
+        status?: string | null;
+      }
+    | null
+    | undefined
+): boolean {
+  if (!subscription?.stripeSubscriptionId) return false;
+  return PAID_ACCESS_STATUSES.has((subscription.status ?? "").toLowerCase());
+}
+
 function planFromPriceId(priceId: string | undefined): Plan {
   if (!priceId) return Plan.FREE;
   if (priceId === getStripePriceId("PRO")) return Plan.PRO;
   if (priceId === getStripePriceId("BUSINESS")) return Plan.BUSINESS;
   return Plan.FREE;
+}
+
+/**
+ * Maps Stripe subscription → DB plan.
+ * Incomplete / unpaid / canceled never grant Pro/Business.
+ */
+export function planFromStripeSubscription(subscription: Stripe.Subscription): Plan {
+  if (!PAID_ACCESS_STATUSES.has(subscription.status)) {
+    return Plan.FREE;
+  }
+  const priceId = subscription.items.data[0]?.price.id;
+  return planFromPriceId(priceId);
 }
 
 export async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
@@ -136,7 +168,7 @@ export async function handleSubscriptionUpdate(subscription: Stripe.Subscription
   }
 
   const priceId = subscription.items.data[0]?.price.id;
-  const plan = planFromPriceId(priceId);
+  const plan = planFromStripeSubscription(subscription);
   const customerId =
     typeof subscription.customer === "string"
       ? subscription.customer

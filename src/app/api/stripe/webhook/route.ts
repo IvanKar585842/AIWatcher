@@ -7,7 +7,10 @@ import { processStripeEvent } from "@/lib/stripe-webhook";
 
 export const runtime = "nodejs";
 
-/** Legacy webhook path — prefer /api/stripe/webhook for new Stripe Dashboard configs. */
+/**
+ * Stripe webhook endpoint (canonical path).
+ * Verify signature → idempotent process → update Subscription via Stripe only.
+ */
 export async function POST(request: NextRequest) {
   const body = await request.text();
   const signature = (await headers()).get("stripe-signature");

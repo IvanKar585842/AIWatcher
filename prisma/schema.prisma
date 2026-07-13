@@ -157,6 +157,9 @@ model User {
   @@index([telegramChatId])
 }
 
+/// Stripe-backed subscription (1:1 with User).
+/// Maps to: subscriptionPlan=plan, subscriptionStatus=status,
+/// subscriptionEndsAt=currentPeriodEnd, plus stripeCustomerId / stripeSubscriptionId.
 model Subscription {
   id                   String    @id @default(cuid())
   userId               String    @unique
