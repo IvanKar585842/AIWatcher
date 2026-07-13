@@ -3,7 +3,6 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import { AlertTriangle } from "lucide-react";
 import { CommandCenterSkeleton } from "./dashboard-skeletons";
 import { MonitoringHealth } from "./monitoring-health";
@@ -23,6 +22,7 @@ const NetworkMap = dynamic(
 const IntelligenceCenter = dynamic(
   () => import("./intelligence-center").then((m) => m.IntelligenceCenter),
   {
+    ssr: false,
     loading: () => (
       <div className="min-h-[360px] animate-pulse rounded-2xl border border-white/[0.06] bg-white/[0.02]" />
     ),
@@ -87,6 +87,7 @@ const EMPTY_STATS: CommandStats = {
 export function CommandCenter() {
   const [stats, setStats] = useState<CommandStats>(EMPTY_STATS);
   const [loading, setLoading] = useState(true);
+  const [heavyReady, setHeavyReady] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -121,17 +122,50 @@ export function CommandCenter() {
     };
   }, [load]);
 
+  // Defer map + intelligence feed until after first paint / idle
+  useEffect(() => {
+    let idleId: number | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    const enable = () => setHeavyReady(true);
+
+    if ("requestIdleCallback" in window) {
+      idleId = window.requestIdleCallback(enable, { timeout: 1500 });
+    } else {
+      timeoutId = setTimeout(enable, 300);
+    }
+
+    return () => {
+      if (idleId !== undefined && "cancelIdleCallback" in window) {
+        window.cancelIdleCallback(idleId);
+      }
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, []);
+
+  // Paint heading immediately — cards fill after stats fetch
   if (loading) {
-    return <CommandCenterSkeleton />;
+    return (
+      <div className="mx-auto w-full max-w-full space-y-3 overflow-x-hidden p-3 sm:space-y-4 sm:p-4 lg:space-y-6 lg:p-6">
+        <div>
+          <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-cyan-500/60">
+            Command Center · Live
+          </p>
+          <h2 className="mt-1.5 text-lg font-semibold tracking-tight text-zinc-50 sm:text-xl">
+            WatchFlowing is watching your business
+          </h2>
+          <p className="mt-1 max-w-xl text-xs leading-relaxed text-zinc-500 sm:text-sm">
+            Loading monitors…
+          </p>
+        </div>
+        <CommandCenterSkeleton />
+      </div>
+    );
   }
 
   return (
     <div className="mx-auto w-full max-w-full space-y-3 overflow-x-hidden p-3 sm:space-y-4 sm:p-4 lg:space-y-6 lg:p-6">
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex flex-wrap items-end justify-between gap-3"
-      >
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <span className="relative flex h-2 w-2">
@@ -163,27 +197,25 @@ export function CommandCenter() {
             pausedCount={stats.pausedMonitors + stats.errorMonitors}
           />
         </div>
-      </motion.div>
+      </div>
 
       {stats.importantAlerts > 0 && (
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-          <Link
-            href="/dashboard/notifications"
-            className="flex min-h-12 items-center gap-3 rounded-xl border border-amber-400/25 bg-amber-500/[0.08] px-3 py-3 transition-colors hover:border-amber-400/40 sm:px-4"
-          >
-            <AlertTriangle className="h-5 w-5 shrink-0 text-amber-300" />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-amber-100">
-                {stats.importantAlerts} important alert
-                {stats.importantAlerts === 1 ? "" : "s"}
-              </p>
-              <p className="truncate text-xs text-amber-200/60">
-                Review high-priority detections
-              </p>
-            </div>
-            <span className="shrink-0 text-xs text-amber-300/80">View</span>
-          </Link>
-        </motion.div>
+        <Link
+          href="/dashboard/notifications"
+          className="flex min-h-12 items-center gap-3 rounded-xl border border-amber-400/25 bg-amber-500/[0.08] px-3 py-3 transition-colors hover:border-amber-400/40 sm:px-4"
+        >
+          <AlertTriangle className="h-5 w-5 shrink-0 text-amber-300" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-amber-100">
+              {stats.importantAlerts} important alert
+              {stats.importantAlerts === 1 ? "" : "s"}
+            </p>
+            <p className="truncate text-xs text-amber-200/60">
+              Review high-priority detections
+            </p>
+          </div>
+          <span className="shrink-0 text-xs text-amber-300/80">View</span>
+        </Link>
       )}
 
       <div className="hidden space-y-4 lg:block">
@@ -203,37 +235,31 @@ export function CommandCenter() {
         />
       </div>
 
-      {/*
-        Priority: 1 Map · 2 Intelligence Center · 3 Monitor list (below)
-        Equal-weight desktop columns — page scrolls, no nested sticky scroll.
-      */}
       <div className="grid grid-cols-1 items-stretch gap-3 lg:grid-cols-2 lg:gap-5">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.99 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.06 }}
-          className="order-2 min-w-0 lg:order-1"
-        >
-          <Suspense
-            fallback={
-              <div className="min-h-[420px] animate-pulse rounded-2xl border border-white/[0.06] bg-white/[0.02] lg:min-h-[640px]" />
-            }
-          >
-            <NetworkMap monitors={stats.monitors} />
-          </Suspense>
-        </motion.div>
+        <div className="order-2 min-w-0 lg:order-1">
+          {heavyReady ? (
+            <Suspense
+              fallback={
+                <div className="min-h-[420px] animate-pulse rounded-2xl border border-white/[0.06] bg-white/[0.02] lg:min-h-[640px]" />
+              }
+            >
+              <NetworkMap monitors={stats.monitors} />
+            </Suspense>
+          ) : (
+            <div className="min-h-[420px] animate-pulse rounded-2xl border border-white/[0.06] bg-white/[0.02] lg:min-h-[640px]" />
+          )}
+        </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="order-1 min-w-0 lg:order-2"
-        >
-          <IntelligenceCenter
-            changes={stats.recentChanges}
-            notifications={stats.recentNotifications}
-          />
-        </motion.div>
+        <div className="order-1 min-w-0 lg:order-2">
+          {heavyReady ? (
+            <IntelligenceCenter
+              changes={stats.recentChanges}
+              notifications={stats.recentNotifications}
+            />
+          ) : (
+            <div className="min-h-[360px] animate-pulse rounded-2xl border border-white/[0.06] bg-white/[0.02]" />
+          )}
+        </div>
       </div>
 
       <div className="lg:hidden">

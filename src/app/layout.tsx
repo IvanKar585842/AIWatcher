@@ -12,14 +12,16 @@ const syne = Syne({
   variable: "--font-syne",
   display: "swap",
   preload: true,
+  adjustFontFallback: true,
 });
 
 const mono = IBM_Plex_Mono({
   subsets: ["latin"],
-  weight: ["400", "500"],
+  weight: ["400"],
   variable: "--font-os-mono",
-  display: "swap",
+  display: "optional",
   preload: false,
+  adjustFontFallback: true,
 });
 
 export const metadata: Metadata = defaultMetadata;

@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useEffect, useRef, useState } from "react";
 
 function SectionSkeleton({ className = "min-h-[420px]" }: { className?: string }) {
   return <div className={`animate-pulse bg-white/[0.02] ${className}`} aria-hidden="true" />;
@@ -32,15 +33,42 @@ const OsFooter = dynamic(
   { loading: () => <SectionSkeleton className="min-h-[280px]" /> }
 );
 
-/** Below-fold marketing sections — code-split, client-only orchestration. */
+/** Below-fold sections load only when approaching the viewport. */
 export function LandingBelowFold() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          setVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "280px 0px" }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <>
-      <OsFeatures />
-      <OsDashboardShowcase />
-      <OsPricing />
-      <OsFaq />
-      <OsFooter />
-    </>
+    <div ref={ref}>
+      {visible ? (
+        <>
+          <OsFeatures />
+          <OsDashboardShowcase />
+          <OsPricing />
+          <OsFaq />
+          <OsFooter />
+        </>
+      ) : (
+        <SectionSkeleton className="min-h-[200px]" />
+      )}
+    </div>
   );
 }

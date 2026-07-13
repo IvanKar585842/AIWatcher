@@ -1,9 +1,10 @@
-"use client";
-
 import Link from "next/link";
 import Image from "next/image";
-import { AuthButtons } from "@/components/auth/clerk-wrappers";
 
+/**
+ * Server Component navbar — plain links avoid Clerk JS on the marketing LCP path.
+ * Auth modals remain on /sign-in and /sign-up.
+ */
 export function OsNavbar() {
   return (
     <header className="fixed top-0 z-50 w-full border-b border-white/[0.04] bg-[#090909]/80 backdrop-blur-xl">
@@ -16,6 +17,7 @@ export function OsNavbar() {
               width={32}
               height={32}
               className="h-8 w-8"
+              priority
             />
           </span>
           <span className="text-sm font-medium tracking-wide text-zinc-200">
@@ -41,10 +43,18 @@ export function OsNavbar() {
         </nav>
 
         <div className="flex items-center gap-2">
-          <AuthButtons
-            signInClassName="text-zinc-400 hover:text-zinc-200"
-            signUpClassName="rounded-full border border-cyan-400/30 bg-cyan-500/10 text-cyan-100 hover:border-cyan-300/50"
-          />
+          <Link
+            href="/sign-in"
+            className="inline-flex h-8 items-center rounded-md px-3 text-sm text-zinc-400 transition-colors hover:text-zinc-200"
+          >
+            Sign In
+          </Link>
+          <Link
+            href="/sign-up"
+            className="inline-flex h-8 items-center rounded-full border border-cyan-400/30 bg-cyan-500/10 px-3 text-sm text-cyan-100 transition-colors hover:border-cyan-300/50"
+          >
+            Get Started
+          </Link>
         </div>
       </div>
     </header>

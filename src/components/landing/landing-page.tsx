@@ -3,9 +3,34 @@ import { OsNavbar } from "@/components/landing/os/navbar";
 import { HeroVisualLoader } from "@/components/landing/os/hero-visual-loader";
 import { LandingBelowFold } from "@/components/landing/landing-below-fold";
 
+/** Static hero chrome in initial HTML so LCP is not delayed by client JS. */
+function HeroVisualShell() {
+  return (
+    <div
+      className="mx-auto aspect-[16/10] w-full max-w-5xl overflow-hidden rounded-2xl border border-white/[0.06] bg-gradient-to-b from-white/[0.04] to-transparent"
+      aria-hidden
+    >
+      <div className="flex h-10 items-center gap-2 border-b border-white/[0.05] px-4">
+        <span className="h-2 w-2 rounded-full bg-zinc-600" />
+        <span className="h-2 w-2 rounded-full bg-zinc-600" />
+        <span className="h-2 w-2 rounded-full bg-zinc-600" />
+        <span className="ml-3 h-2 w-32 rounded bg-zinc-700/80" />
+      </div>
+      <div className="grid h-[calc(100%-2.5rem)] grid-cols-3 gap-3 p-4">
+        <div className="col-span-2 rounded-xl bg-cyan-500/[0.04]" />
+        <div className="space-y-3">
+          <div className="h-1/3 rounded-xl bg-white/[0.03]" />
+          <div className="h-1/3 rounded-xl bg-white/[0.03]" />
+          <div className="h-1/3 rounded-xl bg-white/[0.03]" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Server Component landing shell.
- * H1 + primary CTA ship in the initial HTML (LCP).
+ * H1 + hero chrome ship in the initial HTML (LCP).
  * Heavy visuals and below-fold sections hydrate separately.
  */
 export function LandingPage() {
@@ -49,7 +74,7 @@ export function LandingPage() {
               </div>
             </div>
 
-            <HeroVisualLoader />
+            <HeroVisualLoader fallback={<HeroVisualShell />} />
           </div>
         </section>
 
