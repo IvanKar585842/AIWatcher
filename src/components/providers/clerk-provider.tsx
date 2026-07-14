@@ -18,6 +18,17 @@ function isMarketingPath(pathname: string | null) {
   return pathname.startsWith("/status/") || pathname.startsWith("/report/");
 }
 
+/** Routes that must not render without Clerk context (SignIn/SignUp/UserButton). */
+function requiresClerkContext(pathname: string | null) {
+  if (!pathname) return true;
+  return (
+    pathname.startsWith("/sign-in") ||
+    pathname.startsWith("/sign-up") ||
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/admin")
+  );
+}
+
 type ClerkProviderComponent = ComponentType<{
   children: ReactNode;
   appearance?: { variables?: Record<string, string> };
@@ -25,11 +36,12 @@ type ClerkProviderComponent = ComponentType<{
 
 /**
  * Truly code-splits @clerk/nextjs so marketing LCP is not blocked by Clerk parse/download.
- * App routes import Clerk immediately; marketing waits for idle after load.
+ * App/auth routes wait for ClerkProvider before rendering children that need its context.
  */
 export function ClerkThemeProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const marketing = isMarketingPath(pathname);
+  const needsClerk = requiresClerkContext(pathname);
   const [ClerkProvider, setClerkProvider] = useState<ClerkProviderComponent | null>(null);
 
   useEffect(() => {
@@ -40,12 +52,16 @@ export function ClerkThemeProvider({ children }: { children: React.ReactNode }) 
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
     const load = () => {
-      void import("@clerk/nextjs").then((mod) => {
-        if (!cancelled) setClerkProvider(() => mod.ClerkProvider);
-      });
+      void import("@clerk/nextjs")
+        .then((mod) => {
+          if (!cancelled) setClerkProvider(() => mod.ClerkProvider);
+        })
+        .catch(() => {
+          // Keep waiting UI — do not crash the tree
+        });
     };
 
-    if (!marketing) {
+    if (!marketing || needsClerk) {
       load();
       return () => {
         cancelled = true;
@@ -75,9 +91,24 @@ export function ClerkThemeProvider({ children }: { children: React.ReactNode }) 
       }
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [marketing]);
+  }, [marketing, needsClerk]);
 
-  if (!publishableKey || publishableKey.includes("placeholder") || !ClerkProvider) {
+  if (!publishableKey || publishableKey.includes("placeholder")) {
+    return <>{children}</>;
+  }
+
+  // Auth/app pages: never mount SignIn/dashboard without ClerkProvider (avoids client crash)
+  if (!ClerkProvider) {
+    if (needsClerk) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-[#090909]">
+          <div
+            className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-400/25 border-t-cyan-400"
+            aria-label="Loading"
+          />
+        </div>
+      );
+    }
     return <>{children}</>;
   }
 
