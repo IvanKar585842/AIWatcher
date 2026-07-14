@@ -7,13 +7,11 @@ import {
   Activity,
   Bell,
   Bot,
-  Clock,
   Copy,
   ExternalLink,
   Gift,
   HelpCircle,
   Loader2,
-  Lock,
   Monitor,
   Plug,
   Save,
@@ -85,6 +83,12 @@ function OsSelectTrigger({ className, ...props }: React.ComponentProps<typeof Se
 
 /** Set true to restore the Integrations settings section in the UI. */
 const SHOW_INTEGRATIONS_UI = false;
+
+/**
+ * Preferences that only write to localStorage and do not affect server behavior yet.
+ * Hidden until wiring exists — keep flags for easy restore.
+ */
+const SHOW_UNWIRED_PREFERENCE_UI = false;
 
 export default function SettingsPage() {
   const { user } = useUser();
@@ -346,7 +350,7 @@ export default function SettingsPage() {
     window.setTimeout(() => setReferralCopied(false), 2000);
   }
 
-  function updateSettings(patch: Partial<UserSettings>) {
+  function updateSettings(patch: Partial<UserSettings>, opts?: { toastLabel?: string }) {
     setSettings((prev) => {
       const next = { ...prev, ...patch };
       saveUserSettings(next);
@@ -368,24 +372,43 @@ export default function SettingsPage() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(serverPatch),
-      }).catch(() => {
-        /* keep local toggle; server sync best-effort */
-      });
+      })
+        .then(async (res) => {
+          if (!res.ok) throw new Error("sync failed");
+          toast(opts?.toastLabel ?? "Notification settings saved", "success");
+        })
+        .catch(() => {
+          toast("Could not sync notification settings to the server", "error");
+        });
+      return;
+    }
+
+    if (opts?.toastLabel) {
+      toast(opts.toastLabel, "success");
     }
   }
 
   async function unlinkTelegram() {
     setUnlinking(true);
-    await fetch("/api/telegram/link", { method: "DELETE" });
-    const data = await fetch("/api/telegram/link").then((r) => r.json());
-    setTelegram(data);
-    setUnlinking(false);
+    try {
+      await fetch("/api/telegram/link", { method: "DELETE" });
+      const data = await fetch("/api/telegram/link").then((r) => r.json());
+      setTelegram(data);
+      toast("Telegram disconnected", "success");
+    } catch {
+      toast("Could not disconnect Telegram", "error");
+    } finally {
+      setUnlinking(false);
+    }
   }
 
   function addTemplate() {
     const trimmed = newTemplate.trim();
     if (!trimmed || settings.aiPromptTemplates.includes(trimmed)) return;
-    updateSettings({ aiPromptTemplates: [...settings.aiPromptTemplates, trimmed] });
+    updateSettings(
+      { aiPromptTemplates: [...settings.aiPromptTemplates, trimmed] },
+      { toastLabel: "Template saved on this device" }
+    );
     setNewTemplate("");
   }
 
@@ -467,23 +490,9 @@ export default function SettingsPage() {
                 {user?.primaryEmailAddress?.emailAddress ?? "—"}
               </p>
             </div>
-            <SettingRow title="Compact dashboard layout" description="Reduce spacing in monitor grids">
-              <Switch
-                checked={settings.compactMode}
-                onCheckedChange={(v) => updateSettings({ compactMode: v })}
-                className="data-[state=checked]:bg-cyan-500"
-              />
-            </SettingRow>
-            <SettingRow
-              title="Usage analytics"
-              description="Help improve WatchFlowing with anonymous usage data"
-            >
-              <Switch
-                checked={settings.analyticsEnabled}
-                onCheckedChange={(v) => updateSettings({ analyticsEnabled: v })}
-                className="data-[state=checked]:bg-cyan-500"
-              />
-            </SettingRow>
+            <p className="text-xs text-zinc-500">
+              Name and email are managed through your account provider (Manage account below).
+            </p>
           </div>
         </OsExpandableSection>
 
@@ -653,13 +662,15 @@ export default function SettingsPage() {
               </div>
             )}
 
-            <SettingRow title="Instant alerts" description="Notify immediately on important changes">
-              <Switch
-                checked={settings.instantAlerts}
-                onCheckedChange={(v) => updateSettings({ instantAlerts: v })}
-                className="data-[state=checked]:bg-cyan-500"
-              />
-            </SettingRow>
+            {SHOW_UNWIRED_PREFERENCE_UI && (
+              <SettingRow title="Instant alerts" description="Notify immediately on important changes">
+                <Switch
+                  checked={settings.instantAlerts}
+                  onCheckedChange={(v) => updateSettings({ instantAlerts: v })}
+                  className="data-[state=checked]:bg-cyan-500"
+                />
+              </SettingRow>
+            )}
           </div>
         </OsExpandableSection>
         </div>
@@ -667,16 +678,22 @@ export default function SettingsPage() {
         {/* Monitoring preferences */}
         <OsExpandableSection
           title="Monitoring preferences"
-          subtitle="Defaults applied when creating new monitors"
+          subtitle="Defaults applied when you create a new monitor"
           icon={<Monitor className="h-5 w-5" />}
         >
           <div className="space-y-4">
+            <p className="text-xs text-zinc-500">
+              Saved for this browser and applied the next time you open Create Monitor.
+            </p>
             <div>
               <OsFieldLabel>Default interval</OsFieldLabel>
               <Select
                 value={settings.defaultInterval}
                 onValueChange={(v) =>
-                  updateSettings({ defaultInterval: v as MonitoringInterval })
+                  updateSettings(
+                    { defaultInterval: v as MonitoringInterval },
+                    { toastLabel: "Default interval saved" }
+                  )
                 }
               >
                 <OsSelectTrigger>
@@ -695,48 +712,59 @@ export default function SettingsPage() {
               <OsFieldLabel>Default monitoring mode</OsFieldLabel>
               <Select
                 value={settings.defaultMode}
-                onValueChange={(v) => updateSettings({ defaultMode: v as MonitoringMode })}
+                onValueChange={(v) =>
+                  updateSettings(
+                    { defaultMode: v as MonitoringMode },
+                    { toastLabel: "Default mode saved" }
+                  )
+                }
               >
                 <OsSelectTrigger>
                   <SelectValue />
                 </OsSelectTrigger>
                 <SelectContent>
                   {Object.entries(MODE_LABELS)
-                    .filter(([value]) =>
-                      value !== "PRODUCT_AVAILABILITY" && value !== "JOB_LISTINGS"
+                    .filter(
+                      ([value]) =>
+                        value !== "PRODUCT_AVAILABILITY" && value !== "JOB_LISTINGS"
                     )
                     .map(([value, label]) => (
-                    <SelectItem key={value} value={value}>
-                      {label}
-                    </SelectItem>
-                  ))}
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <OsFieldLabel>Timezone</OsFieldLabel>
-              <Select
-                value={settings.timezone}
-                onValueChange={(v) => updateSettings({ timezone: v })}
-              >
-                <OsSelectTrigger>
-                  <SelectValue />
-                </OsSelectTrigger>
-                <SelectContent>
-                  {TIMEZONE_OPTIONS.map((tz) => (
-                    <SelectItem key={tz} value={tz}>
-                      {tz}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {SHOW_UNWIRED_PREFERENCE_UI && (
+              <div>
+                <OsFieldLabel>Timezone</OsFieldLabel>
+                <Select
+                  value={settings.timezone}
+                  onValueChange={(v) => updateSettings({ timezone: v })}
+                >
+                  <OsSelectTrigger>
+                    <SelectValue />
+                  </OsSelectTrigger>
+                  <SelectContent>
+                    {TIMEZONE_OPTIONS.map((tz) => (
+                      <SelectItem key={tz} value={tz}>
+                        {tz}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div>
               <OsFieldLabel>Default notification method</OsFieldLabel>
               <Select
                 value={settings.defaultNotificationMethod}
                 onValueChange={(v) =>
-                  updateSettings({ defaultNotificationMethod: v as NotificationMethod })
+                  updateSettings(
+                    { defaultNotificationMethod: v as NotificationMethod },
+                    { toastLabel: "Default notification method saved" }
+                  )
                 }
               >
                 <OsSelectTrigger>
@@ -757,69 +785,72 @@ export default function SettingsPage() {
         {/* AI preferences */}
         <OsExpandableSection
           title="AI preferences"
-          subtitle="Provider, templates, and analysis thresholds"
+          subtitle="Prompt ideas for new monitors"
           icon={<Bot className="h-5 w-5" />}
         >
           <div className="space-y-4">
+            {SHOW_UNWIRED_PREFERENCE_UI && (
+              <>
+                <div>
+                  <OsFieldLabel>Default AI provider</OsFieldLabel>
+                  <Select
+                    value={settings.aiProvider}
+                    onValueChange={(v) =>
+                      updateSettings({ aiProvider: v as UserSettings["aiProvider"] })
+                    }
+                  >
+                    <OsSelectTrigger>
+                      <SelectValue />
+                    </OsSelectTrigger>
+                    <SelectContent>
+                      {AI_PROVIDER_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <OsFieldLabel>Importance threshold</OsFieldLabel>
+                  <Select
+                    value={settings.importanceThreshold}
+                    onValueChange={(v) =>
+                      updateSettings({
+                        importanceThreshold: v as UserSettings["importanceThreshold"],
+                      })
+                    }
+                  >
+                    <OsSelectTrigger>
+                      <SelectValue />
+                    </OsSelectTrigger>
+                    <SelectContent>
+                      {IMPORTANCE_OPTIONS.map((imp) => (
+                        <SelectItem key={imp} value={imp}>
+                          {imp} and above
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <SettingRow
+                  title="Ignore cosmetic changes"
+                  description="Filter layout-only and styling noise"
+                >
+                  <Switch
+                    checked={settings.ignoreCosmeticChanges}
+                    onCheckedChange={(v) => updateSettings({ ignoreCosmeticChanges: v })}
+                    className="data-[state=checked]:bg-cyan-500"
+                  />
+                </SettingRow>
+              </>
+            )}
+
             <div>
-              <OsFieldLabel>Default AI provider</OsFieldLabel>
-              <Select
-                value={settings.aiProvider}
-                onValueChange={(v) =>
-                  updateSettings({ aiProvider: v as UserSettings["aiProvider"] })
-                }
-              >
-                <OsSelectTrigger>
-                  <SelectValue />
-                </OsSelectTrigger>
-                <SelectContent>
-                  {AI_PROVIDER_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="mt-2 text-xs text-zinc-600">
-                Server override via <code className="text-cyan-400/80">AI_PROVIDER</code> takes
-                precedence when set.
+              <OsFieldLabel>AI prompt examples</OsFieldLabel>
+              <p className="mb-2 text-xs text-zinc-500">
+                Reference ideas for monitor AI prompts. Custom lines are saved on this device.
               </p>
-            </div>
-
-            <div>
-              <OsFieldLabel>Importance threshold</OsFieldLabel>
-              <Select
-                value={settings.importanceThreshold}
-                onValueChange={(v) =>
-                  updateSettings({ importanceThreshold: v as UserSettings["importanceThreshold"] })
-                }
-              >
-                <OsSelectTrigger>
-                  <SelectValue />
-                </OsSelectTrigger>
-                <SelectContent>
-                  {IMPORTANCE_OPTIONS.map((imp) => (
-                    <SelectItem key={imp} value={imp}>
-                      {imp} and above
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <SettingRow
-              title="Ignore cosmetic changes"
-              description="Filter layout-only and styling noise"
-            >
-              <Switch
-                checked={settings.ignoreCosmeticChanges}
-                onCheckedChange={(v) => updateSettings({ ignoreCosmeticChanges: v })}
-                className="data-[state=checked]:bg-cyan-500"
-              />
-            </SettingRow>
-
-            <div>
-              <OsFieldLabel>AI prompt templates</OsFieldLabel>
               <div className="flex flex-wrap gap-1.5">
                 {[...CREATE_AI_PROMPT_EXAMPLES, ...settings.aiPromptTemplates].map((tpl) => (
                   <span
@@ -1034,18 +1065,13 @@ export default function SettingsPage() {
         {/* Account */}
         <OsExpandableSection
           title="Account"
-          subtitle="Security, sessions, and authentication"
+          subtitle="Security and authentication via Clerk"
           icon={<Shield className="h-5 w-5" />}
         >
           <div className="space-y-3">
-            <SettingRow title="Active sessions" description="Managed via your account provider">
-              <Clock className="h-4 w-4 text-zinc-600" />
-            </SettingRow>
-            <SettingRow title="Two-factor authentication" description="Enable in account manager">
-              <Lock className="h-4 w-4 text-zinc-600" />
-            </SettingRow>
             <p className="text-sm text-zinc-500">
               Password, email, 2FA, and sessions are managed through your account provider.
+              Use Manage account to change them — fake toggles are not shown here.
             </p>
             <Button
               variant="outline"

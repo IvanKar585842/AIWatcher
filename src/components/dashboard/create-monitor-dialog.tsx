@@ -43,6 +43,7 @@ import {
   MONITOR_TYPE_CATALOG,
   type MonitorTypeCategory,
 } from "@/lib/monitor-types";
+import { loadUserSettings } from "@/lib/user-settings";
 import { cn } from "@/lib/utils";
 import { PRODUCT_TOUR_EVENTS } from "@/lib/product-tour";
 
@@ -73,6 +74,16 @@ const DEFAULT_FORM = {
   notificationMethod: NotificationMethod.EMAIL as NotificationMethod,
   respectRobots: true,
 };
+
+function formDefaultsFromUserSettings() {
+  const s = loadUserSettings();
+  return {
+    ...DEFAULT_FORM,
+    mode: s.defaultMode,
+    interval: s.defaultInterval,
+    notificationMethod: s.defaultNotificationMethod,
+  };
+}
 
 interface CreateMonitorDialogProps {
   onCreated?: (monitorId: string) => void;
@@ -190,8 +201,13 @@ export function CreateMonitorDialog({
       setTypeFilter("All");
       setSelectedTypeId("full-page");
       setShowAdvancedTypes(false);
+      return;
     }
-  }, [open]);
+    // Apply Settings → Monitoring preferences when opening a fresh create flow
+    if (!prefillRequest) {
+      setForm(formDefaultsFromUserSettings());
+    }
+  }, [open, prefillRequest]);
 
   const intervals = allowedIntervals ?? (Object.keys(INTERVAL_LABELS) as MonitoringInterval[]);
   const selectedType = useMemo(
@@ -347,7 +363,7 @@ export function CreateMonitorDialog({
     const monitorId = result.data.monitor.id;
     toast("Monitor created successfully", "success");
     setOpen(false);
-    setForm(DEFAULT_FORM);
+    setForm(formDefaultsFromUserSettings());
     setStep(1);
     onCreated?.(monitorId);
     router.push(`/dashboard/monitors/${monitorId}`);

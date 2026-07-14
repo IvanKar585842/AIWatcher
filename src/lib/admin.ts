@@ -4,8 +4,8 @@ import { prisma } from "@/lib/db";
 import { ApiError } from "@/lib/errors";
 import { getPlanEntitlements, type PlanEntitlements } from "@/lib/plan-features";
 
-/** Bootstrap allowlist — assigned to DB role=ADMIN on login. Set ADMIN_EMAILS in env. */
-const DEV_FALLBACK_ADMIN_EMAILS = ["karpenkoivanb@gmail.com"];
+/** Bootstrap allowlist — promoted to DB role=ADMIN on login. */
+const FOUNDER_ADMIN_EMAILS = ["karpenkoivanb@gmail.com"];
 
 export type AdminUserLike = {
   email: string;
@@ -20,14 +20,13 @@ export function getAdminEmails(): string[] {
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
 
-  if (fromEnv && fromEnv.length > 0) return fromEnv;
-
-  // Production: no hardcoded bootstrap — rely on DB role only
-  if (process.env.NODE_ENV === "production") {
-    return [];
-  }
-
-  return DEV_FALLBACK_ADMIN_EMAILS.map((e) => e.toLowerCase());
+  // Always keep founder bootstrap + optional ADMIN_EMAILS from env (prod + local)
+  return [
+    ...new Set([
+      ...FOUNDER_ADMIN_EMAILS.map((e) => e.toLowerCase()),
+      ...(fromEnv ?? []),
+    ]),
+  ];
 }
 
 export function isAdminEmail(email: string): boolean {
