@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { ToastProvider } from "@/components/ui/os-toast";
+import { ProductTourGate } from "@/components/dashboard/tour/product-tour-gate";
 import { CommandProvider, useCommand } from "./command-context";
 import { CommandSidebar } from "./command-sidebar";
 import { CommandTopbar } from "./command-topbar";
@@ -37,6 +38,7 @@ export function CommandShell({ children }: { children: React.ReactNode }) {
         >
           <CommandSidebar />
           <CommandMain>{children}</CommandMain>
+          <ProductTourGate />
         </div>
       </CommandProvider>
     </ToastProvider>

@@ -7,6 +7,8 @@ import { apiFailureFromError, apiErrorResponse } from "@/lib/api-response";
 import { ApiError, parseJsonBody } from "@/lib/errors";
 import { assertMonitorModeAllowed, assertNotificationAllowed } from "@/lib/plan-guards";
 import { withRateLimit } from "@/lib/rate-limit";
+import { resolveFaviconUrl } from "@/lib/favicon";
+import { getFaviconUrl } from "@/lib/utils";
 import { assertMonitorOwnedBy } from "@/lib/security/ownership";
 import { updateMonitorSchema } from "@/lib/validations";
 export async function GET(
@@ -117,11 +119,18 @@ export async function PATCH(
           }
         }
         const { config, ...rest } = parsed.data;
+        const urlChanged = Boolean(parsed.data.url && parsed.data.url !== existing.url);
+        const faviconUrl = urlChanged
+          ? await resolveFaviconUrl(parsed.data.url!).catch(() =>
+              getFaviconUrl(parsed.data.url!, 128)
+            )
+          : undefined;
         try {
           const monitor = await prisma.monitor.update({
             where: { id },
             data: {
               ...rest,
+              ...(faviconUrl !== undefined ? { faviconUrl } : {}),
               ...(config !== undefined
                 ? { config: config === null ? Prisma.JsonNull : (config as Prisma.InputJsonValue) }
                 : {}),

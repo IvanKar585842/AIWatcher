@@ -91,4 +91,60 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+
+  .wf-enter,
+  .wf-enter-delay-1,
+  .wf-enter-delay-2,
+  .wf-enter-delay-3,
+  .wf-enter-delay-4 {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
 }
+
+/* Lightweight premium entrance — used instead of framer springs on critical UI */
+@keyframes wf-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.wf-enter {
+  animation: wf-fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.wf-enter-delay-1 {
+  animation: wf-fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.06s both;
+}
+
+.wf-enter-delay-2 {
+  animation: wf-fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.12s both;
+}
+
+.wf-enter-delay-3 {
+  animation: wf-fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.18s both;
+}
+
+.wf-enter-delay-4 {
+  animation: wf-fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.24s both;
+}
+
+.wf-card-hover {
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .wf-card-hover:hover {
+    transform: translateY(-2px);
+  }
+}
+

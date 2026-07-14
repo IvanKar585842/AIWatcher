@@ -1,8 +1,12 @@
 "use client";
 
-import { ClerkProvider } from "@clerk/nextjs";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useState,
+  type ComponentType,
+  type ReactNode,
+} from "react";
 
 const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
@@ -14,31 +18,58 @@ function isMarketingPath(pathname: string | null) {
   return pathname.startsWith("/status/") || pathname.startsWith("/report/");
 }
 
+type ClerkProviderComponent = ComponentType<{
+  children: ReactNode;
+  appearance?: { variables?: Record<string, string> };
+}>;
+
 /**
- * On marketing pages, defer mounting Clerk until idle so its JS
- * does not compete with LCP (hero H1 / chrome). App routes mount Clerk immediately.
+ * Truly code-splits @clerk/nextjs so marketing LCP is not blocked by Clerk parse/download.
+ * App routes import Clerk immediately; marketing waits for idle after load.
  */
 export function ClerkThemeProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const marketing = isMarketingPath(pathname);
-  const [deferredReady, setDeferredReady] = useState(false);
-  const clerkReady = !marketing || deferredReady;
+  const [ClerkProvider, setClerkProvider] = useState<ClerkProviderComponent | null>(null);
 
   useEffect(() => {
-    if (!marketing) return;
+    if (!publishableKey || publishableKey.includes("placeholder")) return;
 
+    let cancelled = false;
     let idleId: number | undefined;
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
-    const enable = () => setDeferredReady(true);
+    const load = () => {
+      void import("@clerk/nextjs").then((mod) => {
+        if (!cancelled) setClerkProvider(() => mod.ClerkProvider);
+      });
+    };
 
-    if ("requestIdleCallback" in window) {
-      idleId = window.requestIdleCallback(enable, { timeout: 2500 });
+    if (!marketing) {
+      load();
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const schedule = () => {
+      if ("requestIdleCallback" in window) {
+        idleId = window.requestIdleCallback(load, { timeout: 4000 });
+      } else {
+        timeoutId = setTimeout(load, 2000);
+      }
+    };
+
+    if (document.readyState === "complete") {
+      schedule();
     } else {
-      timeoutId = setTimeout(enable, 800);
+      window.addEventListener("load", schedule, { once: true });
+      timeoutId = setTimeout(schedule, 3500);
     }
 
     return () => {
+      cancelled = true;
+      window.removeEventListener("load", schedule);
       if (idleId !== undefined && "cancelIdleCallback" in window) {
         window.cancelIdleCallback(idleId);
       }
@@ -46,11 +77,7 @@ export function ClerkThemeProvider({ children }: { children: React.ReactNode }) 
     };
   }, [marketing]);
 
-  if (!publishableKey || publishableKey.includes("placeholder")) {
-    return <>{children}</>;
-  }
-
-  if (!clerkReady) {
+  if (!publishableKey || publishableKey.includes("placeholder") || !ClerkProvider) {
     return <>{children}</>;
   }
 

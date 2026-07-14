@@ -66,7 +66,7 @@ export default function ReportsPage() {
   const latest = useMemo(() => reports[0], [reports]);
 
   return (
-    <div className={os.page}>
+    <div className={os.page} data-tour="weekly-report">
       <CommandPageHeader
         label="Intelligence"
         title="Weekly AI Reports"

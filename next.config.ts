@@ -13,6 +13,7 @@ const nextConfig: NextConfig = {
     optimizePackageImports: [
       "lucide-react",
       "framer-motion",
+      "@clerk/nextjs",
       "@radix-ui/react-dialog",
       "@radix-ui/react-select",
       "@radix-ui/react-tabs",

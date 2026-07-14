@@ -1,7 +1,6 @@
 "use client";
 
 import { memo } from "react";
-import { motion } from "framer-motion";
 import { Activity, AlertTriangle, Brain, HeartPulse, Radio } from "lucide-react";
 
 interface StatItem {
@@ -9,9 +8,16 @@ interface StatItem {
   value: string | number;
   suffix?: string;
   icon: React.ElementType;
-  trend?: string;
   accent: string;
 }
+
+const DELAYS = [
+  "wf-enter",
+  "wf-enter-delay-1",
+  "wf-enter-delay-2",
+  "wf-enter-delay-3",
+  "wf-enter-delay-4",
+] as const;
 
 export const StatReadouts = memo(function StatReadouts({
   activeMonitors,
@@ -77,21 +83,18 @@ export const StatReadouts = memo(function StatReadouts({
         if (mobilePriority && secondary) return null;
 
         return (
-          <motion.div
+          <div
             key={stat.label}
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.06, type: "spring", stiffness: 320, damping: 28 }}
-            className={`group relative min-w-0 overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3 transition-colors hover:border-cyan-400/15 sm:p-4 ${
-              secondary ? "hidden sm:block" : ""
-            }`}
+            className={`wf-card-hover group relative min-w-0 overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3 hover:border-cyan-400/15 sm:p-4 ${
+              DELAYS[i] ?? "wf-enter"
+            } ${secondary ? "hidden sm:block" : ""}`}
           >
             <div
-              className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${stat.accent} opacity-0 transition-opacity group-hover:opacity-100`}
+              className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${stat.accent} opacity-0 transition-opacity duration-200 group-hover:opacity-100`}
             />
             <div className="relative">
               <div className="flex items-center justify-between gap-1">
-                <stat.icon className="h-4 w-4 shrink-0 text-zinc-600 transition-colors group-hover:text-cyan-400/80" />
+                <stat.icon className="h-4 w-4 shrink-0 text-zinc-600 transition-colors duration-200 group-hover:text-cyan-400/80" />
                 <span className="hidden font-mono text-[9px] uppercase tracking-widest text-zinc-700 sm:inline">
                   {String(i + 1).padStart(2, "0")}
                 </span>
@@ -106,7 +109,7 @@ export const StatReadouts = memo(function StatReadouts({
                 {stat.label}
               </p>
             </div>
-          </motion.div>
+          </div>
         );
       })}
     </div>

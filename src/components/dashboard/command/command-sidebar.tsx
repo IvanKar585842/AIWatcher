@@ -24,6 +24,31 @@ import { DashboardUserButton } from "@/components/auth/clerk-wrappers";
 import { cn } from "@/lib/utils";
 import { useCommand } from "./command-context";
 
+type NavItem = {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  exact?: boolean;
+  /** Extra path prefixes that should keep this item highlighted */
+  matchPrefixes?: string[];
+  /** Set false to hide from UI without deleting the entry (easy restore). */
+  visible?: boolean;
+};
+
+function isNavItemActive(pathname: string, item: NavItem): boolean {
+  if (item.exact) {
+    return pathname === item.href;
+  }
+
+  if (pathname === item.href || pathname.startsWith(`${item.href}/`)) {
+    return true;
+  }
+
+  return (item.matchPrefixes ?? []).some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
+}
+
 export function CommandSidebar() {
   const pathname = usePathname();
   const { collapsed, setCollapsed, mobileOpen, setMobileOpen } = useCommand();
@@ -49,15 +74,27 @@ export function CommandSidebar() {
     };
   }, []);
 
-  const navItems = [
+  const navItems: NavItem[] = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
     { href: "/dashboard/monitors", label: "Monitors", icon: Radio },
     { href: "/dashboard/assistant", label: "AI Assistant", icon: MessageSquare },
     { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
-    { href: "/dashboard/history", label: "History", icon: Clock },
+    {
+      href: "/dashboard/history",
+      label: "Changes",
+      icon: Clock,
+      // Change detail pages live under /dashboard/changes/[id]
+      matchPrefixes: ["/dashboard/changes"],
+    },
     { href: "/dashboard/reports", label: "Reports", icon: FileText },
     { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
-    { href: "/dashboard/integrations", label: "Integrations", icon: Plug },
+    // Hidden from UI for now — keep entry for easy restore later
+    {
+      href: "/dashboard/integrations",
+      label: "Integrations",
+      icon: Plug,
+      visible: false,
+    },
     { href: "/dashboard/settings", label: "Settings", icon: Settings },
     { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
     ...(isAdmin
@@ -65,8 +102,15 @@ export function CommandSidebar() {
       : []),
   ];
 
+  const visibleNavItems = navItems.filter((item) => item.visible !== false);
+
   const width = mobileOpen ? 280 : collapsed ? 72 : 220;
   const showLabels = mobileOpen || !collapsed;
+  const settingsActive = isNavItemActive(pathname, {
+    href: "/dashboard/settings",
+    label: "Settings",
+    icon: Settings,
+  });
 
   return (
     <>
@@ -113,10 +157,8 @@ export function CommandSidebar() {
         </div>
 
         <nav className="flex-1 space-y-1 overflow-y-auto p-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-          {navItems.map((item) => {
-            const isActive = item.exact
-              ? pathname === item.href
-              : pathname === item.href || pathname.startsWith(`${item.href}/`);
+          {visibleNavItems.map((item) => {
+            const isActive = isNavItemActive(pathname, item);
 
             return (
               <Link
@@ -124,12 +166,13 @@ export function CommandSidebar() {
                 href={item.href}
                 onClick={() => setMobileOpen(false)}
                 title={!showLabels ? item.label : undefined}
+                aria-current={isActive ? "page" : undefined}
                 className="group relative block"
               >
                 {isActive && (
                   <motion.div
                     layoutId="command-nav-active"
-                    className="absolute inset-0 rounded-xl border border-cyan-400/20 bg-cyan-500/[0.08] shadow-[0_0_24px_-8px_rgba(34,211,238,0.4)]"
+                    className="absolute inset-0 rounded-xl border border-cyan-400/25 bg-cyan-500/[0.12] shadow-[0_0_24px_-8px_rgba(34,211,238,0.45)]"
                     transition={{ type: "spring", stiffness: 400, damping: 30 }}
                   />
                 )}
@@ -137,14 +180,16 @@ export function CommandSidebar() {
                   className={cn(
                     "relative flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors",
                     isActive
-                      ? "text-cyan-100"
-                      : "text-zinc-500 group-hover:text-zinc-300"
+                      ? "font-medium text-cyan-50"
+                      : "text-zinc-500 group-hover:bg-white/[0.03] group-hover:text-zinc-200"
                   )}
                 >
                   <item.icon
                     className={cn(
-                      "h-4 w-4 shrink-0",
-                      isActive ? "text-cyan-400" : "text-zinc-600 group-hover:text-zinc-400"
+                      "h-4 w-4 shrink-0 transition-colors",
+                      isActive
+                        ? "text-cyan-300"
+                        : "text-zinc-600 group-hover:text-zinc-300"
                     )}
                   />
                   <AnimatePresence>
@@ -153,7 +198,7 @@ export function CommandSidebar() {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="truncate font-medium"
+                        className="truncate"
                       >
                         {item.label}
                       </motion.span>
@@ -170,9 +215,20 @@ export function CommandSidebar() {
             href="/dashboard/settings"
             onClick={() => setMobileOpen(false)}
             title={!showLabels ? "Profile" : undefined}
-            className="flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm text-zinc-500 transition-colors hover:text-zinc-300"
+            aria-current={settingsActive ? "page" : undefined}
+            className={cn(
+              "flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors",
+              settingsActive
+                ? "border border-cyan-400/20 bg-cyan-500/[0.08] text-cyan-100"
+                : "text-zinc-500 hover:bg-white/[0.03] hover:text-zinc-300"
+            )}
           >
-            <User className="h-4 w-4 shrink-0" />
+            <User
+              className={cn(
+                "h-4 w-4 shrink-0",
+                settingsActive ? "text-cyan-300" : "text-zinc-600"
+              )}
+            />
             {showLabels && <span>Profile</span>}
           </Link>
 

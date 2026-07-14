@@ -63,6 +63,7 @@ interface CommandStats {
     id: string;
     name: string;
     url: string;
+    faviconUrl?: string | null;
     status: string;
     lastChangedAt: string | null;
     _count?: { changes: number };
@@ -122,17 +123,36 @@ export function CommandCenter() {
     };
   }, [load]);
 
-  // Defer map + intelligence feed until after first paint / idle
+  // Defer map + intelligence until after first paint / idle (longer for LCP/INP)
   useEffect(() => {
     let idleId: number | undefined;
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
     const enable = () => setHeavyReady(true);
 
-    if ("requestIdleCallback" in window) {
-      idleId = window.requestIdleCallback(enable, { timeout: 1500 });
+    if (document.readyState === "complete") {
+      if ("requestIdleCallback" in window) {
+        idleId = window.requestIdleCallback(enable, { timeout: 2500 });
+      } else {
+        timeoutId = setTimeout(enable, 500);
+      }
     } else {
-      timeoutId = setTimeout(enable, 300);
+      const onLoad = () => {
+        if ("requestIdleCallback" in window) {
+          idleId = window.requestIdleCallback(enable, { timeout: 2500 });
+        } else {
+          timeoutId = setTimeout(enable, 500);
+        }
+      };
+      window.addEventListener("load", onLoad, { once: true });
+      timeoutId = setTimeout(enable, 2200);
+      return () => {
+        window.removeEventListener("load", onLoad);
+        if (idleId !== undefined && "cancelIdleCallback" in window) {
+          window.cancelIdleCallback(idleId);
+        }
+        if (timeoutId) clearTimeout(timeoutId);
+      };
     }
 
     return () => {

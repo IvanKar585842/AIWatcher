@@ -90,6 +90,7 @@ export async function GET() {
               id: true,
               name: true,
               url: true,
+              faviconUrl: true,
               status: true,
               lastChangedAt: true,
               errorCount: true,

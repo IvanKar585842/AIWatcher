@@ -1,0 +1,43 @@
+---
+description: After every new WatchFlowing feature — run security, performance, and production readiness checks before finishing.
+alwaysApply: true
+---
+
+# Post-feature quality gate (WatchFlowing)
+
+This is a production SaaS. After **every** new feature or meaningful change, before finishing:
+
+## Do not
+- Rewrite unrelated app areas
+- Delete code reserved for planned/future features
+- Skip `npm run build`
+
+## Always review
+
+### Security
+- Auth on new/changed API routes (`requireUser` / ownership checks)
+- Input validation (Zod) + rate limiting on mutating/AI routes
+- Prisma (no raw SQL string interpolation with user input)
+- SSRF on any outbound URL fetch
+- Stripe webhook signature verification (if touched)
+- Telegram webhook secret verification (if touched)
+- No secrets in client bundles / logs
+
+### Performance
+- Prefer `dynamic()` / lazy load for heavy or optional UI (tours, maps, chat)
+- Avoid blocking LCP (defer non-critical work with idle callbacks)
+- Cap probe loops and external fetches with timeouts
+- Keep mobile layout and LCP goals in mind (~2.5s)
+
+### Reliability / production
+- Graceful fallbacks when DB columns or deps are missing
+- User data isolation (`userId` scoping)
+- Error responses without leaking internals
+
+### Code quality
+- Remove only **safe** unused imports/files from the change set
+- Do not remove integration stubs or hidden UI retained for restore
+
+## Required before done
+1. `npm run build` (no TS errors)
+2. Brief report: security findings, perf changes, files changed, remaining recommendations

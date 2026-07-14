@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/os-toast";
+import { PRODUCT_TOUR_EVENTS } from "@/lib/product-tour";
 
 const CommandCenter = dynamic(
   () =>
@@ -85,6 +86,7 @@ export function DashboardHome({
             /* ignore */
           }
           setShowOnboarding(false);
+          window.dispatchEvent(new CustomEvent(PRODUCT_TOUR_EVENTS.MAYBE_START));
         }}
       />
     );

@@ -11,6 +11,7 @@ import {
   Copy,
   ExternalLink,
   Gift,
+  HelpCircle,
   Loader2,
   Lock,
   Monitor,
@@ -47,6 +48,7 @@ import {
   type UserSettings,
 } from "@/lib/user-settings";
 import { useToast } from "@/components/ui/os-toast";
+import { PRODUCT_TOUR_EVENTS } from "@/lib/product-tour";
 import { cn } from "@/lib/utils";
 
 function SettingRow({
@@ -80,6 +82,9 @@ function OsSelectTrigger({ className, ...props }: React.ComponentProps<typeof Se
     />
   );
 }
+
+/** Set true to restore the Integrations settings section in the UI. */
+const SHOW_INTEGRATIONS_UI = false;
 
 export default function SettingsPage() {
   const { user } = useUser();
@@ -483,11 +488,12 @@ export default function SettingsPage() {
         </OsExpandableSection>
 
         {/* Notifications */}
-        <OsExpandableSection
-          title="Notifications"
-          subtitle="Email, Telegram, and alert delivery"
-          icon={<Bell className="h-5 w-5" />}
-        >
+        <div data-tour="settings-notifications">
+          <OsExpandableSection
+            title="Notifications"
+            subtitle="Email, Telegram, and alert delivery"
+            icon={<Bell className="h-5 w-5" />}
+          >
           <div className="space-y-3">
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-xl border border-white/[0.06] bg-black/20 p-4">
@@ -656,6 +662,7 @@ export default function SettingsPage() {
             </SettingRow>
           </div>
         </OsExpandableSection>
+        </div>
 
         {/* Monitoring preferences */}
         <OsExpandableSection
@@ -844,125 +851,127 @@ export default function SettingsPage() {
           </div>
         </OsExpandableSection>
 
-        {/* Integrations */}
-        <OsExpandableSection
-          title="Integrations"
-          subtitle="Channels, apps, and public status"
-          icon={<Plug className="h-5 w-5" />}
-        >
-          <div className="space-y-4">
-            <Link
-              href="/dashboard/integrations"
-              className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-black/20 px-4 py-3 transition-colors hover:border-cyan-500/25"
-            >
-              <div>
-                <p className="text-sm text-zinc-200">Browse integrations</p>
-                <p className="text-xs text-zinc-500">Email is active · more channels coming soon</p>
-              </div>
-              <ExternalLink className="h-4 w-4 text-zinc-500" />
-            </Link>
+        {/* Integrations — hidden from UI; set SHOW_INTEGRATIONS_UI true to restore */}
+        {SHOW_INTEGRATIONS_UI && (
+          <OsExpandableSection
+            title="Integrations"
+            subtitle="Channels, apps, and public status"
+            icon={<Plug className="h-5 w-5" />}
+          >
+            <div className="space-y-4">
+              <Link
+                href="/dashboard/integrations"
+                className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-black/20 px-4 py-3 transition-colors hover:border-cyan-500/25"
+              >
+                <div>
+                  <p className="text-sm text-zinc-200">Browse integrations</p>
+                  <p className="text-xs text-zinc-500">Email is active · more channels coming soon</p>
+                </div>
+                <ExternalLink className="h-4 w-4 text-zinc-500" />
+              </Link>
 
-            <div className="rounded-xl border border-white/[0.06] bg-black/20 p-4">
-              <div className="mb-4 flex items-center gap-2">
-                <Activity className="h-4 w-4 text-cyan-400" />
-                <p className="text-sm font-medium text-zinc-200">Public status page</p>
-              </div>
+              <div className="rounded-xl border border-white/[0.06] bg-black/20 p-4">
+                <div className="mb-4 flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-cyan-400" />
+                  <p className="text-sm font-medium text-zinc-200">Public status page</p>
+                </div>
 
-              {statusLoading ? (
-                <Loader2 className="h-5 w-5 animate-spin text-cyan-400" />
-              ) : (
-                <div className="space-y-4">
-                  <SettingRow
-                    title="Enable public status page"
-                  description="Share a client-ready reliability page at /status/your-username"
-                  >
-                    <Switch
-                      checked={statusEnabled}
-                      onCheckedChange={setStatusEnabled}
-                      className="data-[state=checked]:bg-cyan-500"
-                    />
-                  </SettingRow>
-
-                  <div>
-                    <OsFieldLabel>Username</OsFieldLabel>
-                    <div className="flex items-center gap-2">
-                      <span className="shrink-0 text-xs text-zinc-600">/status/</span>
-                      <OsInput
-                        value={statusUsername}
-                        onChange={(e) => setStatusUsername(e.target.value.toLowerCase())}
-                        placeholder="acme"
-                        className="font-mono"
+                {statusLoading ? (
+                  <Loader2 className="h-5 w-5 animate-spin text-cyan-400" />
+                ) : (
+                  <div className="space-y-4">
+                    <SettingRow
+                      title="Enable public status page"
+                    description="Share a client-ready reliability page at /status/your-username"
+                    >
+                      <Switch
+                        checked={statusEnabled}
+                        onCheckedChange={setStatusEnabled}
+                        className="data-[state=checked]:bg-cyan-500"
                       />
-                    </div>
-                  </div>
+                    </SettingRow>
 
-                  <div>
-                    <OsFieldLabel>Page title (optional)</OsFieldLabel>
-                    <OsInput
-                      value={statusTitle}
-                      onChange={(e) => setStatusTitle(e.target.value)}
-                      placeholder="Acme status"
-                    />
-                  </div>
-
-                  {publicUrl && statusEnabled && (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <a
-                        href={publicUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-cyan-400 hover:text-cyan-300"
-                      >
-                        {publicUrl}
-                      </a>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={copyPublicUrl}
-                        className="h-8 rounded-full border-white/[0.08] bg-transparent text-zinc-400"
-                      >
-                        <Copy className="mr-1.5 h-3.5 w-3.5" />
-                        Copy
-                      </Button>
-                    </div>
-                  )}
-
-                  {statusMonitors.length > 0 && (
                     <div>
-                      <p className="mb-2 text-xs text-zinc-500">Monitors on status page</p>
-                      <div className="space-y-2">
-                        {statusMonitors.map((m) => (
-                          <SettingRow key={m.id} title={m.name} description={m.url}>
-                            <Switch
-                              checked={m.statusPageVisible}
-                              onCheckedChange={(v) => toggleMonitorVisibility(m.id, v)}
-                              className="data-[state=checked]:bg-cyan-500"
-                            />
-                          </SettingRow>
-                        ))}
+                      <OsFieldLabel>Username</OsFieldLabel>
+                      <div className="flex items-center gap-2">
+                        <span className="shrink-0 text-xs text-zinc-600">/status/</span>
+                        <OsInput
+                          value={statusUsername}
+                          onChange={(e) => setStatusUsername(e.target.value.toLowerCase())}
+                          placeholder="acme"
+                          className="font-mono"
+                        />
                       </div>
                     </div>
-                  )}
 
-                  <Button
-                    type="button"
-                    onClick={saveStatusPage}
-                    disabled={statusSaving}
-                    className="rounded-full bg-cyan-500 text-black hover:bg-cyan-400"
-                  >
-                    {statusSaving ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Save className="mr-2 h-4 w-4" />
+                    <div>
+                      <OsFieldLabel>Page title (optional)</OsFieldLabel>
+                      <OsInput
+                        value={statusTitle}
+                        onChange={(e) => setStatusTitle(e.target.value)}
+                        placeholder="Acme status"
+                      />
+                    </div>
+
+                    {publicUrl && statusEnabled && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <a
+                          href={publicUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-cyan-400 hover:text-cyan-300"
+                        >
+                          {publicUrl}
+                        </a>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={copyPublicUrl}
+                          className="h-8 rounded-full border-white/[0.08] bg-transparent text-zinc-400"
+                        >
+                          <Copy className="mr-1.5 h-3.5 w-3.5" />
+                          Copy
+                        </Button>
+                      </div>
                     )}
-                    Save status page
-                  </Button>
-                </div>
-              )}
+
+                    {statusMonitors.length > 0 && (
+                      <div>
+                        <p className="mb-2 text-xs text-zinc-500">Monitors on status page</p>
+                        <div className="space-y-2">
+                          {statusMonitors.map((m) => (
+                            <SettingRow key={m.id} title={m.name} description={m.url}>
+                              <Switch
+                                checked={m.statusPageVisible}
+                                onCheckedChange={(v) => toggleMonitorVisibility(m.id, v)}
+                                className="data-[state=checked]:bg-cyan-500"
+                              />
+                            </SettingRow>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <Button
+                      type="button"
+                      onClick={saveStatusPage}
+                      disabled={statusSaving}
+                      className="rounded-full bg-cyan-500 text-black hover:bg-cyan-400"
+                    >
+                      {statusSaving ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Save className="mr-2 h-4 w-4" />
+                      )}
+                      Save status page
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        </OsExpandableSection>
+          </OsExpandableSection>
+        )}
 
         <OsExpandableSection
           title="Invite & referrals"
@@ -1057,6 +1066,30 @@ export default function SettingsPage() {
                 />
               </div>
             )}
+          </div>
+        </OsExpandableSection>
+
+        <OsExpandableSection
+          title="Help"
+          subtitle="Guides and product walkthrough"
+          icon={<HelpCircle className="h-5 w-5" />}
+        >
+          <div className="space-y-3">
+            <SettingRow
+              title="Product Tour"
+              description="Walk through the real dashboard — map, AI feed, monitors, and alerts"
+            >
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-full border-cyan-400/25 bg-cyan-500/10 text-cyan-100 hover:bg-cyan-500/15"
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent(PRODUCT_TOUR_EVENTS.START));
+                }}
+              >
+                Start tour
+              </Button>
+            </SettingRow>
           </div>
         </OsExpandableSection>
 

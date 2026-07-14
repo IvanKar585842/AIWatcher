@@ -16,15 +16,18 @@ export function ParticleField({ density = 0.00008 }: { density?: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const reducedMotion = usePrefersReducedMotion();
   const [visible, setVisible] = useState(true);
+  const [allowCanvas, setAllowCanvas] = useState(false);
 
   useEffect(() => {
     const onVisibility = () => setVisible(document.visibilityState === "visible");
     document.addEventListener("visibilitychange", onVisibility);
+    // Mobile: skip continuous canvas entirely
+    setAllowCanvas(window.innerWidth >= 768);
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, []);
 
   useEffect(() => {
-    if (reducedMotion || !visible) return;
+    if (reducedMotion || !visible || !allowCanvas) return;
 
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -113,9 +116,9 @@ export function ParticleField({ density = 0.00008 }: { density?: number }) {
       cancelAnimationFrame(animationId);
       window.removeEventListener("resize", resize);
     };
-  }, [density, reducedMotion, visible]);
+  }, [density, reducedMotion, visible, allowCanvas]);
 
-  if (reducedMotion) return null;
+  if (reducedMotion || !allowCanvas) return null;
 
   return (
     <canvas

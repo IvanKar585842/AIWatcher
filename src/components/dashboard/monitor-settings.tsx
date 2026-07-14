@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
@@ -52,7 +51,8 @@ import {
   type MonitorConfig,
 } from "@/lib/monitor-config";
 import { getProtectedSiteWarning } from "@/lib/monitor-types";
-import { cn, formatRelativeTime, getDomainFromUrl, getFaviconUrl } from "@/lib/utils";
+import { WebsiteLogo } from "@/components/dashboard/website-logo";
+import { cn, formatRelativeTime, getDomainFromUrl } from "@/lib/utils";
 
 interface MonitorChange {
   id: string;
@@ -66,6 +66,7 @@ interface MonitorData {
   id: string;
   name: string;
   url: string;
+  faviconUrl?: string | null;
   description: string | null;
   category: string | null;
   tags: string[];
@@ -444,13 +445,13 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
       >
         <div className="flex items-start gap-4">
           <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-white/[0.08] bg-black/50">
-            <Image
-              src={getFaviconUrl(monitor.url)}
+            <WebsiteLogo
+              url={monitor.url}
+              faviconUrl={monitor.faviconUrl}
+              size={48}
               alt=""
-              width={48}
-              height={48}
-              className="h-full w-full object-cover"
-              unoptimized
+              className="h-full w-full"
+              imgClassName="object-cover"
             />
           </div>
           <div className="min-w-0">

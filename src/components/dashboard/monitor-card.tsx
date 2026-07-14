@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -16,10 +15,10 @@ import {
   formatRelativeTime,
   formatUpcomingTime,
   getDomainFromUrl,
-  getFaviconUrl,
 } from "@/lib/utils";
 import type { Monitor } from "@prisma/client";
 import { MonitorErrorBanner } from "@/components/dashboard/monitor-error-banner";
+import { WebsiteLogo } from "@/components/dashboard/website-logo";
 
 interface MonitorWithCount extends Monitor {
   _count: { changes: number };
@@ -140,13 +139,11 @@ export function MonitorCard({
         {/* Header */}
         <div className="flex items-start gap-3">
           <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/[0.08] bg-[#090909]">
-            <Image
-              src={getFaviconUrl(monitor.url)}
+            <WebsiteLogo
+              url={monitor.url}
+              faviconUrl={monitor.faviconUrl}
+              size={24}
               alt=""
-              width={24}
-              height={24}
-              className="rounded-sm"
-              unoptimized
             />
             {status.pulse && (
               <span className="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5">

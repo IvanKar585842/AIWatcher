@@ -9,7 +9,10 @@ const HeroDashboardVisual = dynamic(
   { ssr: false }
 );
 
-/** Defer heavy framer-motion/canvas hero until idle; SSR fallback paints immediately. */
+/**
+ * Keep SSR fallback through LCP; load framer/canvas only after load + idle
+ * (or first scroll / long fallback).
+ */
 export function HeroVisualLoader({ fallback }: { fallback: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
@@ -20,28 +23,41 @@ export function HeroVisualLoader({ fallback }: { fallback: ReactNode }) {
 
     let idleId: number | undefined;
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    let enabled = false;
 
-    const enable = () => setReady(true);
+    const enable = () => {
+      if (enabled) return;
+      enabled = true;
+      setReady(true);
+    };
 
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry?.isIntersecting) {
-          observer.disconnect();
-          if ("requestIdleCallback" in window) {
-            idleId = window.requestIdleCallback(enable, { timeout: 1800 });
-          } else {
-            timeoutId = setTimeout(enable, 400);
-          }
-        }
-      },
-      { rootMargin: "80px" }
-    );
+    const scheduleIdle = () => {
+      if ("requestIdleCallback" in window) {
+        idleId = window.requestIdleCallback(enable, { timeout: 5000 });
+      } else {
+        timeoutId = setTimeout(enable, 1200);
+      }
+    };
 
-    observer.observe(el);
-    timeoutId = setTimeout(enable, 3000);
+    const onScroll = () => {
+      window.removeEventListener("scroll", onScroll);
+      scheduleIdle();
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true, once: true });
+
+    if (document.readyState === "complete") {
+      scheduleIdle();
+    } else {
+      window.addEventListener("load", scheduleIdle, { once: true });
+    }
+
+    // Hard fallback so premium visual still appears
+    timeoutId = setTimeout(enable, 4500);
 
     return () => {
-      observer.disconnect();
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("load", scheduleIdle);
       if (idleId !== undefined && "cancelIdleCallback" in window) {
         window.cancelIdleCallback(idleId);
       }

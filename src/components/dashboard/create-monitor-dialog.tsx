@@ -44,6 +44,7 @@ import {
   type MonitorTypeCategory,
 } from "@/lib/monitor-types";
 import { cn } from "@/lib/utils";
+import { PRODUCT_TOUR_EVENTS } from "@/lib/product-tour";
 
 export interface MonitorPrefill {
   name: string;
@@ -84,6 +85,8 @@ interface CreateMonitorDialogProps {
   hideTrigger?: boolean;
   triggerLabel?: string;
   triggerClassName?: string;
+  /** Enables product-tour open/close events + data-tour anchors (Monitors page). */
+  enableTourControl?: boolean;
 }
 
 function FieldLabel({
@@ -124,6 +127,7 @@ export function CreateMonitorDialog({
   hideTrigger = false,
   triggerLabel = "New Monitor",
   triggerClassName,
+  enableTourControl = false,
 }: CreateMonitorDialogProps) {
   const router = useRouter();
   const { toast } = useToast();
@@ -153,6 +157,30 @@ export function CreateMonitorDialog({
       onPrefillConsumed?.();
     }
   }, [prefillRequest, onPrefillConsumed, setOpen]);
+
+  useEffect(() => {
+    if (!enableTourControl) return;
+    try {
+      if (sessionStorage.getItem("wf-open-create-after-tour") === "1") {
+        sessionStorage.removeItem("wf-open-create-after-tour");
+        setOpen(true);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [enableTourControl, setOpen]);
+
+  useEffect(() => {
+    if (!enableTourControl) return;
+    const openFromTour = () => setOpen(true);
+    const closeFromTour = () => setOpen(false);
+    window.addEventListener(PRODUCT_TOUR_EVENTS.OPEN_CREATE, openFromTour);
+    window.addEventListener(PRODUCT_TOUR_EVENTS.CLOSE_CREATE, closeFromTour);
+    return () => {
+      window.removeEventListener(PRODUCT_TOUR_EVENTS.OPEN_CREATE, openFromTour);
+      window.removeEventListener(PRODUCT_TOUR_EVENTS.CLOSE_CREATE, closeFromTour);
+    };
+  }, [enableTourControl, setOpen]);
 
   useEffect(() => {
     if (!open) {
@@ -330,6 +358,7 @@ export function CreateMonitorDialog({
       {!hideTrigger && (
         <DialogTrigger asChild>
           <Button
+            data-tour={enableTourControl ? "create-monitor-trigger" : undefined}
             className={cn(
               triggerClassName,
               variant === "os"
@@ -344,6 +373,7 @@ export function CreateMonitorDialog({
       )}
 
       <DialogContent
+        data-tour={enableTourControl ? "create-monitor-dialog" : undefined}
         className="flex max-h-[min(92dvh,900px)] w-[min(calc(100vw-1rem),56rem)] max-w-none flex-col gap-0 overflow-hidden border border-cyan-500/20 bg-[#0a0a0a] p-0 text-zinc-100 shadow-[0_0_80px_-16px_rgba(34,211,238,0.45)] sm:w-[min(calc(100vw-1.5rem),56rem)]"
       >
         {/* Header */}

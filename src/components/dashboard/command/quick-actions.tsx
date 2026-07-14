@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
 import { Download, Pause, Play, Loader2 } from "lucide-react";
 
 interface QuickActionsProps {
@@ -71,27 +70,17 @@ export function QuickActions({ onRefresh, pausedCount, activeCount }: QuickActio
   ] as const;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.05 }}
-      className="flex flex-wrap gap-2"
-    >
-      {actions.map((action, i) => {
+    <div className="wf-enter flex flex-wrap gap-2">
+      {actions.map((action) => {
         const Icon = action.icon;
         const isLoading = loading === action.id;
         return (
-          <motion.button
+          <button
             key={action.id}
             type="button"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.08 + i * 0.04 }}
-            whileHover={{ scale: action.disabled ? 1 : 1.02 }}
-            whileTap={{ scale: action.disabled ? 1 : 0.98 }}
             onClick={action.onClick}
             disabled={action.disabled || isLoading}
-            className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-xs font-medium text-zinc-400 transition-all hover:border-white/[0.14] hover:bg-white/[0.05] hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none sm:px-4"
+            className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-xs font-medium text-zinc-400 transition-all duration-200 hover:border-white/[0.14] hover:bg-white/[0.05] hover:text-zinc-200 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none sm:px-4"
           >
             {isLoading ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -99,9 +88,9 @@ export function QuickActions({ onRefresh, pausedCount, activeCount }: QuickActio
               <Icon className="h-3.5 w-3.5" />
             )}
             {action.label}
-          </motion.button>
+          </button>
         );
       })}
-    </motion.div>
+    </div>
   );
 }

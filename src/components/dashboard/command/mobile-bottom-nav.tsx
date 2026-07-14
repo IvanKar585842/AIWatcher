@@ -42,6 +42,7 @@ export function MobileBottomNav() {
             <li key={item.href}>
               <Link
                 href={item.href}
+                aria-current={isActive ? "page" : undefined}
                 className={cn(
                   "flex min-h-[56px] flex-col items-center justify-center gap-1 px-1 text-[10px] font-medium transition-colors",
                   isActive ? "text-cyan-300" : "text-zinc-500 active:text-zinc-300"
@@ -51,7 +52,7 @@ export function MobileBottomNav() {
                   className={cn("h-5 w-5", isActive ? "text-cyan-400" : "text-zinc-600")}
                   aria-hidden
                 />
-                <span>{item.label}</span>
+                <span className={cn(isActive && "text-cyan-200")}>{item.label}</span>
               </Link>
             </li>
           );

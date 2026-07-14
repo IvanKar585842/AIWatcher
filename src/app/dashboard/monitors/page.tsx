@@ -12,6 +12,7 @@ export default function MonitorsPage() {
       >
         <CreateMonitorDialog
           variant="os"
+          enableTourControl
           triggerLabel="+ Create Monitor"
           triggerClassName="h-11 px-6 text-sm font-medium shadow-[0_0_32px_-8px_rgba(34,211,238,0.55)]"
         />

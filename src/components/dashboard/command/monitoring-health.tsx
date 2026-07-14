@@ -1,7 +1,6 @@
 "use client";
 
 import { memo } from "react";
-import { motion } from "framer-motion";
 import { Activity, AlertCircle, Clock, Pause } from "lucide-react";
 
 interface MonitoringHealthProps {
@@ -12,13 +11,20 @@ interface MonitoringHealthProps {
   totalMonitors: number;
 }
 
+const DELAYS = [
+  "wf-enter",
+  "wf-enter-delay-1",
+  "wf-enter-delay-2",
+  "wf-enter-delay-3",
+] as const;
+
 function HealthCard({
   label,
   value,
   suffix,
   icon: Icon,
   accent,
-  delay,
+  enterClass,
   barPercent,
   barColor,
 }: {
@@ -27,21 +33,18 @@ function HealthCard({
   suffix?: string;
   icon: React.ElementType;
   accent: string;
-  delay: number;
+  enterClass: string;
   barPercent: number;
   barColor: string;
 }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay, type: "spring", stiffness: 320, damping: 28 }}
-      className="group relative min-w-0 overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3 transition-colors hover:border-white/[0.1] sm:p-4"
+    <div
+      className={`wf-card-hover group relative min-w-0 overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3 hover:border-white/[0.1] sm:p-4 ${enterClass}`}
     >
       <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${accent} opacity-40`} />
       <div className="relative">
         <div className="flex items-center justify-between">
-          <Icon className="h-4 w-4 text-zinc-500 group-hover:text-cyan-400/80 transition-colors" />
+          <Icon className="h-4 w-4 text-zinc-500 transition-colors duration-200 group-hover:text-cyan-400/80" />
           <span className="font-mono text-[9px] uppercase tracking-widest text-zinc-700">
             Health
           </span>
@@ -52,15 +55,13 @@ function HealthCard({
         </p>
         <p className="mt-1 text-[11px] text-zinc-600">{label}</p>
         <div className="mt-3 h-1 overflow-hidden rounded-full bg-white/[0.06]">
-          <motion.div
-            initial={{ width: 0 }}
-            animate={{ width: `${barPercent}%` }}
-            transition={{ delay: delay + 0.2, duration: 0.8, ease: [0.4, 0, 0.2, 1] }}
-            className={`h-full rounded-full bg-gradient-to-r ${barColor}`}
+          <div
+            className={`h-full rounded-full bg-gradient-to-r ${barColor} transition-[width] duration-700 ease-out`}
+            style={{ width: `${Math.max(0, Math.min(100, barPercent))}%` }}
           />
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -128,7 +129,11 @@ export const MonitoringHealth = memo(function MonitoringHealth({
       </div>
       <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
         {cards.map((card, i) => (
-          <HealthCard key={card.label} {...card} delay={i * 0.06} />
+          <HealthCard
+            key={card.label}
+            {...card}
+            enterClass={DELAYS[i] ?? "wf-enter"}
+          />
         ))}
       </div>
     </div>

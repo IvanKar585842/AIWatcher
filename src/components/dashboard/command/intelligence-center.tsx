@@ -31,21 +31,22 @@ export function IntelligenceCenter({
   changes: ActivityChange[];
   notifications: ActivityNotification[];
 }) {
-  const [tab, setTab] = useState<CenterTab>("assistant");
-  /** Delay chat API boot so stats/monitors win the first network window */
+  const [tab, setTab] = useState<CenterTab>("feed");
+  /** Mount chat only when user opens the assistant tab */
   const [assistantReady, setAssistantReady] = useState(false);
 
   useEffect(() => {
+    // Only prewarm assistant after idle if user stays on feed
     let cancelled = false;
     const enable = () => {
-      if (!cancelled) setAssistantReady(true);
+      if (!cancelled && tab === "assistant") setAssistantReady(true);
     };
 
     let idleId: number | undefined;
     if (typeof window !== "undefined" && "requestIdleCallback" in window) {
-      idleId = window.requestIdleCallback(enable, { timeout: 1500 });
+      idleId = window.requestIdleCallback(enable, { timeout: 4000 });
     }
-    const timer = window.setTimeout(enable, 450);
+    const timer = window.setTimeout(enable, 2000);
 
     return () => {
       cancelled = true;
@@ -54,7 +55,7 @@ export function IntelligenceCenter({
         window.cancelIdleCallback(idleId);
       }
     };
-  }, []);
+  }, [tab]);
 
   const tabs: {
     id: CenterTab;
@@ -63,21 +64,24 @@ export function IntelligenceCenter({
     emoji: string;
   }[] = [
     {
-      id: "assistant",
-      label: "Detection Assistant",
-      mobileLabel: "Assistant",
-      emoji: "🤖",
-    },
-    {
       id: "feed",
       label: "Intelligence Feed",
       mobileLabel: "Feed",
       emoji: "🧠",
     },
+    {
+      id: "assistant",
+      label: "Detection Assistant",
+      mobileLabel: "Assistant",
+      emoji: "🤖",
+    },
   ];
 
   return (
-    <section className="flex w-full min-w-0 flex-col rounded-2xl border border-cyan-500/15 bg-white/[0.02]">
+    <section
+      className="flex w-full min-w-0 flex-col rounded-2xl border border-cyan-500/15 bg-white/[0.02]"
+      data-tour="intelligence-center"
+    >
       <div className="shrink-0 border-b border-white/[0.06] px-3 pt-3 sm:px-5 sm:pt-5">
         <div className="mb-3 min-w-0 sm:mb-4">
           <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-cyan-500/70">
@@ -104,6 +108,7 @@ export function IntelligenceCenter({
                 type="button"
                 role="tab"
                 aria-selected={active}
+                data-tour={t.id === "feed" ? "tab-feed" : "tab-assistant"}
                 onClick={() => {
                   setTab(t.id);
                   if (t.id === "assistant") setAssistantReady(true);
@@ -133,10 +138,28 @@ export function IntelligenceCenter({
 
       <div className="relative w-full min-w-0">
         <AnimatePresence mode="wait" initial={false}>
-          {tab === "assistant" ? (
+          {tab === "feed" ? (
+            <motion.div
+              key="feed"
+              role="tabpanel"
+              data-tour="intelligence-feed"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+              className="w-full"
+            >
+              <RecentActivityPanel
+                embedded
+                changes={changes}
+                notifications={notifications}
+              />
+            </motion.div>
+          ) : (
             <motion.div
               key="assistant"
               role="tabpanel"
+              data-tour="detection-assistant"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
@@ -150,22 +173,6 @@ export function IntelligenceCenter({
                   Loading assistant…
                 </div>
               )}
-            </motion.div>
-          ) : (
-            <motion.div
-              key="feed"
-              role="tabpanel"
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-              className="w-full"
-            >
-              <RecentActivityPanel
-                embedded
-                changes={changes}
-                notifications={notifications}
-              />
             </motion.div>
           )}
         </AnimatePresence>

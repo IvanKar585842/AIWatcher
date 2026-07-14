@@ -125,6 +125,7 @@ model User {
   telegramNotificationsEnabled   Boolean        @default(true)
   emailNotificationsEnabled      Boolean        @default(true)
   onboardingCompleted            Boolean        @default(false)
+  productTourCompleted           Boolean        @default(false)
   username            String?        @unique
   statusPageEnabled   Boolean        @default(false)
   statusPageTitle     String?
@@ -185,6 +186,8 @@ model Monitor {
   user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   name               String
   url                String
+  /** Cached website favicon/logo URL (resolved at create/update). */
+  faviconUrl         String?
   description        String?            @db.Text
   category           String?
   tags               String[]           @default([])

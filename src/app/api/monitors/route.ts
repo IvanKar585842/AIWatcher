@@ -14,6 +14,8 @@ import {
 } from "@/lib/plan-guards";
 import { withRateLimit } from "@/lib/rate-limit";
 import { createMonitorSchema } from "@/lib/validations";
+import { resolveFaviconUrl } from "@/lib/favicon";
+import { getFaviconUrl } from "@/lib/utils";
 import { syncMonitorQueue } from "@/lib/monitoring/queue";
 import { markOnboardingCompleted } from "@/lib/onboarding";
 
@@ -180,11 +182,15 @@ export async function POST(request: NextRequest) {
           }
 
           const nextCheckAt = new Date();
+          const faviconUrl = await resolveFaviconUrl(parsed.data.url).catch(() =>
+            getFaviconUrl(parsed.data.url, 128)
+          );
           const monitor = await prisma.monitor.create({
             data: {
               userId: user.id,
               name: parsed.data.name,
               url: parsed.data.url,
+              faviconUrl,
               description: parsed.data.description ?? null,
               category: parsed.data.category ?? null,
               tags: parsed.data.tags ?? [],
