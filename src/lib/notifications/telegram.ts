@@ -1,4 +1,5 @@
 import { telegramLog } from "@/lib/telegram/config";
+import { getTelegramBotToken } from "@/lib/telegram/env";
 
 const TELEGRAM_API = "https://api.telegram.org/bot";
 
@@ -7,7 +8,7 @@ export type TelegramSendResult =
   | { ok: false; error: string; blocked?: boolean; invalidChat?: boolean };
 
 function getBotToken(): string {
-  const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
+  const token = getTelegramBotToken();
   if (!token) {
     telegramLog("config_missing", { reason: "TELEGRAM_BOT_TOKEN missing" });
     throw new Error("Missing token");
@@ -81,7 +82,7 @@ export async function sendTelegramNotification(
     return { ok: false, error: "Telegram account is not connected", invalidChat: true };
   }
 
-  if (!process.env.TELEGRAM_BOT_TOKEN?.trim()) {
+  if (!getTelegramBotToken()) {
     telegramLog("send_skipped", { reason: "Missing token" });
     return { ok: false, error: "Telegram bot is not configured" };
   }

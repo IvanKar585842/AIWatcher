@@ -4,6 +4,7 @@ import { apiErrorResponse } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { withRateLimit } from "@/lib/rate-limit";
 import { getTelegramConfigStatus } from "@/lib/telegram/config";
+import { getTelegramBotUsername } from "@/lib/telegram/env";
 import { ensureTelegramWebhook, probeTelegramBot } from "@/lib/telegram/setup";
 
 const DEFAULT_BOT_USERNAME = "WatchFlowAlertsBot";
@@ -45,9 +46,7 @@ export async function GET() {
           fresh?.telegramChatId && (fresh.telegramConnected || fresh.telegramChatId)
         );
         const botUsername =
-          probe.username ||
-          process.env.TELEGRAM_BOT_USERNAME?.replace(/^@/, "").trim() ||
-          DEFAULT_BOT_USERNAME;
+          probe.username || getTelegramBotUsername() || DEFAULT_BOT_USERNAME;
 
         let userMessage: string | null = null;
         if (!config.botConfigured) {
@@ -157,9 +156,7 @@ export async function DELETE() {
       "telegram-unlink",
       async () => {
         const config = getTelegramConfigStatus();
-        const botUsername =
-          process.env.TELEGRAM_BOT_USERNAME?.replace(/^@/, "").trim() ||
-          DEFAULT_BOT_USERNAME;
+        const botUsername = getTelegramBotUsername() || DEFAULT_BOT_USERNAME;
 
         await prisma.user.update({
           where: { id: user.id },

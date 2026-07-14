@@ -9,6 +9,7 @@ import {
   telegramLog,
   type TelegramUserFacingError,
 } from "@/lib/telegram/config";
+import { getTelegramBotToken, getTelegramWebhookSecret } from "@/lib/telegram/env";
 
 interface ProbeCache {
   at: number;
@@ -26,7 +27,7 @@ export async function probeTelegramBot(): Promise<{
   username: string | null;
   error: TelegramUserFacingError;
 }> {
-  const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
+  const token = getTelegramBotToken();
   if (!token) {
     return { ok: false, username: null, error: "Telegram bot is not configured" };
   }
@@ -111,7 +112,10 @@ export async function ensureTelegramWebhook(force = false): Promise<{
     }
   }
 
-  const secret = process.env.TELEGRAM_WEBHOOK_SECRET!.trim();
+  const secret = getTelegramWebhookSecret();
+  if (!secret) {
+    return { ok: false, url: webhookUrl, error: "Telegram webhook is not configured" };
+  }
   const setResult = await setTelegramWebhook(webhookUrl, secret);
   lastEnsureAt = Date.now();
 

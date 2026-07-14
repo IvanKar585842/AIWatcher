@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { isStripeSecretConfigured, isStripePaymentsEnabled } from "@/lib/stripe-config";
+import { getTelegramBotToken, getTelegramWebhookSecret } from "@/lib/telegram/env";
 
 export const dynamic = "force-dynamic";
 
@@ -35,8 +36,8 @@ export async function GET() {
           process.env.UPSTASH_REDIS_REST_TOKEN?.trim()
       ),
       cronSecret: Boolean(process.env.CRON_SECRET?.trim()),
-      telegram: Boolean(process.env.TELEGRAM_BOT_TOKEN?.trim()),
-      telegramWebhook: Boolean(process.env.TELEGRAM_WEBHOOK_SECRET?.trim()),
+      telegram: Boolean(getTelegramBotToken()),
+      telegramWebhook: Boolean(getTelegramWebhookSecret()),
       latencyMs: Date.now() - started,
       timestamp: new Date().toISOString(),
     },

@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 import { Plan } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { getAppBaseUrl } from "@/lib/app-url";
 import { ApiError } from "@/lib/errors";
 import {
   assertStripeCheckoutReady,
@@ -24,15 +25,6 @@ export function getStripe(): Stripe {
     });
   }
   return stripe;
-}
-
-function appBaseUrl(): string {
-  const raw =
-    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-    process.env.VERCEL_URL?.trim() ||
-    "http://localhost:3000";
-  const withProtocol = raw.startsWith("http") ? raw : `https://${raw}`;
-  return withProtocol.replace(/\/$/, "");
 }
 
 /**
@@ -133,7 +125,7 @@ export async function createCheckoutSession(
 
   const customerId = await getOrCreateStripeCustomer(userId, email);
   const priceId = await resolveStripePriceId(plan);
-  const appUrl = appBaseUrl();
+  const appUrl = getAppBaseUrl();
 
   try {
     // Confirm price exists in this Stripe mode before opening Checkout
@@ -146,8 +138,8 @@ export async function createCheckoutSession(
       line_items: [{ price: priceId, quantity: 1 }],
       allow_promotion_codes: true,
       billing_address_collection: "auto",
-      success_url: `${appUrl}/dashboard/billing?success=true&plan=${plan}`,
-      cancel_url: `${appUrl}/dashboard/billing?canceled=true`,
+      success_url: `${appUrl}/dashboard?checkout=success&plan=${plan}`,
+      cancel_url: `${appUrl}/dashboard`,
       metadata: { userId, plan, priceId },
       subscription_data: {
         metadata: { userId, plan, priceId },
@@ -174,12 +166,12 @@ export async function createBillingPortalSession(customerId: string) {
     throw new ApiError("No billing account yet. Upgrade to a paid plan first.", 400);
   }
 
-  const appUrl = appBaseUrl();
+  const appUrl = getAppBaseUrl();
 
   try {
     const session = await getStripe().billingPortal.sessions.create({
       customer: customerId,
-      return_url: `${appUrl}/dashboard/billing`,
+      return_url: `${appUrl}/dashboard`,
     });
 
     if (!session.url) {

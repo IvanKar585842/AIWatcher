@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { handleTelegramUpdate } from "@/lib/telegram/bot";
 import { telegramLog } from "@/lib/telegram/config";
+import { getTelegramBotToken, getTelegramWebhookSecret } from "@/lib/telegram/env";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,12 +11,12 @@ export async function GET() {
   return NextResponse.json({
     ok: true,
     service: "telegram-webhook",
-    configured: Boolean(process.env.TELEGRAM_BOT_TOKEN?.trim()),
+    configured: Boolean(getTelegramBotToken()),
   });
 }
 
 export async function POST(request: NextRequest) {
-  const secret = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
+  const secret = getTelegramWebhookSecret();
   if (!secret) {
     telegramLog("webhook_not_configured", {
       reason: "TELEGRAM_WEBHOOK_SECRET missing",
@@ -26,7 +27,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!process.env.TELEGRAM_BOT_TOKEN?.trim()) {
+  if (!getTelegramBotToken()) {
     telegramLog("webhook_missing_token", { reason: "TELEGRAM_BOT_TOKEN missing" });
     return NextResponse.json(
       { error: "Telegram bot is not configured" },

@@ -2,6 +2,9 @@
  * Telegram bot / webhook configuration flags (no network I/O).
  */
 
+import { getAppBaseUrl } from "@/lib/app-url";
+import { getTelegramBotToken, getTelegramWebhookSecret } from "@/lib/telegram/env";
+
 export type TelegramUserFacingError =
   | "Telegram bot is not configured"
   | "Invalid bot configuration"
@@ -21,15 +24,9 @@ export interface TelegramConfigStatus {
 }
 
 export function getPublicAppUrl(): string | null {
-  const raw =
-    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-    process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim() ||
-    process.env.VERCEL_URL?.trim() ||
-    "";
-  if (!raw) return null;
-  const withProtocol = raw.startsWith("http") ? raw : `https://${raw}`;
+  const origin = getAppBaseUrl();
   try {
-    const url = new URL(withProtocol);
+    const url = new URL(origin);
     if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
       return null;
     }
@@ -48,8 +45,8 @@ export function getTelegramWebhookUrl(): string | null {
 }
 
 export function getTelegramConfigStatus(): TelegramConfigStatus {
-  const botConfigured = Boolean(process.env.TELEGRAM_BOT_TOKEN?.trim());
-  const webhookConfigured = Boolean(process.env.TELEGRAM_WEBHOOK_SECRET?.trim());
+  const botConfigured = Boolean(getTelegramBotToken());
+  const webhookConfigured = Boolean(getTelegramWebhookSecret());
   const publicAppUrlConfigured = Boolean(getPublicAppUrl());
 
   let configError: TelegramUserFacingError = null;

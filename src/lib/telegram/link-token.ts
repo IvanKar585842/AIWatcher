@@ -1,12 +1,10 @@
 import { createHmac, timingSafeEqual } from "crypto";
+import { getTelegramLinkSecret } from "@/lib/telegram/env";
 
 const LINK_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
 function getLinkSecret(): string {
-  const secret =
-    process.env.TELEGRAM_LINK_SECRET ??
-    process.env.TELEGRAM_WEBHOOK_SECRET ??
-    process.env.CRON_SECRET;
+  const secret = getTelegramLinkSecret();
   if (!secret) {
     throw new Error("Telegram link secret is not configured");
   }

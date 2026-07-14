@@ -2,7 +2,9 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/components/ui/os-toast";
 
 const CommandCenter = dynamic(
   () =>
@@ -47,6 +49,9 @@ export function DashboardHome({
 }: {
   initialShowOnboarding?: boolean;
 }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { toast } = useToast();
   const [showOnboarding, setShowOnboarding] = useState(initialShowOnboarding);
 
   useEffect(() => {
@@ -55,6 +60,12 @@ export function DashboardHome({
     }
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   }, []);
+
+  useEffect(() => {
+    if (searchParams.get("checkout") !== "success") return;
+    toast("Payment successful — your plan will update in a moment.", "success");
+    router.replace("/dashboard");
+  }, [searchParams, router, toast]);
 
   useEffect(() => {
     try {
