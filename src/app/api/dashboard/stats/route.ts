@@ -18,7 +18,7 @@ export async function GET() {
         const [
           statusGroups,
           changesToday,
-          importantAlerts,
+          importantAlertChanges,
           recentChanges,
           recentNotifications,
           monitorActivity,
@@ -37,11 +37,21 @@ export async function GET() {
               createdAt: { gte: today },
             },
           }),
-          prisma.change.count({
+          prisma.change.findMany({
             where: {
               monitor: { userId: user.id },
               createdAt: { gte: today },
               importance: { in: [ChangeImportance.HIGH, ChangeImportance.CRITICAL] },
+            },
+            orderBy: { createdAt: "desc" },
+            take: 25,
+            select: {
+              id: true,
+              summary: true,
+              emoji: true,
+              importance: true,
+              createdAt: true,
+              monitor: { select: { name: true } },
             },
           }),
           prisma.change.findMany({
@@ -163,7 +173,8 @@ export async function GET() {
               pausedMonitors,
               errorMonitors,
               changesToday,
-              importantAlerts,
+              importantAlerts: importantAlertChanges.length,
+              importantAlertChanges,
               aiAccuracy,
               monitoringHealth,
               mostActiveWebsite,

@@ -5,6 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Bell } from "lucide-react";
 import { useToast } from "@/components/ui/os-toast";
+import {
+  getReadNotificationIds,
+  markAlertOpened,
+  markNotificationsRead,
+  READ_STATE_EVENT,
+} from "@/lib/notification-read-state";
 import { formatRelativeTime } from "@/lib/utils";
 
 interface NotificationItem {
@@ -16,28 +22,9 @@ interface NotificationItem {
     id: string;
     summary: string;
     emoji: string;
+    importance?: string;
     monitor: { name: string };
   };
-}
-
-const READ_KEY = "watchflow-read-notifications";
-const LEGACY_READ_KEY = "WatchFlowing-read-notifications";
-
-function getReadIds(): Set<string> {
-  if (typeof window === "undefined") return new Set();
-  try {
-    const raw =
-      localStorage.getItem(READ_KEY) ?? localStorage.getItem(LEGACY_READ_KEY) ?? "[]";
-    return new Set(JSON.parse(raw) as string[]);
-  } catch {
-    return new Set();
-  }
-}
-
-function markRead(id: string) {
-  const ids = getReadIds();
-  ids.add(id);
-  localStorage.setItem(READ_KEY, JSON.stringify([...ids]));
 }
 
 export function NotificationDropdown() {
@@ -51,6 +38,10 @@ export function NotificationDropdown() {
   const knownIdsRef = useRef<Set<string>>(new Set());
   const initializedRef = useRef(false);
 
+  const syncReadIds = useCallback(() => {
+    setReadIds(getReadNotificationIds());
+  }, []);
+
   const loadNotifications = useCallback(async () => {
     setLoading(true);
     try {
@@ -60,7 +51,7 @@ export function NotificationDropdown() {
       const items: NotificationItem[] = data.notifications ?? [];
 
       if (initializedRef.current) {
-        const read = getReadIds();
+        const read = getReadNotificationIds();
         for (const item of items) {
           if (!knownIdsRef.current.has(item.id) && !read.has(item.id)) {
             toast(`${item.change.emoji} ${item.change.monitor.name}: ${item.change.summary}`, "success");
@@ -78,11 +69,17 @@ export function NotificationDropdown() {
   }, [toast]);
 
   useEffect(() => {
-    setReadIds(getReadIds());
+    syncReadIds();
     loadNotifications();
     const interval = setInterval(loadNotifications, 30_000);
-    return () => clearInterval(interval);
-  }, [loadNotifications]);
+    window.addEventListener(READ_STATE_EVENT, syncReadIds);
+    window.addEventListener("storage", syncReadIds);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener(READ_STATE_EVENT, syncReadIds);
+      window.removeEventListener("storage", syncReadIds);
+    };
+  }, [loadNotifications, syncReadIds]);
 
   useEffect(() => {
     if (open) loadNotifications();
@@ -103,15 +100,18 @@ export function NotificationDropdown() {
   const unreadCount = notifications.filter((n) => !readIds.has(n.id)).length;
 
   function handleNotificationClick(item: NotificationItem) {
-    markRead(item.id);
-    setReadIds(getReadIds());
+    markAlertOpened({
+      notificationId: item.id,
+      changeId: item.change.id,
+    });
+    syncReadIds();
     setOpen(false);
     router.push(`/dashboard/changes/${item.change.id}`);
   }
 
   function markAllRead() {
-    notifications.forEach((n) => markRead(n.id));
-    setReadIds(getReadIds());
+    markNotificationsRead(notifications.map((n) => n.id));
+    syncReadIds();
   }
 
   return (

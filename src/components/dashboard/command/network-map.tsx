@@ -86,9 +86,10 @@ export function computeMapScale(count: number): MapScale {
     coreInner,
     coreLogo,
     coreCpu,
-    glowR: 52 * factor,
-    coreR: 28 * factor,
-    labelGap: Math.round(clamp(32 * factor, 18, 32)),
+    // SVG radii follow the visible HTML core so chip sits inside the glow
+    glowR: coreOuter * 0.82,
+    coreR: coreOuter / 2,
+    labelGap: Math.round(clamp(18 * factor, 10, 18)),
     pulseR: 18 * factor,
   };
 }
@@ -138,8 +139,9 @@ function layoutNodes(
   if (count === 0) return [];
 
   const cardHalf = scale.cardMaxW / 2;
+  // Extra bottom pad for focus strip; keep clear of AI Core diameter
   const edgePad = Math.max(cardHalf + 8, 36 * scale.factor);
-  const coreClearance = scale.coreR + scale.iconBox / 2 + 28 * scale.factor + 16;
+  const coreClearance = scale.coreOuter / 2 + scale.iconBox / 2 + 24 * scale.factor + 12;
 
   const rings = count <= 8 ? 1 : count <= 24 ? 2 : 3;
   const ringSpacing = clamp(44 * scale.factor + 8, 28, 56);
@@ -350,27 +352,34 @@ export function NetworkMap({ monitors }: { monitors: NetworkMonitor[] }) {
                 const scanDur = 2.6 + (i % 7) * 0.32;
                 const scanDelay = (i % 11) * 0.18;
                 const pulseR = Math.max(1.6, 2.4 * scale.factor);
+                // Slight curve so spokes don’t look like a flat star
+                const dx = node.x - core.x;
+                const dy = node.y - core.y;
+                const len = Math.hypot(dx, dy) || 1;
+                const bend = Math.min(16 * scale.factor, len * 0.09);
+                const cpx = (core.x + node.x) / 2 + (-dy / len) * bend;
+                const cpy = (core.y + node.y) / 2 + (dx / len) * bend;
+                const pathD = `M${core.x},${core.y} Q${cpx},${cpy} ${node.x},${node.y}`;
                 return (
                   <g key={`line-${node.id}`}>
-                    <motion.line
-                      x1={core.x}
-                      y1={core.y}
-                      x2={node.x}
-                      y2={node.y}
+                    <motion.path
+                      d={pathD}
+                      fill="none"
                       stroke={
                         selectedId === node.id
                           ? "rgba(34,211,238,0.55)"
                           : node.pulsing
                             ? "rgba(34,211,238,0.42)"
-                            : "rgba(56,189,248,0.14)"
+                            : "rgba(56,189,248,0.16)"
                       }
-                      strokeWidth={isHot ? 1.45 : 0.85}
+                      strokeWidth={isHot ? 1.45 : 0.9}
+                      strokeLinecap="round"
                       animate={
                         reduceMotion
                           ? { strokeOpacity: isHot ? 0.45 : 0.18 }
                           : isHot
                             ? { strokeOpacity: [0.28, 0.72, 0.28] }
-                            : { strokeOpacity: [0.12, 0.22, 0.12] }
+                            : { strokeOpacity: [0.12, 0.24, 0.12] }
                       }
                       transition={
                         reduceMotion
@@ -378,7 +387,6 @@ export function NetworkMap({ monitors }: { monitors: NetworkMonitor[] }) {
                           : { duration: isHot ? 2 : 3.2, repeat: Infinity, ease: "easeInOut" }
                       }
                     />
-                    {/* Lightweight SVG scan pulse: AI Core → website */}
                     {!reduceMotion && (
                       <circle
                         r={pulseR}
@@ -390,7 +398,7 @@ export function NetworkMap({ monitors }: { monitors: NetworkMonitor[] }) {
                           dur={`${scanDur}s`}
                           begin={`${scanDelay}s`}
                           repeatCount="indefinite"
-                          path={`M${core.x},${core.y} L${node.x},${node.y}`}
+                          path={pathD}
                         />
                         <animate
                           attributeName="opacity"
@@ -402,7 +410,6 @@ export function NetworkMap({ monitors }: { monitors: NetworkMonitor[] }) {
                         />
                       </circle>
                     )}
-                    {/* Extra brighter packet for recent changes */}
                     {!reduceMotion && node.pulsing && (
                       <circle
                         r={pulseR * 1.25}
@@ -414,7 +421,7 @@ export function NetworkMap({ monitors }: { monitors: NetworkMonitor[] }) {
                           dur={`${Math.max(1.6, scanDur * 0.72)}s`}
                           begin={`${scanDelay + 0.55}s`}
                           repeatCount="indefinite"
-                          path={`M${core.x},${core.y} L${node.x},${node.y}`}
+                          path={pathD}
                         />
                         <animate
                           attributeName="opacity"
@@ -454,54 +461,60 @@ export function NetworkMap({ monitors }: { monitors: NetworkMonitor[] }) {
               </motion.g>
             </svg>
 
-            {/* AI Core avatar — scales with density */}
-            <div className="pointer-events-none absolute left-1/2 top-1/2 z-[5] flex -translate-x-1/2 -translate-y-1/2 flex-col items-center">
-              <motion.div
-                className="relative flex items-center justify-center"
-                animate={{ width: scale.coreOuter, height: scale.coreOuter }}
-                transition={{ type: "spring", stiffness: 280, damping: 30 }}
+            {/* AI Core — chip perfectly centered; label sits outside without shifting the icon */}
+            <div className="pointer-events-none absolute inset-0 z-[5]">
+              <div
+                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+                style={{ width: scale.coreOuter, height: scale.coreOuter }}
               >
-                <AnimatePresence mode="wait" initial={false}>
-                  {selected ? (
-                    <motion.div
-                      key={selected.id}
-                      initial={{ opacity: 0, scale: 0.7, rotate: -8 }}
-                      animate={{ opacity: 1, scale: 1, rotate: 0 }}
-                      exit={{ opacity: 0, scale: 0.75, rotate: 8 }}
-                      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-                      className="flex items-center justify-center overflow-hidden rounded-full border border-cyan-400/40 bg-[#090909] shadow-[0_0_24px_-6px_rgba(34,211,238,0.55)]"
-                      style={{ width: scale.coreInner, height: scale.coreInner }}
-                    >
-                      <WebsiteLogo
-                        url={selected.url}
-                        faviconUrl={selected.faviconUrl}
-                        size={scale.coreLogo}
-                        alt={selected.name}
-                        className="rounded-full"
-                      />
-                    </motion.div>
-                  ) : (
-                    <motion.div
-                      key="ai-core-default"
-                      initial={{ opacity: 0, scale: 0.7 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.75 }}
-                      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-                      className="flex items-center justify-center rounded-full border border-cyan-400/40 bg-cyan-500/10"
-                      style={{ width: scale.coreInner, height: scale.coreInner }}
-                    >
-                      <Cpu
-                        className="text-cyan-300"
-                        style={{ width: scale.coreCpu, height: scale.coreCpu }}
-                      />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </motion.div>
+                <motion.div
+                  className="relative flex h-full w-full items-center justify-center"
+                  animate={reduceMotion ? undefined : { scale: [1, 1.03, 1] }}
+                  transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                >
+                  <AnimatePresence mode="wait" initial={false}>
+                    {selected ? (
+                      <motion.div
+                        key={selected.id}
+                        initial={{ opacity: 0, scale: 0.7, rotate: -8 }}
+                        animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                        exit={{ opacity: 0, scale: 0.75, rotate: 8 }}
+                        transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                        className="flex items-center justify-center overflow-hidden rounded-full border border-cyan-400/40 bg-[#090909] shadow-[0_0_24px_-6px_rgba(34,211,238,0.55)]"
+                        style={{ width: scale.coreInner, height: scale.coreInner }}
+                      >
+                        <WebsiteLogo
+                          url={selected.url}
+                          faviconUrl={selected.faviconUrl}
+                          size={scale.coreLogo}
+                          alt={selected.name}
+                          className="rounded-full"
+                        />
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="ai-core-default"
+                        initial={{ opacity: 0, scale: 0.7 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.75 }}
+                        transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                        className="flex items-center justify-center rounded-full border border-cyan-400/45 bg-cyan-500/15"
+                        style={{ width: scale.coreInner, height: scale.coreInner }}
+                      >
+                        <Cpu
+                          className="text-cyan-300"
+                          style={{ width: scale.coreCpu, height: scale.coreCpu }}
+                          aria-hidden
+                        />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+              </div>
               <p
-                className="font-mono tracking-[0.3em] text-sky-300/70"
+                className="absolute left-1/2 -translate-x-1/2 font-mono tracking-[0.3em] text-sky-300/70"
                 style={{
-                  marginTop: scale.labelGap,
+                  top: `calc(50% + ${scale.coreOuter / 2 + scale.labelGap}px)`,
                   fontSize: clamp(8 * scale.factor, 7, 10),
                 }}
               >

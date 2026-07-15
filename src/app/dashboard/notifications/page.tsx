@@ -13,12 +13,16 @@ import {
 } from "lucide-react";
 import { CommandPageHeader } from "@/components/dashboard/command/command-page-header";
 import { Badge } from "@/components/ui/badge";
+import {
+  getReadNotificationIds,
+  markAlertOpened,
+  markImportantChangesRead,
+  markNotificationsRead,
+  READ_STATE_EVENT,
+} from "@/lib/notification-read-state";
 import { formatRelativeTime } from "@/lib/utils";
 import { MODE_LABELS } from "@/lib/constants";
 import type { MonitoringMode } from "@prisma/client";
-
-const READ_KEY = "watchflow-read-notifications";
-const LEGACY_READ_KEY = "WatchFlowing-read-notifications";
 
 interface NotificationItem {
   id: string;
@@ -38,21 +42,6 @@ interface NotificationItem {
     createdAt: string;
     monitor: { name: string; url: string; mode?: string };
   };
-}
-
-function getReadIds(): Set<string> {
-  if (typeof window === "undefined") return new Set();
-  try {
-    const raw =
-      localStorage.getItem(READ_KEY) ?? localStorage.getItem(LEGACY_READ_KEY) ?? "[]";
-    return new Set(JSON.parse(raw) as string[]);
-  } catch {
-    return new Set();
-  }
-}
-
-function persistReadIds(ids: Set<string>) {
-  localStorage.setItem(READ_KEY, JSON.stringify([...ids]));
 }
 
 function importanceVariant(imp: string) {
@@ -94,7 +83,16 @@ export default function NotificationsPage() {
   }, [query, importance, channel]);
 
   useEffect(() => {
-    setReadIds(getReadIds());
+    setReadIds(getReadNotificationIds());
+    function sync() {
+      setReadIds(getReadNotificationIds());
+    }
+    window.addEventListener(READ_STATE_EVENT, sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener(READ_STATE_EVENT, sync);
+      window.removeEventListener("storage", sync);
+    };
   }, []);
 
   useEffect(() => {
@@ -109,18 +107,23 @@ export default function NotificationsPage() {
     [items, readIds]
   );
 
-  function markRead(id: string) {
-    const next = new Set(getReadIds());
-    next.add(id);
-    persistReadIds(next);
-    setReadIds(next);
+  function markRead(item: NotificationItem) {
+    markAlertOpened({
+      notificationId: item.id,
+      changeId: item.change.id,
+    });
+    setReadIds(getReadNotificationIds());
   }
 
   function markAllRead() {
-    const next = new Set(getReadIds());
-    items.forEach((i) => next.add(i.id));
-    persistReadIds(next);
-    setReadIds(next);
+    markNotificationsRead(items.map((i) => i.id));
+    const highChangeIds = items
+      .filter((i) => i.change.importance === "HIGH" || i.change.importance === "CRITICAL")
+      .map((i) => i.change.id);
+    if (highChangeIds.length > 0) {
+      markImportantChangesRead(highChangeIds);
+    }
+    setReadIds(getReadNotificationIds());
   }
 
   return (
@@ -291,7 +294,7 @@ export default function NotificationsPage() {
                     <button
                       type="button"
                       onClick={() => {
-                        markRead(item.id);
+                        markRead(item);
                         setExpandedId(isExpanded ? null : item.id);
                       }}
                       className="min-h-9 rounded-lg border border-white/[0.08] px-3 text-xs text-zinc-400 hover:text-zinc-200"
@@ -300,7 +303,7 @@ export default function NotificationsPage() {
                     </button>
                     <Link
                       href={`/dashboard/changes/${item.change.id}`}
-                      onClick={() => markRead(item.id)}
+                      onClick={() => markRead(item)}
                       className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-cyan-400/25 bg-cyan-500/10 px-3 text-xs text-cyan-200 hover:bg-cyan-500/15"
                     >
                       Open details
@@ -309,7 +312,7 @@ export default function NotificationsPage() {
                     {isUnread && (
                       <button
                         type="button"
-                        onClick={() => markRead(item.id)}
+                        onClick={() => markRead(item)}
                         className="min-h-9 rounded-lg px-3 text-xs text-zinc-600 hover:text-zinc-300"
                       >
                         Mark read

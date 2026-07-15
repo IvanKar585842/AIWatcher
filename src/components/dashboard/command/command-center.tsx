@@ -1,9 +1,15 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import Link from "next/link";
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle } from "lucide-react";
+import {
+  getReadImportantChangeIds,
+  markImportantChangesRead,
+  markNotificationsRead,
+  READ_STATE_EVENT,
+} from "@/lib/notification-read-state";
 import { CommandCenterSkeleton } from "./dashboard-skeletons";
 import { MonitoringHealth } from "./monitoring-health";
 import { QuickActions } from "./quick-actions";
@@ -29,6 +35,15 @@ const IntelligenceCenter = dynamic(
   }
 );
 
+interface ImportantAlertChange {
+  id: string;
+  summary: string;
+  emoji: string;
+  importance: string;
+  createdAt: string;
+  monitor: { name: string };
+}
+
 interface CommandStats {
   totalMonitors: number;
   activeMonitors: number;
@@ -36,6 +51,7 @@ interface CommandStats {
   errorMonitors: number;
   changesToday: number;
   importantAlerts: number;
+  importantAlertChanges: ImportantAlertChange[];
   aiAccuracy: number;
   monitoringHealth: number;
   avgResponseTime: number;
@@ -77,6 +93,7 @@ const EMPTY_STATS: CommandStats = {
   errorMonitors: 0,
   changesToday: 0,
   importantAlerts: 0,
+  importantAlertChanges: [],
   aiAccuracy: 100,
   monitoringHealth: 100,
   avgResponseTime: 0,
@@ -86,9 +103,11 @@ const EMPTY_STATS: CommandStats = {
 };
 
 export function CommandCenter() {
+  const router = useRouter();
   const [stats, setStats] = useState<CommandStats>(EMPTY_STATS);
   const [loading, setLoading] = useState(true);
   const [heavyReady, setHeavyReady] = useState(false);
+  const [readImportantIds, setReadImportantIds] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     try {
@@ -99,6 +118,7 @@ export function CommandCenter() {
         setStats({
           ...EMPTY_STATS,
           ...data.stats,
+          importantAlertChanges: data.stats.importantAlertChanges ?? [],
           avgResponseTime:
             data.stats.avgResponseTime ?? data.stats.analytics?.avgAiResponseMs ?? 0,
         });
@@ -113,6 +133,19 @@ export function CommandCenter() {
   }, []);
 
   useEffect(() => {
+    setReadImportantIds(getReadImportantChangeIds());
+    function syncRead() {
+      setReadImportantIds(getReadImportantChangeIds());
+    }
+    window.addEventListener(READ_STATE_EVENT, syncRead);
+    window.addEventListener("storage", syncRead);
+    return () => {
+      window.removeEventListener(READ_STATE_EVENT, syncRead);
+      window.removeEventListener("storage", syncRead);
+    };
+  }, []);
+
+  useEffect(() => {
     load();
     const interval = setInterval(load, 30000);
     const onMonitorsUpdated = () => load();
@@ -123,6 +156,33 @@ export function CommandCenter() {
     };
   }, [load]);
 
+  const unreadImportant = useMemo(() => {
+    const list = stats.importantAlertChanges ?? [];
+    return list.filter((c) => !readImportantIds.has(c.id));
+  }, [stats.importantAlertChanges, readImportantIds]);
+
+  const unreadImportantCount = unreadImportant.length;
+
+  function handleViewImportantAlerts(e?: React.MouseEvent) {
+    e?.preventDefault();
+    const changeIds = unreadImportant.map((c) => c.id);
+    if (changeIds.length > 0) {
+      markImportantChangesRead(changeIds);
+      const relatedNotificationIds = stats.recentNotifications
+        .filter((n) => changeIds.includes(n.change.id))
+        .map((n) => n.id);
+      if (relatedNotificationIds.length > 0) {
+        markNotificationsRead(relatedNotificationIds);
+      }
+      setReadImportantIds(getReadImportantChangeIds());
+    }
+    const first = unreadImportant[0];
+    if (first) {
+      router.push(`/dashboard/changes/${first.id}`);
+    } else {
+      router.push("/dashboard/notifications");
+    }
+  }
   // Defer map + intelligence until after first paint / idle (longer for LCP/INP)
   useEffect(() => {
     let idleId: number | undefined;
@@ -201,8 +261,8 @@ export function CommandCenter() {
           </h2>
           <p className="mt-1 max-w-xl text-xs leading-relaxed text-zinc-500 sm:text-sm">
             {stats.activeMonitors} site{stats.activeMonitors === 1 ? "" : "s"} monitored
-            {stats.importantAlerts > 0
-              ? ` · ${stats.importantAlerts} need attention`
+            {unreadImportantCount > 0
+              ? ` · ${unreadImportantCount} need attention`
               : " · all clear"}
             {stats.changesToday > 0
               ? ` · ${stats.changesToday} change${stats.changesToday === 1 ? "" : "s"} today`
@@ -219,30 +279,33 @@ export function CommandCenter() {
         </div>
       </div>
 
-      {stats.importantAlerts > 0 && (
-        <Link
-          href="/dashboard/notifications"
-          className="flex min-h-12 items-center gap-3 rounded-xl border border-amber-400/25 bg-amber-500/[0.08] px-3 py-3 transition-colors hover:border-amber-400/40 sm:px-4"
+      {unreadImportantCount > 0 && (
+        <button
+          type="button"
+          onClick={handleViewImportantAlerts}
+          className="flex min-h-12 w-full items-center gap-3 rounded-xl border border-amber-400/25 bg-amber-500/[0.08] px-3 py-3 text-left transition-colors hover:border-amber-400/40 sm:px-4"
         >
           <AlertTriangle className="h-5 w-5 shrink-0 text-amber-300" />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-amber-100">
-              {stats.importantAlerts} important alert
-              {stats.importantAlerts === 1 ? "" : "s"}
+              {unreadImportantCount} important alert
+              {unreadImportantCount === 1 ? "" : "s"}
             </p>
             <p className="truncate text-xs text-amber-200/60">
-              Review high-priority detections
+              {unreadImportant[0]
+                ? `${unreadImportant[0].emoji} ${unreadImportant[0].monitor.name}: ${unreadImportant[0].summary}`
+                : "Review high-priority detections"}
             </p>
           </div>
           <span className="shrink-0 text-xs text-amber-300/80">View</span>
-        </Link>
+        </button>
       )}
 
       <div className="hidden space-y-4 lg:block">
         <StatReadouts
           activeMonitors={stats.activeMonitors}
           changesToday={stats.changesToday}
-          importantAlerts={stats.importantAlerts}
+          importantAlerts={unreadImportantCount}
           aiAccuracy={stats.aiAccuracy}
           monitoringHealth={stats.monitoringHealth}
         />
@@ -286,7 +349,7 @@ export function CommandCenter() {
         <StatReadouts
           activeMonitors={stats.activeMonitors}
           changesToday={stats.changesToday}
-          importantAlerts={stats.importantAlerts}
+          importantAlerts={unreadImportantCount}
           aiAccuracy={stats.aiAccuracy}
           monitoringHealth={stats.monitoringHealth}
           mobilePriority

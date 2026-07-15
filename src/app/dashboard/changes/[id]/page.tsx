@@ -13,6 +13,7 @@ import { EmptyState } from "@/components/dashboard/command/dashboard-skeletons";
 import { ShareInsightButton } from "@/components/dashboard/share-insight-report";
 import { UpgradePrompt } from "@/components/dashboard/upgrade-prompt";
 import { defaultCategoryLabel, formatImportanceEstimate } from "@/lib/ai/change-insight";
+import { markAlertOpened } from "@/lib/notification-read-state";
 import { MODE_LABELS } from "@/lib/constants";
 import { FileQuestion } from "lucide-react";
 import type { MonitoringMode } from "@prisma/client";
@@ -64,6 +65,12 @@ export default function ChangeDetailPage({
   const [change, setChange] = useState<ChangeDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+
+    useEffect(() => {
+    if (!changeId) return;
+    // Opening a change detail clears matching important-alert / notification unread state
+    markAlertOpened({ changeId });
+  }, [changeId]);
 
   useEffect(() => {
     const controller = new AbortController();
