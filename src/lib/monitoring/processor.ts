@@ -150,11 +150,6 @@ export async function processMonitor(monitorId: string): Promise<ProcessMonitorR
   } finally {
     releaseCheckSlot();
     releaseMonitorLock(monitorId);
-    try {
-      await closeBrowser();
-    } catch (closeError) {
-      monitorLogError("error", "Browser close failed (non-fatal)", closeError, { monitorId });
-    }
   }
 }
 
@@ -214,6 +209,7 @@ async function processMonitorInternal(monitorId: string): Promise<ProcessMonitor
       url: monitor.url,
       mode: monitor.mode,
       monitorId: monitor.id,
+      userId: monitor.userId,
       selector: monitor.selector,
       keywords: monitor.keywords,
       respectRobots: monitor.respectRobots,
@@ -221,7 +217,28 @@ async function processMonitorInternal(monitorId: string): Promise<ProcessMonitor
       ignoreAds: config.ignoreAds,
       cleanOptions: buildCleanOptions(config),
       maxRetries,
+      waitStrategy: config.waitStrategy,
+      stabilizeMs: config.stabilizeMs,
+      scrollForLazyLoad: config.scrollForLazyLoad,
+      scrollDepthPx: config.scrollDepthPx,
+      waitForSelector: config.waitForSelector,
+      expandSelectors: config.expandSelectors,
+      encryptedSession: config.encryptedSession,
+      sessionExpiresAt: config.sessionExpiresAt,
     });
+
+    if (result.refreshedEncryptedSession && result.refreshedEncryptedSession !== config.encryptedSession) {
+      await prisma.monitor.update({
+        where: { id: monitor.id },
+        data: {
+          config: {
+            ...config,
+            encryptedSession: result.refreshedEncryptedSession,
+            sessionStatus: "active",
+          } as Prisma.InputJsonValue,
+        },
+      });
+    }
 
     monitorLog({
       step: "fetch_success",
@@ -499,7 +516,24 @@ async function processMonitorInternal(monitorId: string): Promise<ProcessMonitor
       classified.technical ??
       (error instanceof Error ? error.message : "Unknown error");
     const errorCount = monitor.errorCount + 1;
-    const retryAt = computeNextCheckAt(monitor.interval);
+    const isTemporary =
+      classified.kind === "TEMPORARILY_UNAVAILABLE" ||
+      classified.kind === "TIMEOUT" ||
+      classified.kind === "SESSION_EXPIRED";
+    // Soft failures retry sooner; permanent blocks follow the monitor interval
+    const retryAt = isTemporary
+      ? new Date(Date.now() + 15 * 60 * 1000)
+      : computeNextCheckAt(monitor.interval);
+
+    const sessionPatch =
+      classified.kind === "SESSION_EXPIRED"
+        ? ({
+            config: {
+              ...config,
+              sessionStatus: "expired",
+            } as Prisma.InputJsonValue,
+          } as const)
+        : {};
 
     monitorLogError("error", "Monitor check failed", error, {
       monitorId,
@@ -511,6 +545,7 @@ async function processMonitorInternal(monitorId: string): Promise<ProcessMonitor
         willDisable: errorCount >= maxRetries,
         kind: classified.kind,
         title: classified.title,
+        temporary: isTemporary,
         technical,
       },
     });
@@ -523,6 +558,7 @@ async function processMonitorInternal(monitorId: string): Promise<ProcessMonitor
         status: errorCount >= maxRetries ? MonitorStatus.ERROR : monitor.status,
         lastCheckedAt: now,
         nextCheckAt: retryAt,
+        ...sessionPatch,
       },
     });
 
@@ -671,6 +707,12 @@ export async function processDueMonitors(batchSize = 10): Promise<number> {
     message: "Batch processing complete",
     data: { total: toProcess.length, succeeded, skipped, failed },
   });
+
+  try {
+    await closeBrowser();
+  } catch (closeError) {
+    monitorLogError("error", "Browser close after batch failed (non-fatal)", closeError);
+  }
 
   return succeeded;
 }

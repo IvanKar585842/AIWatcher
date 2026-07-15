@@ -14,6 +14,7 @@ export type MonitoringErrorKind =
   | "NOT_FOUND"
   | "SELECTOR_MISSING"
   | "ROBOTS_BLOCKED"
+  | "SESSION_EXPIRED"
   | "UNKNOWN";
 
 export type MonitoringErrorTone = "red" | "amber" | "zinc" | "emerald";
@@ -35,23 +36,27 @@ const KIND_COPY: Record<
   Omit<MonitoringErrorInfo, "kind" | "technical">
 > = {
   BLOCKED: {
-    title: "Website blocked automated monitoring",
+    title: "This website denied automated access.",
     description:
-      "This website does not allow automated tools to access its pages. This is usually caused by anti-bot protection or security settings.",
+      "The site refused this check (often HTTP 401/403). Public pages with strong access controls may not support automated monitoring.",
     suggestions: [
       "Try another public page on the same site",
-      "Use a page without bot protection",
+      "If you have an authenticated session, reconnect cookies in Advanced settings",
       "Use API / RSS monitoring if the site provides it",
     ],
-    statusLabel: "Monitoring unavailable",
+    statusLabel: "Access denied",
     tone: "red",
     icon: "shield",
   },
   TEMPORARILY_UNAVAILABLE: {
-    title: "Website temporarily unavailable",
+    title: "The page could not be loaded at this time. This may be a temporary server issue.",
     description:
-      "The website did not respond correctly during the check. This may be temporary or caused by traffic protection.",
-    suggestions: ["Retry the check now", "Try again later", "Confirm the site loads in your browser"],
+      "The website did not respond correctly during the check. Rate limits, maintenance, or brief outages are common causes.",
+    suggestions: [
+      "Retry the check now",
+      "Try again later",
+      "Confirm the site loads in your browser",
+    ],
     statusLabel: "Temporarily unavailable",
     tone: "amber",
     icon: "wifi-off",
@@ -59,11 +64,11 @@ const KIND_COPY: Record<
   TIMEOUT: {
     title: "Check timed out",
     description:
-      "The page took too long to load. Slow servers, heavy scripts, or network delays can cause this.",
+      "The page took too long to become usable. Slow servers, heavy scripts, or network delays can cause this.",
     suggestions: [
       "Retry the check",
-      "Try a lighter page URL",
-      "Increase patience and check again later",
+      "Increase the Timeout in Advanced settings",
+      "Try a lighter wait strategy (DOM ready) if the page is simple",
     ],
     statusLabel: "Timeout",
     tone: "amber",
@@ -116,6 +121,19 @@ const KIND_COPY: Record<
     tone: "amber",
     icon: "bot",
   },
+  SESSION_EXPIRED: {
+    title: "Saved session expired",
+    description:
+      "Cookies for this monitor are missing or past their expiry. Reconnect the session in Advanced settings to continue authenticated checks.",
+    suggestions: [
+      "Paste fresh cookies from your browser (DevTools → Application → Cookies)",
+      "Set a new session expiry if the site requires it",
+      "Clear the session if the page is public",
+    ],
+    statusLabel: "Session expired",
+    tone: "amber",
+    icon: "clock",
+  },
   WARNING: {
     title: "Check completed with a warning",
     description: "The check finished, but something needs your attention.",
@@ -166,10 +184,13 @@ function extractHttpStatus(message: string): number | null {
 }
 
 function kindFromHttp(status: number): Exclude<MonitoringErrorKind, "SUCCESS"> {
-  if (status === 401 || status === 403 || status === 407 || status === 429) return "BLOCKED";
+  // Rate limits / overload — temporary, not "unsupported site"
+  if (status === 429 || status === 503 || status === 502 || status === 504) {
+    return "TEMPORARILY_UNAVAILABLE";
+  }
+  if (status === 401 || status === 403 || status === 407) return "BLOCKED";
   if (status === 404 || status === 410) return "NOT_FOUND";
   if (status === 408 || status === 425) return "TIMEOUT";
-  if (status >= 500 && status <= 504) return "TEMPORARILY_UNAVAILABLE";
   if (status >= 500) return "TEMPORARILY_UNAVAILABLE";
   if (status >= 400) return "WARNING";
   return "UNKNOWN";
@@ -230,6 +251,14 @@ export function classifyMonitoringError(raw: unknown): MonitoringErrorInfo {
   }
 
   if (
+    lower.includes("session expired") ||
+    lower.includes("saved session expired") ||
+    lower.includes("reconnect cookies")
+  ) {
+    return fromKind("SESSION_EXPIRED", message);
+  }
+
+  if (
     lower.includes("timeout") ||
     lower.includes("timed out") ||
     lower.includes("aborted") ||
@@ -249,6 +278,16 @@ export function classifyMonitoringError(raw: unknown): MonitoringErrorInfo {
   }
 
   if (
+    lower.includes("rate limit") ||
+    lower.includes("too many requests") ||
+    lower.includes("http 429") ||
+    lower.includes("http 503") ||
+    lower.includes("service unavailable")
+  ) {
+    return fromKind("TEMPORARILY_UNAVAILABLE", message);
+  }
+
+  if (
     lower.includes("navigation returned no response") ||
     lower.includes("net::") ||
     lower.includes("err_connection") ||
@@ -259,7 +298,25 @@ export function classifyMonitoringError(raw: unknown): MonitoringErrorInfo {
   }
 
   if (http != null) {
-    return fromKind(kindFromHttp(http), message);
+    const kind = kindFromHttp(http);
+    if (http === 403 || http === 401) {
+      return fromKind(kind, message, "This website denied automated access.");
+    }
+    if (http === 503) {
+      return fromKind(
+        kind,
+        message,
+        "The page could not be loaded at this time. This may be a temporary server issue."
+      );
+    }
+    if (http === 429) {
+      return fromKind(
+        kind,
+        message,
+        "The page could not be loaded at this time. This may be a temporary server issue."
+      );
+    }
+    return fromKind(kind, message);
   }
 
   // Friendly titles already stored as plain text

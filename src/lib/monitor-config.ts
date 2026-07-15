@@ -22,6 +22,11 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+/** Page readiness strategy for browser-based checks. */
+export type WaitStrategy = "dom" | "load" | "networkidle" | "stabilize";
+
+export type SessionStatus = "none" | "active" | "expired";
+
 export interface MonitorConfig {
   retryAttempts?: number;
   timeout?: number;
@@ -35,11 +40,49 @@ export interface MonitorConfig {
   monitorTypeId?: string;
   minImportance?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
   notificationFrequency?: "INSTANT" | "HOURLY" | "DAILY";
+  /** How long to wait for the page to become usable before extraction. */
+  waitStrategy?: WaitStrategy;
+  /** Extra settle delay (ms) after the chosen wait strategy. */
+  stabilizeMs?: number;
+  /** Scroll to trigger lazy-loaded content (default true). */
+  scrollForLazyLoad?: boolean;
+  /** Max scroll depth in px when lazy-load scrolling is enabled. */
+  scrollDepthPx?: number;
+  /** Adaptive wait: continue when this CSS selector appears. */
+  waitForSelector?: string | null;
+  /** Comma-separated CSS selectors to expand/click before capture (accordions, “show more”). */
+  expandSelectors?: string;
+  /**
+   * Write-only: plaintext JSON cookie array from the settings UI.
+   * Encrypted server-side into encryptedSession — never persisted as plain text.
+   */
+  sessionCookiesPlain?: string;
+  /** AES-GCM sealed Playwright cookies (server-only; never send to client). */
+  encryptedSession?: string;
+  /** Client hint after sanitization — true when a session is stored. */
+  hasSession?: boolean;
+  sessionStatus?: SessionStatus;
+  /** ISO expiry; when past, monitoring asks the user to reconnect. */
+  sessionExpiresAt?: string | null;
+  /** Write-only flag to wipe stored session cookies. */
+  clearSession?: boolean;
 }
 
 export const DEFAULT_MONITOR_CONFIG: Required<
-  Omit<MonitorConfig, "monitorTypeId" | "ignoreSelectors">
-> & { ignoreSelectors: string } = {
+  Omit<
+    MonitorConfig,
+    | "monitorTypeId"
+    | "ignoreSelectors"
+    | "waitForSelector"
+    | "expandSelectors"
+    | "sessionCookiesPlain"
+    | "encryptedSession"
+    | "hasSession"
+    | "sessionStatus"
+    | "sessionExpiresAt"
+    | "clearSession"
+  >
+> & { ignoreSelectors: string; expandSelectors: string } = {
   retryAttempts: 3,
   timeout: 30000,
   ignoreCookies: true,
@@ -51,7 +94,39 @@ export const DEFAULT_MONITOR_CONFIG: Required<
   archived: false,
   minImportance: "MEDIUM",
   notificationFrequency: "INSTANT",
+  waitStrategy: "stabilize",
+  stabilizeMs: 700,
+  scrollForLazyLoad: true,
+  scrollDepthPx: 2400,
+  expandSelectors: "",
 };
+
+export const WAIT_STRATEGY_OPTIONS: Array<{
+  id: WaitStrategy;
+  label: string;
+  description: string;
+}> = [
+  {
+    id: "dom",
+    label: "DOM ready",
+    description: "Fastest — wait until the HTML document is parsed",
+  },
+  {
+    id: "load",
+    label: "Full load",
+    description: "Wait for the window load event",
+  },
+  {
+    id: "networkidle",
+    label: "Network idle",
+    description: "Wait until network activity settles (good for APIs)",
+  },
+  {
+    id: "stabilize",
+    label: "Stabilize (recommended)",
+    description: "Best for SPAs — idle network, content heuristics, soft settle",
+  },
+];
 
 /** Soft organization tags for monitors (create + settings) */
 export const MONITOR_CATEGORIES = [

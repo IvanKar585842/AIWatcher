@@ -11,6 +11,10 @@ import { resolveFaviconUrl } from "@/lib/favicon";
 import { getFaviconUrl } from "@/lib/utils";
 import { assertMonitorOwnedBy } from "@/lib/security/ownership";
 import { updateMonitorSchema } from "@/lib/validations";
+import {
+  prepareMonitorConfigForStorage,
+  sanitizeMonitorConfigForClient,
+} from "@/lib/monitoring/session-cookies";
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -43,7 +47,10 @@ export async function GET(
           return NextResponse.json({ error: "Monitor not found" }, { status: 404 });
         }
         return NextResponse.json({
-          monitor,
+          monitor: {
+            ...monitor,
+            config: sanitizeMonitorConfigForClient(monitor.config),
+          },
           plan: user.subscription?.plan ?? "FREE",
         });
       },
@@ -125,18 +132,51 @@ export async function PATCH(
               getFaviconUrl(parsed.data.url!, 128)
             )
           : undefined;
+        const nextUrl = parsed.data.url ?? existing.url;
+        let preparedConfig: ReturnType<typeof prepareMonitorConfigForStorage> | null | undefined;
+        if (config !== undefined) {
+          if (config === null) {
+            preparedConfig = null;
+          } else {
+            try {
+              preparedConfig = prepareMonitorConfigForStorage({
+                incoming: config,
+                existing: existing.config,
+                userId: user.id,
+                monitorUrl: nextUrl,
+              });
+            } catch (err) {
+              return NextResponse.json(
+                {
+                  error: err instanceof Error ? err.message : "Invalid session configuration",
+                },
+                { status: 400 }
+              );
+            }
+          }
+        }
         try {
           const monitor = await prisma.monitor.update({
             where: { id },
             data: {
               ...rest,
               ...(faviconUrl !== undefined ? { faviconUrl } : {}),
-              ...(config !== undefined
-                ? { config: config === null ? Prisma.JsonNull : (config as Prisma.InputJsonValue) }
+              ...(preparedConfig !== undefined
+                ? {
+                    config:
+                      preparedConfig === null
+                        ? Prisma.JsonNull
+                        : (preparedConfig as Prisma.InputJsonValue),
+                  }
                 : {}),
             },
           });
-          return NextResponse.json({ monitor });
+          return NextResponse.json({
+            monitor: {
+              ...monitor,
+              config: sanitizeMonitorConfigForClient(monitor.config),
+            },
+          });
         } catch (error) {
           if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
             return NextResponse.json(

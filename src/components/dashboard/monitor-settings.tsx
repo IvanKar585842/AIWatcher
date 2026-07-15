@@ -44,11 +44,13 @@ import {
 import {
   AI_PROMPT_EXAMPLES,
   DEFAULT_MONITOR_CONFIG,
+  WAIT_STRATEGY_OPTIONS,
   getSelectableMonitoringModes,
   MONITOR_CATEGORIES,
   MONITORING_MODES,
   parseMonitorConfig,
   type MonitorConfig,
+  type WaitStrategy,
 } from "@/lib/monitor-config";
 import { getProtectedSiteWarning } from "@/lib/monitor-types";
 import { WebsiteLogo } from "@/components/dashboard/website-logo";
@@ -841,6 +843,78 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
               />
             </div>
             <div className="sm:col-span-2">
+              <FieldLabel>Page load strategy</FieldLabel>
+              <Select
+                value={form.config.waitStrategy ?? "stabilize"}
+                onValueChange={(v) => updateConfig({ waitStrategy: v as WaitStrategy })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {WAIT_STRATEGY_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.id} value={opt.id}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="mt-1.5 text-xs text-zinc-600">
+                {WAIT_STRATEGY_OPTIONS.find(
+                  (o) => o.id === (form.config.waitStrategy ?? "stabilize")
+                )?.description}
+              </p>
+            </div>
+            <div>
+              <FieldLabel>Stabilize delay (ms)</FieldLabel>
+              <OsInput
+                type="number"
+                min={0}
+                max={15000}
+                step={100}
+                value={form.config.stabilizeMs ?? 700}
+                onChange={(e) => updateConfig({ stabilizeMs: Number(e.target.value) })}
+              />
+            </div>
+            <div>
+              <FieldLabel>Scroll depth (px)</FieldLabel>
+              <OsInput
+                type="number"
+                min={0}
+                max={12000}
+                step={200}
+                value={form.config.scrollDepthPx ?? 2400}
+                onChange={(e) => updateConfig({ scrollDepthPx: Number(e.target.value) })}
+                disabled={form.config.scrollForLazyLoad === false}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <FieldLabel>Wait for selector (optional)</FieldLabel>
+              <OsInput
+                value={form.config.waitForSelector ?? ""}
+                onChange={(e) =>
+                  updateConfig({ waitForSelector: e.target.value || null })
+                }
+                placeholder="main .content, #pricing"
+                className="font-mono text-sm"
+              />
+              <p className="mt-1.5 text-xs text-zinc-600">
+                Adaptive wait until this element appears before capturing content.
+              </p>
+            </div>
+            <div className="sm:col-span-2">
+              <FieldLabel>Expand selectors (optional)</FieldLabel>
+              <OsInput
+                value={form.config.expandSelectors ?? ""}
+                onChange={(e) => updateConfig({ expandSelectors: e.target.value })}
+                placeholder="button.show-more, details summary"
+                className="font-mono text-sm"
+              />
+              <p className="mt-1.5 text-xs text-zinc-600">
+                Click these elements before capture (accordions, “show more”). Comma-separated.
+              </p>
+            </div>
+            <div className="sm:col-span-2">
               <FieldLabel>Ignore Specific Selectors</FieldLabel>
               <OsInput
                 value={form.config.ignoreSelectors ?? ""}
@@ -851,6 +925,66 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
               <p className="mt-1.5 text-xs text-zinc-600">
                 Comma-separated CSS selectors removed before comparison.
               </p>
+            </div>
+            <div className="sm:col-span-2">
+              <FieldLabel>Session cookies (JSON)</FieldLabel>
+              <OsTextarea
+                value={form.config.sessionCookiesPlain ?? ""}
+                onChange={(e) => updateConfig({ sessionCookiesPlain: e.target.value })}
+                placeholder='[{"name":"session","value":"…","domain":"example.com","path":"/"}]'
+                rows={4}
+                className="font-mono text-xs"
+              />
+              <p className="mt-1.5 text-xs text-zinc-600">
+                Optional authenticated session for sites you already use. Stored encrypted per
+                account — never shared between users. Leave blank to keep the current session.
+                {form.config.hasSession ? (
+                  <span className="mt-1 block text-emerald-500/80">
+                    Session on file
+                    {form.config.sessionStatus === "expired" ? " (expired — reconnect)" : ""}.
+                  </span>
+                ) : null}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <div className="min-w-[200px] flex-1">
+                  <FieldLabel>Session expires (optional)</FieldLabel>
+                  <OsInput
+                    type="datetime-local"
+                    value={
+                      form.config.sessionExpiresAt
+                        ? form.config.sessionExpiresAt.slice(0, 16)
+                        : ""
+                    }
+                    onChange={(e) =>
+                      updateConfig({
+                        sessionExpiresAt: e.target.value
+                          ? new Date(e.target.value).toISOString()
+                          : null,
+                      })
+                    }
+                  />
+                </div>
+                {form.config.hasSession ? (
+                  <div className="flex items-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        updateConfig({
+                          clearSession: true,
+                          sessionCookiesPlain: "",
+                          hasSession: false,
+                          sessionStatus: "none",
+                          sessionExpiresAt: null,
+                        })
+                      }
+                    >
+                      Clear session
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
             </div>
             {(form.mode === "CSS_SELECTOR" || form.mode === "XPATH" || form.selector) && (
               <div className="sm:col-span-2">
@@ -865,6 +999,12 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
             )}
           </div>
           <div className="mt-4 space-y-2">
+            <ToggleRow
+              label="Scroll for lazy content"
+              description="Scroll the page so JS lazy-loaded sections can appear"
+              checked={form.config.scrollForLazyLoad ?? true}
+              onCheckedChange={(v) => updateConfig({ scrollForLazyLoad: v })}
+            />
             <ToggleRow
               label="Ignore Dynamic Content"
               description="Normalize volatile content like counters"

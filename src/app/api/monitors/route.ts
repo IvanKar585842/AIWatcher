@@ -18,6 +18,10 @@ import { resolveFaviconUrl } from "@/lib/favicon";
 import { getFaviconUrl } from "@/lib/utils";
 import { syncMonitorQueue } from "@/lib/monitoring/queue";
 import { markOnboardingCompleted } from "@/lib/onboarding";
+import {
+  prepareMonitorConfigForStorage,
+  sanitizeMonitorConfigForClient,
+} from "@/lib/monitoring/session-cookies";
 
 function isSchemaMismatch(error: unknown): boolean {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -185,6 +189,25 @@ export async function POST(request: NextRequest) {
           const faviconUrl = await resolveFaviconUrl(parsed.data.url).catch(() =>
             getFaviconUrl(parsed.data.url, 128)
           );
+          let storedConfig: ReturnType<typeof prepareMonitorConfigForStorage> | undefined;
+          if (parsed.data.config) {
+            try {
+              storedConfig = prepareMonitorConfigForStorage({
+                incoming: parsed.data.config,
+                existing: null,
+                userId: user.id,
+                monitorUrl: parsed.data.url,
+              });
+            } catch (err) {
+              return NextResponse.json(
+                {
+                  success: false,
+                  error: err instanceof Error ? err.message : "Invalid session configuration",
+                },
+                { status: 400 }
+              );
+            }
+          }
           const monitor = await prisma.monitor.create({
             data: {
               userId: user.id,
@@ -195,7 +218,7 @@ export async function POST(request: NextRequest) {
               category: parsed.data.category ?? null,
               tags: parsed.data.tags ?? [],
               aiPrompt: parsed.data.aiPrompt ?? null,
-              config: parsed.data.config ?? undefined,
+              config: storedConfig as Prisma.InputJsonValue | undefined,
               mode: parsed.data.mode,
               selector: parsed.data.selector ?? null,
               keywords: parsed.data.keywords ?? [],
@@ -231,7 +254,16 @@ export async function POST(request: NextRequest) {
             });
           }
 
-          return NextResponse.json({ success: true, monitor }, { status: 201 });
+          return NextResponse.json(
+            {
+              success: true,
+              monitor: {
+                ...monitor,
+                config: sanitizeMonitorConfigForClient(monitor.config),
+              },
+            },
+            { status: 201 }
+          );
         } catch (error) {
           if (error instanceof Prisma.PrismaClientKnownRequestError) {
             if (error.code === "P2002") {

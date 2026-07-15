@@ -19,6 +19,14 @@ import {
   shouldEnforceRobotsTxt,
 } from "./robots";
 import { assertSafeFetchUrl, fetchWithSafeRedirects } from "@/lib/security/url";
+import type { WaitStrategy } from "@/lib/monitor-config";
+import {
+  cookiesFromBrowser,
+  decryptSessionCookies,
+  encryptSessionCookies,
+  isSessionExpired,
+  toPlaywrightCookies,
+} from "./session-cookies";
 
 const FETCH_RETRY_BASE_MS = 1000;
 
@@ -57,16 +65,99 @@ async function withFetchRetry<T>(
       return await fn();
     } catch (error) {
       lastError = error;
-      if (attempt < maxAttempts - 1) {
-        await sleep(FETCH_RETRY_BASE_MS * Math.pow(2, attempt));
+      const retryable = isRetryableFetchError(error);
+      if (!retryable || attempt >= maxAttempts - 1) {
+        break;
       }
+
+      const msg = error instanceof Error ? error.message : String(error);
+      const http = extractHttpStatusCode(msg);
+      // Longer pause for rate limits / overload
+      const base =
+        http === 429 || http === 503
+          ? FETCH_RETRY_BASE_MS * 3
+          : FETCH_RETRY_BASE_MS;
+      const delay = base * Math.pow(2, attempt);
+
+      monitorLog({
+        step: "fetch_start",
+        message: `Retryable fetch failure (attempt ${attempt + 1}/${maxAttempts}), waiting ${delay}ms`,
+        data: { http, delay },
+      });
+      await sleep(delay);
     }
   }
 
   throw lastError instanceof Error ? lastError : new Error("Fetch failed after retries");
 }
 
+function extractHttpStatusCode(message: string): number | null {
+  const m =
+    message.match(/\bHTTP\s+(\d{3})\b/i) ||
+    message.match(/\bstatus(?:\s*code)?[:\s]+(\d{3})\b/i);
+  if (!m) return null;
+  const code = Number(m[1]);
+  return Number.isFinite(code) ? code : null;
+}
+
+/** Permanent failures should not burn retries; transient ones should. */
+function isRetryableFetchError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  const lower = msg.toLowerCase();
+  const http = extractHttpStatusCode(msg);
+
+  if (
+    lower.includes("robots.txt") ||
+    lower.includes("access denied by robots") ||
+    lower.includes("selector not found") ||
+    lower.includes("xpath not found") ||
+    lower.includes("css selector is required") ||
+    lower.includes("xpath is required") ||
+    lower.includes("not allowed") ||
+    lower.includes("private network") ||
+    lower.includes("invalid url") ||
+    lower.includes("only http")
+  ) {
+    return false;
+  }
+
+  if (http === 401 || http === 403 || http === 404 || http === 410 || http === 407) {
+    return false;
+  }
+
+  if (http === 429 || http === 408 || http === 425 || http === 502 || http === 503 || http === 504) {
+    return true;
+  }
+
+  if (
+    lower.includes("timeout") ||
+    lower.includes("timed out") ||
+    lower.includes("navigation returned no response") ||
+    lower.includes("net::") ||
+    lower.includes("err_connection") ||
+    lower.includes("econnrefused") ||
+    lower.includes("econnreset") ||
+    lower.includes("enotfound") ||
+    lower.includes("socket hang up")
+  ) {
+    return true;
+  }
+
+  // Unknown errors: one retry path is still useful
+  return true;
+}
+
 let browserInstance: Browser | null = null;
+let browserUsers = 0;
+let idleCloseTimer: ReturnType<typeof setTimeout> | null = null;
+const BROWSER_IDLE_CLOSE_MS = 2_000;
+
+function clearIdleCloseTimer() {
+  if (idleCloseTimer) {
+    clearTimeout(idleCloseTimer);
+    idleCloseTimer = null;
+  }
+}
 
 function isServerlessRuntime(): boolean {
   return Boolean(
@@ -217,10 +308,43 @@ async function getBrowser(): Promise<Browser> {
   }
 }
 
+/**
+ * Borrow the shared Chromium instance for one check.
+ * Pair with releaseBrowser() so the process can idle-close safely.
+ */
+export async function acquireBrowser(): Promise<Browser> {
+  clearIdleCloseTimer();
+  browserUsers += 1;
+  try {
+    return await getBrowser();
+  } catch (error) {
+    browserUsers = Math.max(0, browserUsers - 1);
+    throw error;
+  }
+}
+
+export async function releaseBrowser(): Promise<void> {
+  browserUsers = Math.max(0, browserUsers - 1);
+  if (browserUsers > 0) return;
+
+  clearIdleCloseTimer();
+  idleCloseTimer = setTimeout(() => {
+    idleCloseTimer = null;
+    if (browserUsers === 0) {
+      void closeBrowser();
+    }
+  }, BROWSER_IDLE_CLOSE_MS);
+}
+
 export async function closeBrowser(): Promise<void> {
+  clearIdleCloseTimer();
+  browserUsers = 0;
   if (browserInstance) {
-    await browserInstance.close();
-    browserInstance = null;
+    try {
+      await browserInstance.close();
+    } finally {
+      browserInstance = null;
+    }
   }
 }
 
@@ -230,12 +354,16 @@ export interface FetchResult {
   extractedText: string;
   contentHash: string;
   metadata: Record<string, unknown>;
+  /** When set, processor should persist refreshed encrypted cookies for this user. */
+  refreshedEncryptedSession?: string;
+  sessionExpired?: boolean;
 }
 
 export interface FetchOptions {
   url: string;
   mode: MonitoringMode;
   monitorId?: string;
+  userId?: string;
   selector?: string | null;
   keywords?: string[];
   respectRobots?: boolean;
@@ -243,6 +371,14 @@ export interface FetchOptions {
   ignoreAds?: boolean;
   cleanOptions?: CleanOptions;
   maxRetries?: number;
+  waitStrategy?: WaitStrategy;
+  stabilizeMs?: number;
+  scrollForLazyLoad?: boolean;
+  scrollDepthPx?: number;
+  waitForSelector?: string | null;
+  expandSelectors?: string;
+  encryptedSession?: string;
+  sessionExpiresAt?: string | null;
 }
 
 export async function fetchPageContent(options: FetchOptions): Promise<FetchResult> {
@@ -286,12 +422,21 @@ async function fetchPageContentOnce(options: FetchOptions): Promise<FetchResult>
     url,
     mode,
     monitorId,
+    userId,
     selector,
     keywords,
     respectRobots = true,
     timeout = 30000,
     ignoreAds = true,
     cleanOptions,
+    waitStrategy = "stabilize",
+    stabilizeMs,
+    scrollForLazyLoad = true,
+    scrollDepthPx = 2400,
+    waitForSelector,
+    expandSelectors,
+    encryptedSession,
+    sessionExpiresAt,
   } = options;
 
   // Re-validate at fetch time (SSRF / private IP / DNS) — never trust stored URLs alone
@@ -303,7 +448,7 @@ async function fetchPageContentOnce(options: FetchOptions): Promise<FetchResult>
     url,
     mode,
     message: "Opening website with Playwright",
-    data: { timeout, respectRobots },
+    data: { timeout, respectRobots, waitStrategy },
   });
 
   if (mode === MonitoringMode.API_RESPONSE || mode === MonitoringMode.RSS_FEED) {
@@ -332,34 +477,110 @@ async function fetchPageContentOnce(options: FetchOptions): Promise<FetchResult>
     }
   }
 
-  const browser = await getBrowser();
-  const context = await browser.newContext({
-    userAgent:
-      "WatchFlowing/1.0 (+https://watchflowing.com/bot; monitoring service)",
-    viewport: { width: VISUAL_VIEWPORT.width, height: VISUAL_VIEWPORT.height },
-    deviceScaleFactor: 1,
-    ignoreHTTPSErrors: true,
-  });
+  if (
+    encryptedSession &&
+    isSessionExpired({ encryptedSession, sessionExpiresAt })
+  ) {
+    throw new Error(
+      "Saved session expired. Reconnect cookies in Advanced settings to continue."
+    );
+  }
 
+  const isVisual =
+    mode === MonitoringMode.VISUAL_CHANGES || mode === MonitoringMode.SCREENSHOT_DIFF;
+
+  const browser = await acquireBrowser();
+  let context: Awaited<ReturnType<Browser["newContext"]>> | null = null;
   let page: Page | null = null;
+  let refreshedEncryptedSession: string | undefined;
 
   try {
+    context = await browser.newContext({
+      userAgent:
+        "WatchFlowing/1.0 (+https://watchflowing.com/bot; monitoring service)",
+      viewport: { width: VISUAL_VIEWPORT.width, height: VISUAL_VIEWPORT.height },
+      deviceScaleFactor: 1,
+      ignoreHTTPSErrors: true,
+      javaScriptEnabled: true,
+    });
+
+    if (encryptedSession && userId) {
+      try {
+        const cookies = decryptSessionCookies(encryptedSession, userId);
+        const pwCookies = toPlaywrightCookies(cookies, url);
+        if (pwCookies.length === 0) {
+          throw new Error(
+            "Saved session expired. Reconnect cookies in Advanced settings to continue."
+          );
+        }
+        await context.addCookies(pwCookies);
+        monitorLog({
+          step: "fetch_start",
+          monitorId,
+          url,
+          mode,
+          message: "Applied encrypted user session cookies",
+          data: { cookieCount: pwCookies.length },
+        });
+      } catch (sessionError) {
+        const msg =
+          sessionError instanceof Error ? sessionError.message : String(sessionError);
+        if (msg.toLowerCase().includes("session expired")) throw sessionError;
+        monitorLogError("fetch_failed", "Failed to decrypt monitor session", sessionError, {
+          monitorId,
+          url,
+          mode,
+        });
+        throw new Error(
+          "Saved session expired. Reconnect cookies in Advanced settings to continue."
+        );
+      }
+    }
+
     page = await context.newPage();
 
-    // Block SSRF via redirect hops (re-validate every request URL)
+    // Block SSRF via redirect hops; drop heavy assets on non-visual checks
     await page.route("**/*", async (route) => {
       try {
         await assertSafeFetchUrl(route.request().url());
-        await route.continue();
       } catch {
         await route.abort("blockedbyclient");
+        return;
       }
+      if (!isVisual) {
+        const type = route.request().resourceType();
+        if (type === "media" || type === "font") {
+          await route.abort();
+          return;
+        }
+      }
+      await route.continue();
     });
 
-    const response = await page.goto(url, {
-      waitUntil: "domcontentloaded",
-      timeout,
-    });
+    let response;
+    try {
+      response = await page.goto(url, {
+        waitUntil: "domcontentloaded",
+        timeout,
+      });
+    } catch (navError) {
+      const navMsg = navError instanceof Error ? navError.message : String(navError);
+      if (/timeout|timed out/i.test(navMsg)) {
+        monitorLog({
+          step: "fetch_start",
+          monitorId,
+          url,
+          mode,
+          message: "Primary navigation timed out — retrying with commit wait",
+        });
+        response = await page.goto(url, {
+          waitUntil: "commit",
+          timeout: Math.min(timeout + 15_000, 90_000),
+        });
+      } else {
+        throw navError;
+      }
+    }
 
     if (!response) {
       throw new Error("Navigation returned no response");
@@ -368,11 +589,38 @@ async function fetchPageContentOnce(options: FetchOptions): Promise<FetchResult>
     // Final landed URL must also be safe
     await assertSafeFetchUrl(response.url());
 
-    if (response.status() >= 400) {
-      throw new Error(`HTTP ${response.status()} loading page`);
+    const status = response.status();
+    if (status >= 400) {
+      monitorLogError(
+        "fetch_failed",
+        `Page returned HTTP ${status}`,
+        new Error(`HTTP ${status} loading page`),
+        { monitorId, url, mode, data: { status, finalUrl: response.url() } }
+      );
+      throw new Error(`HTTP ${status} loading page`);
     }
 
-    await waitForPageReady(page, timeout);
+    const effectiveWaitSelector =
+      waitForSelector?.trim() ||
+      (mode === MonitoringMode.CSS_SELECTOR && selector ? selector : null);
+
+    await waitForPageReady(page, {
+      timeout,
+      waitStrategy,
+      stabilizeMs,
+      scrollForLazyLoad,
+      scrollDepthPx,
+      waitForSelector: effectiveWaitSelector,
+      expandSelectors,
+    });
+
+    // Hard adaptive wait for CSS selector modes — fail clearly if missing
+    if (mode === MonitoringMode.CSS_SELECTOR && selector) {
+      const found = await page.$(selector);
+      if (!found) {
+        throw new Error(`CSS selector not found: ${selector}`);
+      }
+    }
 
     const removed = await removeDynamicElements(page, {
       ignoreAds,
@@ -390,7 +638,12 @@ async function fetchPageContentOnce(options: FetchOptions): Promise<FetchResult>
     });
 
     let rawHtml: string;
-    let metadata: Record<string, unknown> = { finalUrl: page.url() };
+    let metadata: Record<string, unknown> = {
+      finalUrl: page.url(),
+      waitStrategy,
+      browserEngine: "chromium",
+      javaScriptEnabled: true,
+    };
 
     switch (mode) {
       case MonitoringMode.CSS_SELECTOR: {
@@ -544,9 +797,6 @@ async function fetchPageContentOnce(options: FetchOptions): Promise<FetchResult>
       mode === MonitoringMode.PRICE_DETECTION ||
       mode === MonitoringMode.KEYWORD_DETECTION;
 
-    const isVisual =
-      mode === MonitoringMode.VISUAL_CHANGES || mode === MonitoringMode.SCREENSHOT_DIFF;
-
     const cleanedHtml = isVisual
       ? rawHtml
       : isPlainText
@@ -569,6 +819,23 @@ async function fetchPageContentOnce(options: FetchOptions): Promise<FetchResult>
 
     const contentHash = computeContentHash(mode, partial);
 
+    if (encryptedSession && userId) {
+      try {
+        const jar = await context.cookies();
+        const refreshed = cookiesFromBrowser(jar);
+        if (refreshed.length > 0) {
+          refreshedEncryptedSession = encryptSessionCookies(refreshed, userId);
+        }
+      } catch (persistError) {
+        monitorLogError(
+          "fetch_failed",
+          "Could not refresh encrypted session cookies (non-fatal)",
+          persistError,
+          { monitorId, url, mode }
+        );
+      }
+    }
+
     monitorLog({
       step: "fetch_success",
       monitorId,
@@ -583,7 +850,11 @@ async function fetchPageContentOnce(options: FetchOptions): Promise<FetchResult>
       },
     });
 
-    return { ...partial, contentHash };
+    return {
+      ...partial,
+      contentHash,
+      refreshedEncryptedSession,
+    };
   } catch (error) {
     monitorLogError("fetch_failed", "Failed to fetch website", error, {
       monitorId,
@@ -592,8 +863,17 @@ async function fetchPageContentOnce(options: FetchOptions): Promise<FetchResult>
     });
     throw error;
   } finally {
-    if (page) await page.close();
-    await context.close();
+    try {
+      if (page) await page.close();
+    } catch {
+      // ignore
+    }
+    try {
+      if (context) await context.close();
+    } catch {
+      // ignore
+    }
+    await releaseBrowser();
   }
 }
 

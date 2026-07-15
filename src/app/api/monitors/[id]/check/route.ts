@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { apiErrorResponse } from "@/lib/api-response";
 import { classifyMonitoringError } from "@/lib/monitoring/error-messages";
+import { closeBrowser } from "@/lib/monitoring/fetcher";
 import { processMonitor } from "@/lib/monitoring/processor";
 import { processPendingAnalyses } from "@/lib/monitoring/ai-processor";
 import { withRateLimit } from "@/lib/rate-limit";
@@ -61,6 +62,12 @@ export async function POST(
             },
             { status: 422 }
           );
+        } finally {
+          try {
+            await closeBrowser();
+          } catch {
+            // non-fatal cleanup
+          }
         }
       },
       user.id,
