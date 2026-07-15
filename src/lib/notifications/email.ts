@@ -6,11 +6,63 @@ let resend: Resend | null = null;
 
 function getResend(): Resend {
   if (!resend) {
-    const apiKey = process.env.RESEND_API_KEY;
-    if (!apiKey) throw new Error("RESEND_API_KEY is not configured");
+    const apiKey = process.env.RESEND_API_KEY?.trim();
+    if (!apiKey) throw new Error("Missing configuration: RESEND_API_KEY");
     resend = new Resend(apiKey);
   }
   return resend;
+}
+
+/** Map Resend / send failures into stable debug-friendly reasons. */
+export function classifyEmailSendError(err: unknown): string {
+  if (!process.env.RESEND_API_KEY?.trim()) {
+    return "Missing configuration: RESEND_API_KEY";
+  }
+
+  const msg = err instanceof Error ? err.message : String(err);
+  const lower = msg.toLowerCase();
+
+  if (
+    lower.includes("api key") ||
+    lower.includes("unauthorized") ||
+    lower.includes("invalid api") ||
+    lower.includes("401") ||
+    lower.includes("forbidden") ||
+    lower.includes("403")
+  ) {
+    return "Invalid API key";
+  }
+
+  if (
+    lower.includes("domain is not verified") ||
+    lower.includes("not verified") ||
+    lower.includes("from address") ||
+    lower.includes("unable to send from") ||
+    lower.includes("sender address") ||
+    (lower.includes("dns") && lower.includes("domain"))
+  ) {
+    return "Domain not verified";
+  }
+
+  if (
+    lower.includes("rate limit") ||
+    lower.includes("too many") ||
+    lower.includes("429") ||
+    lower.includes("throttl")
+  ) {
+    return "Rate limit";
+  }
+
+  if (
+    lower.includes("not configured") ||
+    lower.includes("missing configuration") ||
+    lower.includes("resend_from") ||
+    lower.includes("missing")
+  ) {
+    return `Missing configuration: ${msg.slice(0, 160)}`;
+  }
+
+  return `API failure: ${msg.slice(0, 240)}`;
 }
 
 function escapeHtml(value: string): string {
@@ -36,9 +88,21 @@ function formatEmailTime(date: Date | string = new Date()): string {
 
 function getHostname(url: string): string {
   try {
-    return new URL(url).hostname;
+    return new URL(url).hostname.replace(/^www\./, "");
   } catch {
     return url;
+  }
+}
+
+function resolveFaviconUrl(siteUrl: string, faviconUrl?: string | null): string {
+  if (faviconUrl?.startsWith("https://") || faviconUrl?.startsWith("http://")) {
+    return faviconUrl;
+  }
+  try {
+    const host = new URL(siteUrl).hostname;
+    return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=64`;
+  } catch {
+    return "";
   }
 }
 
@@ -62,16 +126,25 @@ interface ChangeEmailParams {
   monitorMode?: string;
   changeId: string;
   detectedAt?: Date | string;
+  faviconUrl?: string | null;
 }
 
 export async function sendChangeEmail(params: ChangeEmailParams) {
+  if (!params.to?.trim()) {
+    throw new Error("Missing configuration: recipient email address");
+  }
+
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const from = process.env.RESEND_FROM_EMAIL ?? "WatchFlowing <notifications@watchflowing.com>";
+  const from =
+    process.env.RESEND_FROM_EMAIL?.trim() ||
+    "WatchFlowing <notifications@watchflowing.com>";
   const dashboardUrl = `${appUrl}/dashboard/changes/${params.changeId}`;
   const settingsUrl = `${appUrl}/dashboard/settings`;
   const notificationsUrl = `${appUrl}/dashboard/notifications`;
   const detectedAt = formatEmailTime(params.detectedAt ?? new Date());
   const hostname = getHostname(params.url);
+  const logoUrl = resolveFaviconUrl(params.url, params.faviconUrl);
+  const brandLogo = `${appUrl}/icon.svg`;
   const modeLabel =
     params.monitorMode && MODE_LABELS[params.monitorMode as MonitoringMode]
       ? MODE_LABELS[params.monitorMode as MonitoringMode]
@@ -97,6 +170,8 @@ export async function sendChangeEmail(params: ChangeEmailParams) {
     notificationsUrl: escapeHtml(notificationsUrl),
     detectedAt: escapeHtml(detectedAt),
     headline: escapeHtml(importanceHeadline(params.importance)),
+    logoUrl: escapeHtml(logoUrl),
+    brandLogo: escapeHtml(brandLogo),
     changes: params.changes.map(escapeHtml),
   };
 
@@ -117,7 +192,7 @@ export async function sendChangeEmail(params: ChangeEmailParams) {
           .map(
             (c) => `
             <tr>
-              <td style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);color:#d4d4d8;font-size:14px;line-height:1.5;">
+              <td style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);color:#d4d4d8;font-size:14px;line-height:1.5;word-break:break-word;">
                 <span style="color:#22d3ee;margin-right:8px;">•</span>${c}
               </td>
             </tr>`
@@ -130,12 +205,17 @@ export async function sendChangeEmail(params: ChangeEmailParams) {
               </td>
             </tr>`;
 
+  const logoBlock = safe.logoUrl
+    ? `<img src="${safe.logoUrl}" width="40" height="40" alt="" style="display:block;border-radius:10px;border:1px solid rgba(255,255,255,0.08);background:#0a0a0a;" />`
+    : `<div style="width:40px;height:40px;border-radius:10px;background:rgba(34,211,238,0.12);border:1px solid rgba(34,211,238,0.25);text-align:center;line-height:40px;font-size:18px;">${safe.emoji}</div>`;
+
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="color-scheme" content="dark">
+  <meta name="color-scheme" content="dark light">
+  <meta name="supported-color-schemes" content="dark light">
   <title>${urgencyIcon}${safe.monitorName} — ${safe.importance}</title>
 </head>
 <body style="margin:0;padding:0;background:#090909;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
@@ -144,38 +224,40 @@ export async function sendChangeEmail(params: ChangeEmailParams) {
       <td align="center">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#111111;border:1px solid rgba(56,189,248,0.18);border-radius:16px;overflow:hidden;">
           <tr>
-            <td style="padding:28px 24px 20px;border-bottom:1px solid rgba(255,255,255,0.06);background:linear-gradient(135deg,rgba(34,211,238,0.08),transparent 55%);">
-              <p style="margin:0 0 8px;font-size:11px;letter-spacing:0.22em;text-transform:uppercase;color:rgba(56,189,248,0.75);">WatchFlowing</p>
-              <h1 style="margin:0;color:#fafafa;font-size:22px;font-weight:600;line-height:1.3;">
-                ${urgencyIcon}${safe.emoji} ${safe.headline}
+            <td style="padding:24px 24px 18px;border-bottom:1px solid rgba(255,255,255,0.06);background:linear-gradient(135deg,rgba(34,211,238,0.09),transparent 55%);">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="vertical-align:middle;">
+                    <img src="${safe.brandLogo}" width="22" height="22" alt="WatchFlowing" style="display:inline-block;vertical-align:middle;margin-right:8px;" />
+                    <span style="font-size:11px;letter-spacing:0.22em;text-transform:uppercase;color:rgba(56,189,248,0.8);vertical-align:middle;">WatchFlowing</span>
+                  </td>
+                </tr>
+              </table>
+              <h1 style="margin:14px 0 0;color:#fafafa;font-size:21px;font-weight:600;line-height:1.35;">
+                ${urgencyIcon}${safe.headline}
               </h1>
-              <p style="margin:10px 0 0;color:#a1a1aa;font-size:14px;">
-                ${safe.monitorName} · ${safe.modeLabel}
-              </p>
             </td>
           </tr>
 
           <tr>
-            <td style="padding:24px;">
+            <td style="padding:22px 24px;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:12px;">
                 <tr>
-                  <td style="padding:16px 18px;">
-                    <p style="margin:0 0 4px;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#71717a;">Website</p>
-                    <p style="margin:0;color:#f4f4f5;font-size:16px;font-weight:600;">${safe.hostname}</p>
-                    <a href="${safe.url}" style="display:inline-block;margin-top:6px;color:#67e8f9;font-size:12px;word-break:break-all;text-decoration:none;">${safe.url}</a>
+                  <td style="padding:16px 18px;vertical-align:middle;width:52px;">
+                    ${logoBlock}
                   </td>
-                </tr>
-                <tr>
-                  <td style="padding:0 18px 16px;">
-                    <p style="margin:0 0 4px;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#71717a;">Monitor type</p>
-                    <p style="margin:0;color:#e4e4e7;font-size:13px;">${safe.modeLabel} · ${safe.category}</p>
+                  <td style="padding:16px 18px 16px 0;vertical-align:middle;">
+                    <p style="margin:0 0 2px;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#71717a;">Monitored website</p>
+                    <p style="margin:0;color:#f4f4f5;font-size:16px;font-weight:600;">${safe.monitorName}</p>
+                    <p style="margin:4px 0 0;color:#a1a1aa;font-size:13px;">${safe.hostname}</p>
+                    <a href="${safe.url}" style="display:inline-block;margin-top:6px;color:#67e8f9;font-size:12px;word-break:break-all;text-decoration:none;">${safe.url}</a>
                   </td>
                 </tr>
               </table>
 
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;">
                 <tr>
-                  <td width="50%" style="padding-right:8px;vertical-align:top;">
+                  <td width="50%" style="padding-right:6px;vertical-align:top;">
                     <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:14px 16px;">
                       <p style="margin:0 0 6px;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#71717a;">Importance</p>
                       <span style="display:inline-block;background:${color}22;color:${color};border:1px solid ${color}55;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:0.04em;">
@@ -183,7 +265,7 @@ export async function sendChangeEmail(params: ChangeEmailParams) {
                       </span>
                     </div>
                   </td>
-                  <td width="50%" style="padding-left:8px;vertical-align:top;">
+                  <td width="50%" style="padding-left:6px;vertical-align:top;">
                     <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:14px 16px;">
                       <p style="margin:0 0 6px;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#71717a;">Detected</p>
                       <p style="margin:0;color:#e4e4e7;font-size:13px;line-height:1.4;">${safe.detectedAt}</p>
@@ -192,44 +274,30 @@ export async function sendChangeEmail(params: ChangeEmailParams) {
                 </tr>
               </table>
 
-              <div style="margin-top:20px;">
-                <p style="margin:0 0 8px;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#71717a;">Change</p>
-                <p style="margin:0;color:#f4f4f5;font-size:15px;font-weight:600;line-height:1.5;">
-                  ${safe.changes[0] ?? safe.summary}
-                </p>
-              </div>
-
               <div style="margin-top:18px;">
-                <p style="margin:0 0 8px;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#71717a;">AI analysis</p>
-                <p style="margin:0;color:#e4e4e7;font-size:15px;line-height:1.7;">
+                <p style="margin:0 0 8px;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#71717a;">AI summary</p>
+                <p style="margin:0;color:#e4e4e7;font-size:15px;line-height:1.7;word-break:break-word;">
                   ${safe.summary}
                 </p>
               </div>
 
-              <div style="margin-top:18px;padding:16px 18px;background:rgba(34,211,238,0.06);border:1px solid rgba(34,211,238,0.18);border-radius:12px;">
-                <p style="margin:0 0 6px;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(103,232,249,0.85);">Recommended action</p>
-                <p style="margin:0;color:#ecfeff;font-size:14px;line-height:1.6;">${safe.recommendation}</p>
-              </div>
-
-              <div style="margin-top:22px;padding:18px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:12px;">
+              <div style="margin-top:18px;padding:16px 18px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:12px;">
                 <p style="margin:0 0 10px;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#71717a;">What changed</p>
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                   ${changeRows}
                 </table>
               </div>
 
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:28px;">
+              <div style="margin-top:16px;padding:14px 16px;background:rgba(34,211,238,0.06);border:1px solid rgba(34,211,238,0.18);border-radius:12px;">
+                <p style="margin:0 0 4px;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(103,232,249,0.85);">Recommended</p>
+                <p style="margin:0;color:#ecfeff;font-size:14px;line-height:1.55;">${safe.recommendation}</p>
+              </div>
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:26px;">
                 <tr>
                   <td align="center">
                     <a href="${safe.dashboardUrl}" style="display:inline-block;background:#22d3ee;color:#090909;text-decoration:none;padding:14px 28px;border-radius:999px;font-size:14px;font-weight:700;">
-                      View full analysis
-                    </a>
-                  </td>
-                </tr>
-                <tr>
-                  <td align="center" style="padding-top:14px;">
-                    <a href="${safe.url}" style="color:#71717a;font-size:12px;text-decoration:underline;">
-                      Visit monitored website
+                      View Change
                     </a>
                   </td>
                 </tr>
@@ -238,16 +306,14 @@ export async function sendChangeEmail(params: ChangeEmailParams) {
           </tr>
 
           <tr>
-            <td style="padding:18px 24px;background:rgba(255,255,255,0.02);border-top:1px solid rgba(255,255,255,0.06);text-align:center;">
-              <p style="margin:0 0 10px;font-size:11px;color:#52525b;line-height:1.5;">
+            <td style="padding:16px 24px;background:rgba(255,255,255,0.02);border-top:1px solid rgba(255,255,255,0.06);text-align:center;">
+              <p style="margin:0 0 8px;font-size:11px;color:#52525b;line-height:1.5;">
                 You received this because email alerts are enabled for this monitor.
               </p>
               <p style="margin:0;font-size:11px;line-height:1.6;">
                 <a href="${safe.settingsUrl}" style="color:#67e8f9;text-decoration:none;">Notification settings</a>
                 <span style="color:#3f3f46;"> · </span>
                 <a href="${safe.notificationsUrl}" style="color:#67e8f9;text-decoration:none;">Manage alerts</a>
-                <span style="color:#3f3f46;"> · </span>
-                <a href="${safe.settingsUrl}" style="color:#71717a;text-decoration:underline;">Unsubscribe / pause</a>
               </p>
               <p style="margin:12px 0 0;font-size:11px;color:#3f3f46;">
                 WatchFlowing · Intelligent website monitoring
@@ -264,50 +330,55 @@ export async function sendChangeEmail(params: ChangeEmailParams) {
   const text = [
     `${urgencyIcon.trim()}${params.emoji} ${importanceHeadline(params.importance)}`,
     "",
-    `Website: ${hostname}`,
     `Monitor: ${params.monitorName}`,
-    `Type: ${modeLabel}`,
+    `Website: ${hostname}`,
+    `URL: ${params.url}`,
     `Importance: ${params.importance}`,
     `Detected: ${detectedAt}`,
     "",
-    `Change: ${params.changes[0] ?? params.summary}`,
-    "",
-    `AI analysis: ${params.summary}`,
-    "",
-    `Recommended action: ${recommendation}`,
+    `AI summary: ${params.summary}`,
     "",
     "What changed:",
     ...params.changes.map((c) => `• ${c}`),
     "",
-    `View full analysis: ${dashboardUrl}`,
+    `Recommended: ${recommendation}`,
+    "",
+    `View Change: ${dashboardUrl}`,
     `Notification settings: ${settingsUrl}`,
   ].join("\n");
 
-  const result = await getResend().emails.send({
-    from,
-    to: params.to,
-    subject: `${urgencyIcon}${params.emoji} ${params.monitorName} — ${params.importance}`,
-    html,
-    text,
-  });
+  try {
+    const result = await getResend().emails.send({
+      from,
+      to: params.to,
+      subject: `${urgencyIcon}${params.emoji} ${params.monitorName} — ${params.importance}`,
+      html,
+      text,
+    });
 
-  if (result.error) {
-    throw new Error(result.error.message);
+    if (result.error) {
+      throw new Error(result.error.message || "Resend API rejected the request");
+    }
+
+    return result;
+  } catch (err) {
+    throw new Error(classifyEmailSendError(err));
   }
-
-  return result;
 }
 
 export async function sendWelcomeEmail(to: string, name: string) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const from = process.env.RESEND_FROM_EMAIL ?? "WatchFlowing <notifications@watchflowing.com>";
+  const from =
+    process.env.RESEND_FROM_EMAIL?.trim() ||
+    "WatchFlowing <notifications@watchflowing.com>";
   const safeName = escapeHtml(name);
 
-  await getResend().emails.send({
-    from,
-    to,
-    subject: "Welcome to WatchFlowing — create your first monitor",
-    html: `
+  try {
+    const result = await getResend().emails.send({
+      from,
+      to,
+      subject: "Welcome to WatchFlowing — create your first monitor",
+      html: `
       <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:560px;margin:0 auto;padding:40px 20px;background:#090909;color:#d4d4d8;">
         <p style="margin:0 0 8px;font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:rgba(56,189,248,0.75);">WatchFlowing</p>
         <h1 style="color:#fafafa;margin:0 0 12px;">Welcome, ${safeName}</h1>
@@ -321,5 +392,12 @@ export async function sendWelcomeEmail(to: string, name: string) {
         <p style="margin-top:28px;font-size:12px;color:#71717a;">Need help? Reply to this email or open the Detection Assistant in your dashboard.</p>
       </div>
     `,
-  });
+    });
+
+    if (result.error) {
+      throw new Error(result.error.message || "Resend API rejected the request");
+    }
+  } catch (err) {
+    throw new Error(classifyEmailSendError(err));
+  }
 }

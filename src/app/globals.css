@@ -148,3 +148,15 @@
   }
 }
 
+/* Premium scroll panels — wheel/touch scroll, no visible scrollbar */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+

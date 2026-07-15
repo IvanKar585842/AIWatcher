@@ -201,10 +201,10 @@ export function DetectionAssistantPanel({ embedded = false }: { embedded?: boole
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: embedded ? 0 : 0.12 }}
       className={cn(
-        "flex w-full min-w-0 flex-col",
+        "flex w-full min-w-0 flex-col overflow-hidden",
         embedded
-          ? ""
-          : "min-h-[480px] rounded-2xl border border-cyan-500/15 bg-white/[0.02]"
+          ? "h-full min-h-0"
+          : "min-h-[480px] max-h-[min(640px,75vh)] rounded-2xl border border-cyan-500/15 bg-white/[0.02]"
       )}
     >
       <div
@@ -248,7 +248,7 @@ export function DetectionAssistantPanel({ embedded = false }: { embedded?: boole
         </div>
       </div>
 
-      <div className="space-y-3 px-3 py-4 sm:px-4 sm:py-5">
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain scroll-smooth px-3 py-4 scrollbar-none sm:px-4 sm:py-5">
         {booting && (
           <p className="py-8 text-center text-xs text-zinc-600">Loading assistant…</p>
         )}
@@ -288,7 +288,7 @@ export function DetectionAssistantPanel({ embedded = false }: { embedded?: boole
           >
             <div
               className={cn(
-                "max-w-[min(92%,28rem)] break-words rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed",
+                "max-w-[min(92%,28rem)] break-words rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed [overflow-wrap:anywhere]",
                 msg.role === "USER"
                   ? "border border-cyan-400/20 bg-cyan-500/10 text-cyan-50"
                   : "border border-white/[0.06] bg-white/[0.03] text-zinc-300"
@@ -301,7 +301,7 @@ export function DetectionAssistantPanel({ embedded = false }: { embedded?: boole
 
         {streaming && (
           <div className="flex justify-start">
-            <div className="max-w-[min(92%,28rem)] break-words rounded-2xl border border-white/[0.06] bg-white/[0.03] px-3.5 py-2.5 text-sm text-zinc-300">
+            <div className="max-w-[min(92%,28rem)] break-words rounded-2xl border border-white/[0.06] bg-white/[0.03] px-3.5 py-2.5 text-sm text-zinc-300 [overflow-wrap:anywhere]">
               <p className="whitespace-pre-wrap break-words">{streaming}</p>
             </div>
           </div>

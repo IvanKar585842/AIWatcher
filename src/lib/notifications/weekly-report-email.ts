@@ -1,11 +1,12 @@
 import { Resend } from "resend";
+import { classifyEmailSendError } from "@/lib/notifications/email";
 
 let resend: Resend | null = null;
 
 function getResend(): Resend {
   if (!resend) {
-    const apiKey = process.env.RESEND_API_KEY;
-    if (!apiKey) throw new Error("RESEND_API_KEY is not configured");
+    const apiKey = process.env.RESEND_API_KEY?.trim();
+    if (!apiKey) throw new Error("Missing configuration: RESEND_API_KEY");
     resend = new Resend(apiKey);
   }
   return resend;
@@ -30,8 +31,13 @@ export async function sendWeeklyReportEmail(params: {
   recommendations: string[];
   reportUrl: string;
 }) {
+  if (!params.to?.trim()) {
+    throw new Error("Missing configuration: recipient email address");
+  }
+
   const from =
-    process.env.RESEND_FROM_EMAIL ?? "WatchFlowing <notifications@watchflowing.com>";
+    process.env.RESEND_FROM_EMAIL?.trim() ||
+    "WatchFlowing <notifications@watchflowing.com>";
   const greeting = params.name ? `Hi ${escapeHtml(params.name)},` : "Hi,";
 
   const importantHtml = params.importantChanges.length
@@ -98,11 +104,19 @@ export async function sendWeeklyReportEmail(params: {
     params.reportUrl,
   ].join("\n");
 
-  await getResend().emails.send({
-    from,
-    to: params.to,
-    subject: "Your WatchFlowing Weekly Intelligence Report",
-    html,
-    text,
-  });
+  try {
+    const result = await getResend().emails.send({
+      from,
+      to: params.to,
+      subject: "Your WatchFlowing Weekly Intelligence Report",
+      html,
+      text,
+    });
+
+    if (result.error) {
+      throw new Error(result.error.message || "Resend API rejected the request");
+    }
+  } catch (err) {
+    throw new Error(classifyEmailSendError(err));
+  }
 }

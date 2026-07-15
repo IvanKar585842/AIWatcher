@@ -79,7 +79,7 @@ export function IntelligenceCenter({
 
   return (
     <section
-      className="flex w-full min-w-0 flex-col rounded-2xl border border-cyan-500/15 bg-white/[0.02]"
+      className="flex h-full min-h-[360px] w-full min-w-0 max-h-[min(640px,72vh)] flex-col overflow-hidden rounded-2xl border border-cyan-500/15 bg-white/[0.02] lg:max-h-[640px]"
       data-tour="intelligence-center"
     >
       <div className="shrink-0 border-b border-white/[0.06] px-3 pt-3 sm:px-5 sm:pt-5">
@@ -136,7 +136,7 @@ export function IntelligenceCenter({
         </div>
       </div>
 
-      <div className="relative w-full min-w-0">
+      <div className="relative min-h-0 w-full min-w-0 flex-1 overflow-hidden">
         <AnimatePresence mode="wait" initial={false}>
           {tab === "feed" ? (
             <motion.div
@@ -147,7 +147,7 @@ export function IntelligenceCenter({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-              className="w-full"
+              className="flex h-full min-h-0 w-full flex-col"
             >
               <RecentActivityPanel
                 embedded
@@ -164,12 +164,12 @@ export function IntelligenceCenter({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-              className="w-full"
+              className="flex h-full min-h-0 w-full flex-col overflow-hidden"
             >
               {assistantReady ? (
                 <DetectionAssistantPanel embedded />
               ) : (
-                <div className="flex min-h-[280px] items-center justify-center p-6 text-xs text-zinc-600">
+                <div className="flex min-h-[280px] flex-1 items-center justify-center p-6 text-xs text-zinc-600">
                   Loading assistant…
                 </div>
               )}

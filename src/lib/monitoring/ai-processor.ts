@@ -13,7 +13,7 @@ import { trackEvent } from "@/lib/analytics";
 import { prisma } from "@/lib/db";
 import { getUpgradeCopy } from "@/lib/plan-features";
 import { parseMonitorConfig } from "@/lib/monitor-config";
-import { sendChangeEmail } from "@/lib/notifications/email";
+import { sendChangeEmail, classifyEmailSendError } from "@/lib/notifications/email";
 import { sendTelegramChangeNotification } from "@/lib/notifications/telegram";
 import {
   createInAppNotification,
@@ -634,6 +634,7 @@ async function sendNotifications(
   const wantsEmail =
     emailAllowed &&
     monitor.user.emailNotificationsEnabled !== false &&
+    Boolean(monitor.user.email?.trim()) &&
     (monitor.notificationMethod === NotificationMethod.EMAIL ||
       monitor.notificationMethod === NotificationMethod.BOTH);
   // If Telegram is connected + enabled, always send alerts (even when monitor defaults to EMAIL).
@@ -641,6 +642,26 @@ async function sendNotifications(
     Boolean(monitor.user.telegramChatId) &&
     monitor.user.telegramConnected === true &&
     monitor.user.telegramNotificationsEnabled !== false;
+
+  if (
+    (monitor.notificationMethod === NotificationMethod.EMAIL ||
+      monitor.notificationMethod === NotificationMethod.BOTH) &&
+    !monitor.user.email?.trim()
+  ) {
+    await recordAlertDelivery(
+      monitor.userId,
+      changeId,
+      NotificationChannel.EMAIL,
+      "FAILED",
+      "Missing configuration: recipient email address"
+    );
+    monitorLogError(
+      "error",
+      "Email notification skipped — user has no email",
+      new Error("Missing recipient email"),
+      { monitorId: monitor.id, data: { changeId } }
+    );
+  }
 
   if (!emailAllowed && (monitor.notificationMethod === NotificationMethod.EMAIL ||
       monitor.notificationMethod === NotificationMethod.BOTH)) {
@@ -650,6 +671,13 @@ async function sendNotifications(
       userId: monitor.userId,
       resourceId: changeId,
     });
+    await recordAlertDelivery(
+      monitor.userId,
+      changeId,
+      NotificationChannel.EMAIL,
+      "FAILED",
+      "Rate limit"
+    );
   }
 
   if (wantsEmail) {
@@ -688,6 +716,7 @@ async function sendNotifications(
             monitorMode: monitor.mode,
             changeId,
             detectedAt: new Date(),
+            faviconUrl: monitor.faviconUrl,
           });
 
           await recordAlertDelivery(monitor.userId, changeId, NotificationChannel.EMAIL, "SENT");
@@ -700,23 +729,24 @@ async function sendNotifications(
             data: { changeId },
           });
         } catch (err) {
+          const reason = classifyEmailSendError(err);
           await recordAlertDelivery(
             monitor.userId,
             changeId,
             NotificationChannel.EMAIL,
             "FAILED",
-            err instanceof Error ? err.message : "Send failed"
+            reason
           );
           securityLog({
             type: "failsafe.activated",
             message: "Email send failed — logged and continued",
             userId: monitor.userId,
             resourceId: changeId,
-            metadata: { error: err instanceof Error ? err.message : String(err) },
+            metadata: { error: reason },
           });
-          monitorLogError("error", "Email notification failed", err, {
+          monitorLogError("error", `Email notification failed: ${reason}`, err, {
             monitorId: monitor.id,
-            data: { changeId },
+            data: { changeId, reason },
           });
         }
       })()

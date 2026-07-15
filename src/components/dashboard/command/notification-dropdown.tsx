@@ -146,7 +146,7 @@ export function NotificationDropdown() {
             )}
           </div>
 
-          <div className="max-h-[min(55vh,20rem)] overflow-y-auto sm:max-h-80">
+          <div className="max-h-[min(55vh,20rem)] overflow-y-auto overscroll-contain scroll-smooth scrollbar-none sm:max-h-80">
             {loading && notifications.length === 0 && (
               <p className="px-4 py-6 text-center text-xs text-zinc-600">Loading...</p>
             )}

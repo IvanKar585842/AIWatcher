@@ -72,7 +72,9 @@ export const RecentActivityPanel = memo(function RecentActivityPanel({
     <div
       className={cn(
         "flex w-full min-w-0 flex-col",
-        embedded ? "" : "rounded-2xl border border-white/[0.06] bg-white/[0.02]"
+        embedded
+          ? "h-full min-h-0 overflow-hidden"
+          : "max-h-[min(560px,70vh)] overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02]"
       )}
     >
       <div
@@ -131,7 +133,7 @@ export const RecentActivityPanel = memo(function RecentActivityPanel({
         </div>
       </div>
 
-      <div className="w-full min-w-0">
+      <div className="min-h-0 w-full min-w-0 flex-1 overflow-y-auto overscroll-contain scroll-smooth scrollbar-none">
         <AnimatePresence mode="wait">
           {tab === "detections" ? (
             <motion.div
@@ -155,7 +157,7 @@ export const RecentActivityPanel = memo(function RecentActivityPanel({
                       key={change.id}
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.03 }}
+                      transition={{ delay: Math.min(i * 0.03, 0.24) }}
                     >
                       <Link
                         href={`/dashboard/changes/${change.id}`}
@@ -163,7 +165,7 @@ export const RecentActivityPanel = memo(function RecentActivityPanel({
                       >
                         <div className="flex items-start gap-3">
                           <span className="mt-0.5 text-base leading-none">{change.emoji}</span>
-                          <div className="min-w-0 flex-1">
+                          <div className="min-w-0 flex-1 overflow-hidden">
                             <div className="flex flex-wrap items-center gap-2">
                               <span
                                 className={`inline-flex rounded-full border px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider ${
@@ -183,7 +185,7 @@ export const RecentActivityPanel = memo(function RecentActivityPanel({
                             <p className="truncate font-mono text-[10px] text-zinc-600">
                               {hostFromUrl(change.monitor.url)}
                             </p>
-                            <p className="mt-1.5 line-clamp-3 text-xs leading-relaxed text-zinc-400">
+                            <p className="mt-1.5 break-words text-xs leading-relaxed text-zinc-400 [overflow-wrap:anywhere]">
                               {change.summary}
                             </p>
                             <p className="mt-2 text-[10px] font-medium text-cyan-500/70">
@@ -209,8 +211,8 @@ export const RecentActivityPanel = memo(function RecentActivityPanel({
               {notifications.length === 0 ? (
                 <EmptyState
                   icon={Bell}
-                  title="No intelligence insights yet"
-                  description="Once WatchFlowing detects important changes, AI insights will appear here."
+                  title="No notifications yet"
+                  description="Email, Telegram, and in-app alerts for monitored changes will appear here."
                 />
               ) : (
                 <div className="space-y-2">
@@ -219,16 +221,16 @@ export const RecentActivityPanel = memo(function RecentActivityPanel({
                       key={notif.id}
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.03 }}
+                      transition={{ delay: Math.min(i * 0.03, 0.24) }}
                     >
                       <Link
                         href={`/dashboard/changes/${notif.change.id}`}
                         className="group flex min-h-[4.5rem] items-start gap-3 rounded-xl border border-white/[0.05] bg-black/20 p-3 transition-colors hover:border-cyan-500/20 hover:bg-cyan-500/[0.04]"
                       >
                         <span className="mt-0.5 text-base">{notif.change.emoji}</span>
-                        <div className="min-w-0 flex-1">
+                        <div className="min-w-0 flex-1 overflow-hidden">
                           <div className="flex flex-wrap items-center gap-2">
-                            <p className="break-words text-sm font-medium text-zinc-200 group-hover:text-cyan-100">
+                            <p className="min-w-0 break-words text-sm font-medium text-zinc-200 group-hover:text-cyan-100">
                               {notif.change.monitor.name}
                             </p>
                             <span
@@ -239,7 +241,7 @@ export const RecentActivityPanel = memo(function RecentActivityPanel({
                               {notif.status}
                             </span>
                           </div>
-                          <p className="mt-1 line-clamp-3 text-xs text-zinc-400">
+                          <p className="mt-1 break-words text-xs text-zinc-400 [overflow-wrap:anywhere]">
                             {notif.change.summary}
                           </p>
                           <p className="mt-1.5 font-mono text-[10px] text-zinc-600">
