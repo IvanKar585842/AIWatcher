@@ -493,8 +493,10 @@ async function analyzeChangeRecord(change: ChangeWithMonitor): Promise<void> {
     summary: analysis.summary,
     importance: analysis.importance,
     category: analysis.category,
+    categoryLabel: analysis.categoryLabel,
     shouldNotify: analysis.shouldNotify,
     changes,
+    potentialImpact: analysis.potentialImpact,
     recommendedAction:
       analysis.recommendedAction ||
       defaultRecommendedAction(analysis.importance, analysis.category),

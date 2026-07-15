@@ -6,8 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Cpu, Globe2 } from "lucide-react";
 import { CreateMonitorDialog } from "@/components/dashboard/create-monitor-dialog";
 import { WebsiteLogo } from "@/components/dashboard/website-logo";
-import { getDomainFromUrl } from "@/lib/utils";
-import { cn } from "@/lib/utils";
+import { cn, formatRelativeTime, getDomainFromUrl } from "@/lib/utils";
 
 export interface NetworkMonitor {
   id: string;
@@ -211,11 +210,21 @@ export function NetworkMap({ monitors }: { monitors: NetworkMonitor[] }) {
   const [pulseId, setPulseId] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [reduceMotion, setReduceMotion] = useState(false);
 
   useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const apply = () => setReduceMotion(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+
+  useEffect(() => {
+    if (reduceMotion) return;
     const id = setInterval(() => setTick((t) => t + 1), 3000);
     return () => clearInterval(id);
-  }, []);
+  }, [reduceMotion]);
 
   useEffect(() => {
     const recent = monitors.filter((m) => isRecentlyChanged(m.lastChangedAt));
@@ -245,22 +254,37 @@ export function NetworkMap({ monitors }: { monitors: NetworkMonitor[] }) {
 
   const core = { x: CX, y: CY };
 
+  const recentChangeCount = useMemo(
+    () => monitors.filter((m) => isRecentlyChanged(m.lastChangedAt)).length,
+    [monitors]
+  );
+  const activeCount = useMemo(
+    () => monitors.filter((m) => m.status === "ACTIVE").length,
+    [monitors]
+  );
+
   return (
     <div
       className="relative min-h-[420px] w-full overflow-hidden rounded-2xl border border-white/[0.06] bg-[#060606] sm:min-h-[520px] lg:min-h-[640px]"
       data-tour="global-map"
     >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(34,211,238,0.06),transparent_65%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,transparent_70%,rgba(0,0,0,0.55))]" />
 
       <div className="absolute left-4 top-4 z-10 sm:left-5">
         <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-cyan-500/70">
-          Network Grid
+          Intelligence grid
         </p>
         <h3 className="mt-1 text-sm font-medium text-zinc-200 sm:text-base">
           Global Monitor Map
         </h3>
+        <p className="mt-1 max-w-[240px] text-[11px] leading-relaxed text-zinc-600 sm:max-w-xs">
+          {monitors.length === 0
+            ? "Your monitored sites appear around the AI Core."
+            : `${activeCount} active · ${recentChangeCount} changed in the last hour`}
+        </p>
         {selected && (
-          <p className="mt-1 max-w-[200px] truncate font-mono text-[10px] text-zinc-600 sm:max-w-xs">
+          <p className="mt-1 max-w-[200px] truncate font-mono text-[10px] text-cyan-500/80 sm:max-w-xs">
             Focus: {selected.name}
           </p>
         )}
@@ -321,43 +345,90 @@ export function NetworkMap({ monitors }: { monitors: NetworkMonitor[] }) {
                 ))
               )}
 
-              {nodes.map((node) => (
-                <g key={`line-${node.id}`}>
-                  <motion.line
-                    x1={core.x}
-                    y1={core.y}
-                    x2={node.x}
-                    y2={node.y}
-                    stroke={
-                      selectedId === node.id
-                        ? "rgba(34,211,238,0.55)"
-                        : node.pulsing
-                          ? "rgba(34,211,238,0.45)"
-                          : "rgba(56,189,248,0.08)"
-                    }
-                    strokeWidth={selectedId === node.id || node.pulsing ? 1.5 : 0.8}
-                    animate={
-                      node.pulsing || selectedId === node.id
-                        ? { strokeOpacity: [0.3, 0.8, 0.3] }
-                        : { strokeOpacity: 0.15 }
-                    }
-                    transition={{ duration: 2, repeat: Infinity }}
-                  />
-                  {node.pulsing && (
-                    <motion.circle
-                      r={Math.max(2, 3 * scale.factor)}
-                      fill="#22d3ee"
-                      filter="url(#nodeGlow)"
-                      animate={{
-                        cx: [core.x, node.x],
-                        cy: [core.y, node.y],
-                        opacity: [0, 1, 0],
-                      }}
-                      transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+              {nodes.map((node, i) => {
+                const isHot = node.pulsing || selectedId === node.id;
+                const scanDur = 2.6 + (i % 7) * 0.32;
+                const scanDelay = (i % 11) * 0.18;
+                const pulseR = Math.max(1.6, 2.4 * scale.factor);
+                return (
+                  <g key={`line-${node.id}`}>
+                    <motion.line
+                      x1={core.x}
+                      y1={core.y}
+                      x2={node.x}
+                      y2={node.y}
+                      stroke={
+                        selectedId === node.id
+                          ? "rgba(34,211,238,0.55)"
+                          : node.pulsing
+                            ? "rgba(34,211,238,0.42)"
+                            : "rgba(56,189,248,0.14)"
+                      }
+                      strokeWidth={isHot ? 1.45 : 0.85}
+                      animate={
+                        reduceMotion
+                          ? { strokeOpacity: isHot ? 0.45 : 0.18 }
+                          : isHot
+                            ? { strokeOpacity: [0.28, 0.72, 0.28] }
+                            : { strokeOpacity: [0.12, 0.22, 0.12] }
+                      }
+                      transition={
+                        reduceMotion
+                          ? { duration: 0 }
+                          : { duration: isHot ? 2 : 3.2, repeat: Infinity, ease: "easeInOut" }
+                      }
                     />
-                  )}
-                </g>
-              ))}
+                    {/* Lightweight SVG scan pulse: AI Core → website */}
+                    {!reduceMotion && (
+                      <circle
+                        r={pulseR}
+                        fill={isHot ? "#67e8f9" : "#22d3ee"}
+                        filter="url(#nodeGlow)"
+                        opacity={0}
+                      >
+                        <animateMotion
+                          dur={`${scanDur}s`}
+                          begin={`${scanDelay}s`}
+                          repeatCount="indefinite"
+                          path={`M${core.x},${core.y} L${node.x},${node.y}`}
+                        />
+                        <animate
+                          attributeName="opacity"
+                          values="0;0.95;0.85;0"
+                          keyTimes="0;0.1;0.82;1"
+                          dur={`${scanDur}s`}
+                          begin={`${scanDelay}s`}
+                          repeatCount="indefinite"
+                        />
+                      </circle>
+                    )}
+                    {/* Extra brighter packet for recent changes */}
+                    {!reduceMotion && node.pulsing && (
+                      <circle
+                        r={pulseR * 1.25}
+                        fill="#a5f3fc"
+                        filter="url(#nodeGlow)"
+                        opacity={0}
+                      >
+                        <animateMotion
+                          dur={`${Math.max(1.6, scanDur * 0.72)}s`}
+                          begin={`${scanDelay + 0.55}s`}
+                          repeatCount="indefinite"
+                          path={`M${core.x},${core.y} L${node.x},${node.y}`}
+                        />
+                        <animate
+                          attributeName="opacity"
+                          values="0;1;0"
+                          keyTimes="0;0.35;1"
+                          dur={`${Math.max(1.6, scanDur * 0.72)}s`}
+                          begin={`${scanDelay + 0.55}s`}
+                          repeatCount="indefinite"
+                        />
+                      </circle>
+                    )}
+                  </g>
+                );
+              })}
 
               <motion.g
                 animate={{ scale: [1, 1.04, 1] }}
@@ -524,6 +595,43 @@ export function NetworkMap({ monitors }: { monitors: NetworkMonitor[] }) {
                 </motion.button>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {monitors.length > 0 && (
+        <div className="absolute bottom-3 left-3 right-3 z-20 sm:bottom-4 sm:left-4 sm:right-4">
+          <div className="rounded-xl border border-white/[0.08] bg-[#090909]/90 px-3 py-2.5 backdrop-blur-md sm:px-4">
+            {selected ? (
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-zinc-100">{selected.name}</p>
+                  <p className="truncate font-mono text-[10px] text-zinc-500">
+                    {getDomainFromUrl(selected.url)} · {statusLabel(selected.status)}
+                    {selected.lastChangedAt
+                      ? ` · last change ${formatRelativeTime(selected.lastChangedAt)}`
+                      : ""}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-600">
+                    {selected._count?.changes ?? 0} changes
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/dashboard/monitors/${selected.id}`)}
+                    className="rounded-full border border-cyan-400/25 bg-cyan-500/10 px-3 py-1.5 text-[11px] text-cyan-100 transition-colors hover:border-cyan-400/40"
+                  >
+                    Open monitor
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-center text-[11px] text-zinc-500 sm:text-left">
+                Select a site for quick intel · double-click to open · pulsing nodes changed
+                recently
+              </p>
+            )}
           </div>
         </div>
       )}

@@ -63,6 +63,12 @@ export async function GET(
             currentScreenshot: meta.currentScreenshot ?? null,
             structureSummary: Array.isArray(meta.structureSummary) ? meta.structureSummary : [],
             comparisonReason: meta.comparisonReason ?? null,
+            categoryLabel:
+              typeof meta.categoryLabel === "string" ? meta.categoryLabel : null,
+            potentialImpact:
+              typeof meta.potentialImpact === "string" ? meta.potentialImpact : null,
+            recommendedAction:
+              typeof meta.recommendedAction === "string" ? meta.recommendedAction : null,
             upgradePreview: Boolean(meta.upgradePreview),
             upgradeTitle:
               typeof meta.upgradeTitle === "string" ? meta.upgradeTitle : null,

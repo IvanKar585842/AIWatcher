@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Menu, Search } from "lucide-react";
+import { Menu } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { DashboardUserButton } from "@/components/auth/clerk-wrappers";
 import { useGreeting } from "@/hooks/use-client-time";
 import { NotificationDropdown } from "./notification-dropdown";
+import { MonitorHeaderSearch } from "./monitor-header-search";
 import { useCommand } from "./command-context";
 
 function LiveClock() {
@@ -43,7 +44,7 @@ export function CommandTopbar() {
       <div className="flex min-w-0 items-center gap-3">
         <button
           type="button"
-          className="flex min-h-10 min-w-10 shrink-0 items-center justify-center rounded-lg border border-white/[0.06] text-zinc-400 lg:hidden"
+          className="flex min-h-10 min-w-10 shrink-0 items-center justify-center rounded-lg border border-white/[0.06] text-zinc-400 transition-colors hover:border-white/[0.1] hover:text-zinc-200 lg:hidden"
           onClick={() => setMobileOpen(true)}
           aria-label="Open navigation"
         >
@@ -60,7 +61,7 @@ export function CommandTopbar() {
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+      <div className="flex shrink-0 items-center gap-2 sm:gap-3 lg:gap-4">
         <div className="hidden items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/[0.06] px-3 py-1.5 md:flex">
           <span className="relative flex h-2 w-2">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
@@ -71,17 +72,7 @@ export function CommandTopbar() {
           </span>
         </div>
 
-        <div className="relative hidden lg:block">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-600" />
-          <input
-            type="search"
-            placeholder="Search monitors, changes..."
-            aria-label="Search monitors and changes"
-            disabled
-            title="Search coming soon"
-            className="h-9 w-48 rounded-full border border-white/[0.06] bg-white/[0.03] pl-9 pr-4 text-xs text-zinc-300 placeholder:text-zinc-600 outline-none transition-colors focus:border-cyan-400/30 focus:ring-1 focus:ring-cyan-400/20 lg:w-64 disabled:cursor-not-allowed disabled:opacity-50"
-          />
-        </div>
+        <MonitorHeaderSearch className="hidden sm:block" />
 
         <NotificationDropdown />
 

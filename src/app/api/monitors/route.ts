@@ -105,8 +105,14 @@ export async function GET() {
             },
           });
 
-          // Empty array is a valid successful response for new accounts
-          return NextResponse.json({ success: true, monitors });
+          // Never leak encrypted session cookies to the client
+          return NextResponse.json({
+            success: true,
+            monitors: monitors.map((m) => ({
+              ...m,
+              config: sanitizeMonitorConfigForClient(m.config),
+            })),
+          });
         } catch (error) {
           if (isSchemaMismatch(error)) {
             console.error("Database schema mismatch on GET /api/monitors:", error);

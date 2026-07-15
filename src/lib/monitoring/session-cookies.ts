@@ -197,13 +197,11 @@ export function prepareMonitorConfigForStorage(options: {
 }): MonitorConfig {
   const base = parseMonitorConfig(options.existing);
   const incoming = options.incoming ? { ...options.incoming } : {};
+  // Never accept client-supplied ciphertext — only server encrypts after plain input
+  delete incoming.encryptedSession;
   const merged: MonitorConfig = { ...base, ...incoming };
-
-  // Client must never set/overwrite ciphertext directly
-  delete (merged as { sessionCookiesPlain?: string }).sessionCookiesPlain;
-  if (incoming.encryptedSession === undefined) {
-    merged.encryptedSession = base.encryptedSession;
-  }
+  // Re-bind sealed session from stored config unless cleared/replaced below
+  merged.encryptedSession = base.encryptedSession;
 
   if (incoming.clearSession) {
     delete merged.encryptedSession;

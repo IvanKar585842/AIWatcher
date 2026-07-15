@@ -7,7 +7,8 @@ import {
 import { truncateContent, withRetry } from "./utils";
 
 const SYSTEM_INSTRUCTION = `You are WatchFlowing's change analyst.
-Compare old and new webpage snapshots and return structured JSON only.
+Return structured JSON only. Be specific — never summarize as merely "Content changed."
+Write a 2–4 sentence summary, concrete "what changed" bullets, categoryLabel, and potentialImpact.
 Honor the user's monitoring prompt when deciding importance and shouldNotify.
 Set shouldNotify=false for noise: ads, timestamps, cookie banners, minor formatting, tracking params.`;
 

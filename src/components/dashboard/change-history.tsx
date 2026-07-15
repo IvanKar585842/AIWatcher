@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { MODE_LABELS } from "@/lib/constants";
+import { defaultCategoryLabel, formatImportanceEstimate, hostnameFromUrl } from "@/lib/ai/change-insight";
 import { cn, formatDate, formatRelativeTime } from "@/lib/utils";
 import type { MonitoringMode } from "@prisma/client";
 
@@ -133,7 +134,7 @@ export function ChangeHistory() {
             {["PRICE", "CONTENT", "JOBS", "POLICY", "CONTACT_INFO", "PRODUCT", "DOCUMENTATION", "FEATURES", "OTHER"].map(
               (cat) => (
                 <SelectItem key={cat} value={cat}>
-                  {cat.replace("_", " ")}
+                  {defaultCategoryLabel(cat)}
                 </SelectItem>
               )
             )}
@@ -145,11 +146,14 @@ export function ChangeHistory() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Levels</SelectItem>
-            {["CRITICAL", "HIGH", "MEDIUM", "LOW"].map((imp) => (
-              <SelectItem key={imp} value={imp}>
-                {imp}
-              </SelectItem>
-            ))}
+            {["CRITICAL", "HIGH", "MEDIUM", "LOW"].map((imp) => {
+              const est = formatImportanceEstimate(imp);
+              return (
+                <SelectItem key={imp} value={imp}>
+                  {est.emoji} {est.label}
+                </SelectItem>
+              );
+            })}
           </SelectContent>
         </Select>
       </div>
@@ -167,6 +171,9 @@ export function ChangeHistory() {
           <div className="absolute bottom-2 left-[11px] top-2 w-px bg-gradient-to-b from-cyan-500/40 via-white/[0.08] to-transparent sm:left-[15px]" />
           {changes.map((change, index) => {
             const bullets = (change.bulletPoints ?? []).filter(Boolean).slice(0, 3);
+            const est = formatImportanceEstimate(change.importance);
+            const host = hostnameFromUrl(change.monitor.url);
+            const categoryLabel = defaultCategoryLabel(change.category);
             return (
               <Link key={change.id} href={`/dashboard/changes/${change.id}`} className="block">
                 <div className="relative pb-5">
@@ -175,7 +182,7 @@ export function ChangeHistory() {
                       "absolute left-[-9px] top-6 h-2.5 w-2.5 rounded-full border sm:left-[-5px]",
                       importanceDotClass(change.importance)
                     )}
-                    title={`${change.importance} importance`}
+                    title={`${est.label} importance`}
                   />
                   <div className="ml-4 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 transition-colors hover:border-cyan-500/20 hover:bg-cyan-500/[0.03] active:bg-cyan-500/[0.05] sm:ml-6">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
@@ -186,11 +193,14 @@ export function ChangeHistory() {
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="font-medium text-zinc-100">{change.monitor.name}</span>
+                            <Badge variant="outline" className="text-xs">
+                              {host}
+                            </Badge>
                             <Badge variant="outline" className="text-xs capitalize">
-                              {changeTypeLabel(change)}
+                              {categoryLabel}
                             </Badge>
                             <Badge variant={importanceVariant(change.importance)} className="text-xs">
-                              {change.importance}
+                              {est.emoji} {est.label}
                             </Badge>
                             {change.hasScreenshots && (
                               <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-cyan-400/80">
@@ -200,25 +210,33 @@ export function ChangeHistory() {
                             )}
                           </div>
 
-                          <p className="mt-2 text-[11px] font-medium uppercase tracking-wider text-zinc-600">
-                            What changed?
+                          <p className="mt-3 text-[11px] font-medium uppercase tracking-wider text-zinc-600">
+                            Detected · {formatDate(change.createdAt)}
                           </p>
-                          <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-zinc-300">
+                          <p className="mt-1.5 text-[11px] font-medium uppercase tracking-wider text-zinc-600">
+                            AI summary
+                          </p>
+                          <p className="mt-1 line-clamp-3 text-sm leading-relaxed text-zinc-300">
                             {change.summary}
                           </p>
 
                           {bullets.length > 0 && (
-                            <ul className="mt-2 space-y-1">
-                              {bullets.map((point) => (
-                                <li
-                                  key={point}
-                                  className="flex gap-2 text-xs leading-relaxed text-zinc-500"
-                                >
-                                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-cyan-400/70" />
-                                  <span className="line-clamp-1">{point}</span>
-                                </li>
-                              ))}
-                            </ul>
+                            <>
+                              <p className="mt-3 text-[11px] font-medium uppercase tracking-wider text-zinc-600">
+                                What changed
+                              </p>
+                              <ul className="mt-1.5 space-y-1">
+                                {bullets.map((point) => (
+                                  <li
+                                    key={point}
+                                    className="flex gap-2 text-xs leading-relaxed text-zinc-500"
+                                  >
+                                    <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-cyan-400/70" />
+                                    <span className="line-clamp-1">{point}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </>
                           )}
 
                           {(change.oldValue || change.newValue) && (
@@ -231,6 +249,9 @@ export function ChangeHistory() {
                               )}
                             </div>
                           )}
+                          <p className="mt-2 font-mono text-[10px] uppercase tracking-wider text-zinc-700">
+                            {changeTypeLabel(change)}
+                          </p>
                         </div>
                       </div>
                       <div className="flex shrink-0 items-center justify-between gap-3 border-t border-white/[0.04] pt-2 sm:block sm:border-0 sm:pt-0 sm:text-right">

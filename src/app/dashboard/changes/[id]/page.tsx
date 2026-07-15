@@ -7,12 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ChangeInsightBrief } from "@/components/dashboard/change-insight-brief";
 import { DiffViewer } from "@/components/dashboard/diff-viewer";
 import { EmptyState } from "@/components/dashboard/command/dashboard-skeletons";
 import { ShareInsightButton } from "@/components/dashboard/share-insight-report";
 import { UpgradePrompt } from "@/components/dashboard/upgrade-prompt";
+import { defaultCategoryLabel, formatImportanceEstimate } from "@/lib/ai/change-insight";
 import { MODE_LABELS } from "@/lib/constants";
-import { formatDate } from "@/lib/utils";
 import { FileQuestion } from "lucide-react";
 import type { MonitoringMode } from "@prisma/client";
 
@@ -27,6 +28,9 @@ interface ChangeDetail {
   emoji: string;
   importance: string;
   category: string;
+  categoryLabel?: string | null;
+  potentialImpact?: string | null;
+  recommendedAction?: string | null;
   oldValue: string | null;
   newValue: string | null;
   bulletPoints: string[];
@@ -124,6 +128,9 @@ export default function ChangeDetailPage({
   const modeLabel = change.monitor.mode
     ? MODE_LABELS[change.monitor.mode as MonitoringMode] ?? change.monitor.mode
     : change.category.replace(/_/g, " ");
+  const estimate = formatImportanceEstimate(change.importance);
+  const categoryLabel =
+    change.categoryLabel?.trim() || defaultCategoryLabel(change.category);
 
   return (
     <div className="space-y-6 p-4 lg:p-6">
@@ -144,13 +151,14 @@ export default function ChangeDetailPage({
             </h1>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline">{change.importance}</Badge>
-            <Badge variant="outline">{change.category.replace(/_/g, " ")}</Badge>
+            <Badge variant="outline">
+              {estimate.emoji} {estimate.label}
+            </Badge>
+            <Badge variant="outline">{categoryLabel}</Badge>
             <Badge variant="outline">{modeLabel}</Badge>
             {change.comparisonReason && (
               <Badge variant="secondary">{String(change.comparisonReason).replace(/_/g, " ")}</Badge>
             )}
-            <span className="text-xs text-zinc-500">{formatDate(change.createdAt)}</span>
           </div>
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
@@ -163,6 +171,8 @@ export default function ChangeDetailPage({
               bulletPoints: change.bulletPoints,
               createdAt: change.createdAt,
               emoji: change.emoji,
+              category: change.category,
+              potentialImpact: change.potentialImpact ?? undefined,
             }}
           />
           <a href={change.monitor.url} target="_blank" rel="noopener noreferrer" className="shrink-0">
@@ -181,22 +191,32 @@ export default function ChangeDetailPage({
         <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
           <div>
             <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-cyan-500/70">
-              AI understanding
+              AI change analysis
             </p>
-            <CardTitle className="mt-1 text-zinc-100">What changed — and why it matters</CardTitle>
+            <CardTitle className="mt-1 text-zinc-100">Structured change report</CardTitle>
           </div>
         </CardHeader>
         <CardContent>
-          <p className="text-[15px] leading-relaxed text-zinc-200">{change.summary}</p>
-          {change.bulletPoints.length > 0 && (
-            <ul className="mt-4 space-y-2.5">
-              {change.bulletPoints.map((point, i) => (
-                <li key={i} className="flex items-start gap-2.5 text-sm text-zinc-400">
-                  <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-400/80" />
-                  {point}
-                </li>
-              ))}
-            </ul>
+          <ChangeInsightBrief
+            monitorName={change.monitor.name}
+            monitorUrl={change.monitor.url}
+            summary={change.summary}
+            bulletPoints={change.bulletPoints}
+            importance={change.importance}
+            category={change.category}
+            categoryLabel={categoryLabel}
+            potentialImpact={change.potentialImpact}
+            recommendedAction={change.recommendedAction}
+            createdAt={change.createdAt}
+            emoji={change.emoji}
+          />
+          {change.recommendedAction && change.potentialImpact && (
+            <div className="mt-5 rounded-lg border border-white/[0.06] bg-black/20 p-3">
+              <p className="font-mono text-[10px] uppercase tracking-widest text-zinc-500">
+                Recommended action
+              </p>
+              <p className="mt-1.5 text-sm text-zinc-300">{change.recommendedAction}</p>
+            </div>
           )}
           <p className="mt-5 font-mono text-[10px] uppercase tracking-wider text-zinc-600">
             Generated by WatchFlowing AI
