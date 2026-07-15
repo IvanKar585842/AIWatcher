@@ -137,7 +137,7 @@ export async function sendChangeEmail(params: ChangeEmailParams) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const from =
     process.env.RESEND_FROM_EMAIL?.trim() ||
-    "WatchFlowing <notifications@watchflowing.com>";
+    "WatchFlowing Notifications <notifications@watchflowing.com>";
   const dashboardUrl = `${appUrl}/dashboard/changes/${params.changeId}`;
   const settingsUrl = `${appUrl}/dashboard/settings`;
   const notificationsUrl = `${appUrl}/dashboard/notifications`;
@@ -370,7 +370,7 @@ export async function sendWelcomeEmail(to: string, name: string) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const from =
     process.env.RESEND_FROM_EMAIL?.trim() ||
-    "WatchFlowing <notifications@watchflowing.com>";
+    "WatchFlowing Notifications <notifications@watchflowing.com>";
   const safeName = escapeHtml(name);
 
   try {

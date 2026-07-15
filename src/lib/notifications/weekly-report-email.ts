@@ -37,7 +37,7 @@ export async function sendWeeklyReportEmail(params: {
 
   const from =
     process.env.RESEND_FROM_EMAIL?.trim() ||
-    "WatchFlowing <notifications@watchflowing.com>";
+    "WatchFlowing Notifications <notifications@watchflowing.com>";
   const greeting = params.name ? `Hi ${escapeHtml(params.name)},` : "Hi,";
 
   const importantHtml = params.importantChanges.length
