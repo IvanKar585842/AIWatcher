@@ -1,26 +1,34 @@
-import { siteConfig } from "@/lib/seo";
+import type { MetadataRoute } from "next";
+import { SITEMAP_BASE_URL } from "@/lib/public-sitemap";
 
-export default function robots() {
+/**
+ * robots.txt for Google Search Console.
+ * Sitemap is always the production canonical URL.
+ */
+export default function robots(): MetadataRoute.Robots {
   return {
     rules: [
       {
         userAgent: "*",
-        allow: ["/", "/score", "/sign-in", "/sign-up", "/monitored-by"],
+        allow: "/",
         disallow: [
+          // Authenticated app
           "/dashboard",
           "/dashboard/",
           "/admin",
           "/admin/",
+          // APIs (not for indexing)
+          "/api",
           "/api/",
-          "/settings",
-          // Private app surfaces (nested under dashboard but listed for clarity)
-          "/dashboard/settings",
-          "/dashboard/billing",
-          "/dashboard/assistant",
+          // Auth UI (noindex) + private tokenized shares
+          "/sign-in",
+          "/sign-in/",
+          "/report/",
+          "/score/",
         ],
       },
     ],
-    sitemap: `${siteConfig.url}/sitemap.xml`,
-    host: siteConfig.url,
+    sitemap: "https://watchflowing.com/sitemap.xml",
+    host: SITEMAP_BASE_URL,
   };
 }

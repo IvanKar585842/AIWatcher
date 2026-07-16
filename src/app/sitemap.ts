@@ -1,40 +1,60 @@
 import type { MetadataRoute } from "next";
-import { siteConfig } from "@/lib/seo";
+import { prisma } from "@/lib/db";
+import {
+  PUBLIC_SITEMAP_ROUTES,
+  absoluteSitemapUrl,
+} from "@/lib/public-sitemap";
 
-export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = siteConfig.url;
+/** Rebuild periodically so public status pages stay fresh after deploy. */
+export const revalidate = 3600;
+
+/**
+ * Automatic sitemap.xml for Google Search Console.
+ * Served at /sitemap.xml by the Next.js App Router.
+ * Regenerates on deploy and every `revalidate` seconds.
+ */
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
 
-  return [
-    {
-      url: baseUrl,
+  const staticEntries: MetadataRoute.Sitemap = PUBLIC_SITEMAP_ROUTES.map(
+    (route) => ({
+      url: absoluteSitemapUrl(route.path),
       lastModified: now,
-      changeFrequency: "weekly",
-      priority: 1,
-    },
-    {
-      url: `${baseUrl}/score`,
-      lastModified: now,
-      changeFrequency: "weekly",
-      priority: 0.8,
-    },
-    {
-      url: `${baseUrl}/sign-up`,
-      lastModified: now,
-      changeFrequency: "monthly",
-      priority: 0.6,
-    },
-    {
-      url: `${baseUrl}/sign-in`,
-      lastModified: now,
-      changeFrequency: "monthly",
-      priority: 0.4,
-    },
-    {
-      url: `${baseUrl}/monitored-by`,
-      lastModified: now,
-      changeFrequency: "weekly",
-      priority: 0.5,
-    },
-  ];
+      changeFrequency: route.changeFrequency,
+      priority: route.priority,
+    })
+  );
+
+  let statusEntries: MetadataRoute.Sitemap = [];
+
+  try {
+    const publicProfiles = await prisma.user.findMany({
+      where: {
+        statusPageEnabled: true,
+        username: { not: null },
+      },
+      select: {
+        username: true,
+        updatedAt: true,
+      },
+      take: 5000,
+      orderBy: { updatedAt: "desc" },
+    });
+
+    statusEntries = publicProfiles
+      .filter((u): u is { username: string; updatedAt: Date } =>
+        Boolean(u.username?.trim())
+      )
+      .map((u) => ({
+        url: absoluteSitemapUrl(`/status/${encodeURIComponent(u.username.trim().toLowerCase())}`),
+        lastModified: u.updatedAt,
+        changeFrequency: "daily" as const,
+        priority: 0.5,
+      }));
+  } catch {
+    // Build / preview without DB should still emit the static public sitemap.
+    statusEntries = [];
+  }
+
+  return [...staticEntries, ...statusEntries];
 }
