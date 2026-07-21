@@ -27,11 +27,11 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   importanceThreshold: "MEDIUM",
   ignoreCosmeticChanges: true,
   aiPromptTemplates: [
-    "Notify me only when the price drops below €700.",
+    "Notify when documentation or release notes change.",
     "Ignore layout changes.",
     "Notify only when important information changes.",
   ],
-  defaultInterval: "TWELVE_HOURS",
+  defaultInterval: "TWENTY_FOUR_HOURS",
   defaultMode: "ENTIRE_PAGE",
   timezone: "UTC",
   defaultNotificationMethod: "EMAIL",

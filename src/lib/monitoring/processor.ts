@@ -6,7 +6,7 @@ import {
   type Prisma,
 } from "@prisma/client";
 import { trackEvent } from "@/lib/analytics";
-import { INTERVAL_MINUTES } from "@/lib/constants";
+import { INTERVAL_MINUTES, intervalToMs, resolveEffectiveInterval } from "@/lib/constants";
 import { prisma } from "@/lib/db";
 import { parseMonitorConfig } from "@/lib/monitor-config";
 import { processPendingAnalyses, analyzeChangeById } from "./ai-processor";
@@ -199,10 +199,39 @@ async function processMonitorInternal(monitorId: string): Promise<ProcessMonitor
   });
 
   const plan = monitor.user.subscription?.plan ?? Plan.FREE;
+  const effectiveInterval = resolveEffectiveInterval(plan, monitor.interval);
   const config = parseMonitorConfig(monitor.config);
   const maxRetries = config.retryAttempts ?? DEFAULT_MAX_RETRIES;
   const now = new Date();
-  const nextCheckAt = computeNextCheckAt(monitor.interval, now);
+
+  // Honor last successful check — never re-check earlier than the plan/interval allows
+  if (monitor.lastCheckedAt) {
+    const earliestNext = new Date(
+      monitor.lastCheckedAt.getTime() + intervalToMs(effectiveInterval)
+    );
+    if (now.getTime() + 2_000 < earliestNext.getTime()) {
+      await prisma.monitor.update({
+        where: { id: monitor.id },
+        data: { nextCheckAt: earliestNext },
+      });
+      await releaseMonitorQueue(monitor.id, earliestNext);
+      monitorLog({
+        step: "scheduler_batch",
+        monitorId,
+        message: "Skipped — interval not elapsed since last check",
+        data: {
+          plan,
+          storedInterval: monitor.interval,
+          effectiveInterval,
+          lastCheckedAt: monitor.lastCheckedAt.toISOString(),
+          nextCheckAt: earliestNext.toISOString(),
+        },
+      });
+      return { status: "skipped", reason: "interval_not_elapsed" };
+    }
+  }
+
+  const nextCheckAt = computeNextCheckAt(effectiveInterval, now);
 
   try {
     const result = await fetchPageContent({
@@ -520,10 +549,10 @@ async function processMonitorInternal(monitorId: string): Promise<ProcessMonitor
       classified.kind === "TEMPORARILY_UNAVAILABLE" ||
       classified.kind === "TIMEOUT" ||
       classified.kind === "SESSION_EXPIRED";
-    // Soft failures retry sooner; permanent blocks follow the monitor interval
+    // Soft failures retry sooner; permanent blocks follow the effective plan interval
     const retryAt = isTemporary
       ? new Date(Date.now() + 15 * 60 * 1000)
-      : computeNextCheckAt(monitor.interval);
+      : computeNextCheckAt(effectiveInterval);
 
     const sessionPatch =
       classified.kind === "SESSION_EXPIRED"

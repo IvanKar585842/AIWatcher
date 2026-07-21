@@ -65,8 +65,8 @@ const INTENTS: Array<{
   },
   {
     id: "price-changes",
-    label: "Price changes",
-    description: "Get alerts when product prices move.",
+    label: "Public pricing page",
+    description: "Watch a company’s public plans page (not marketplaces).",
     icon: Target,
     accent: "from-amber-500/15 to-orange-500/5 border-amber-500/30",
   },
@@ -77,7 +77,7 @@ function buildPrefill(intent: OnboardingIntent): MonitorPrefill {
     url: "",
     selector: "",
     keywords: "",
-    interval: MonitoringInterval.TWELVE_HOURS,
+    interval: MonitoringInterval.TWENTY_FOUR_HOURS,
     notificationMethod: NotificationMethod.EMAIL,
     respectRobots: true,
   };
@@ -102,9 +102,9 @@ function buildPrefill(intent: OnboardingIntent): MonitorPrefill {
     case "price-changes":
       return {
         ...base,
-        name: "Competitor pricing",
+        name: "Public pricing page",
         category: "Competitor Intelligence",
-        description: "Alert me when competitor pricing changes",
+        description: "Watch a public company pricing or plans page",
         mode: MonitoringMode.PRICE_DETECTION,
       };
     case "my-website":

@@ -4,10 +4,10 @@ import { useRef, useState } from "react";
 import { AnimatePresence, motion, useInView } from "framer-motion";
 
 const TIMELINE = [
-  { time: "14:32:01", site: "stripe.com/pricing", change: "Pro plan: $20 → $25/mo", importance: "HIGH" },
+  { time: "14:32:01", site: "docs.example.com", change: "API auth section rewritten", importance: "HIGH" },
   { time: "14:28:44", site: "jobs.apple.com", change: "New role: Vision Pro Engineer", importance: "MEDIUM" },
   { time: "14:15:12", site: "harvard.edu/finaid", change: "Scholarship deadline extended", importance: "CRITICAL" },
-  { time: "13:58:33", site: "shopify.com/legal", change: "Terms of Service — Section 4.2 modified", importance: "HIGH" },
+  { time: "13:58:33", site: "company.com/legal", change: "Privacy Policy — Section 4.2 modified", importance: "HIGH" },
 ];
 
 const CHART = [32, 45, 38, 62, 55, 78, 71, 89, 84, 95, 88, 102];

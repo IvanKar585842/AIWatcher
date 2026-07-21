@@ -55,8 +55,9 @@ export function LandingPage() {
                 <span className="font-normal text-cyan-300">that explains every change.</span>
               </h1>
               <p className="wf-enter-delay-2 mt-5 max-w-xl text-base leading-relaxed text-zinc-500">
-                WatchFlowing is an AI website tracker and intelligence platform — detect important
-                updates, analyze what changed, and get smart website alerts without the noise.
+                WatchFlowing is an AI website tracker — detect important updates on public pages
+                (docs, news, government, corporate sites), analyze what changed, and get smart
+                alerts without the noise.
               </p>
               <div className="wf-enter-delay-3 mt-8 flex flex-wrap items-center justify-center gap-4">
                 <Link

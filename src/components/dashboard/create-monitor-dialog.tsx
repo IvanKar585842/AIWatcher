@@ -46,6 +46,7 @@ import {
 import { loadUserSettings } from "@/lib/user-settings";
 import { cn } from "@/lib/utils";
 import { PRODUCT_TOUR_EVENTS } from "@/lib/product-tour";
+import { SupportedSitesGuide } from "@/components/dashboard/supported-sites-guide";
 
 export interface MonitorPrefill {
   name: string;
@@ -70,7 +71,7 @@ const DEFAULT_FORM = {
   selector: "",
   keywords: "",
   aiPrompt: "",
-  interval: MonitoringInterval.TWELVE_HOURS as MonitoringInterval,
+  interval: MonitoringInterval.TWENTY_FOUR_HOURS as MonitoringInterval,
   notificationMethod: NotificationMethod.EMAIL as NotificationMethod,
   respectRobots: true,
 };
@@ -209,7 +210,17 @@ export function CreateMonitorDialog({
     }
   }, [open, prefillRequest]);
 
-  const intervals = allowedIntervals ?? (Object.keys(INTERVAL_LABELS) as MonitoringInterval[]);
+  const intervals = useMemo(
+    () => allowedIntervals ?? (Object.keys(INTERVAL_LABELS) as MonitoringInterval[]),
+    [allowedIntervals]
+  );
+
+  useEffect(() => {
+    if (intervals.length > 0 && !intervals.includes(form.interval)) {
+      setForm((prev) => ({ ...prev, interval: intervals[0]! }));
+    }
+  }, [intervals, form.interval]);
+
   const selectedType = useMemo(
     () => getMonitorTypeById(selectedTypeId) ?? MONITOR_TYPE_CATALOG[0],
     [selectedTypeId]
@@ -438,7 +449,7 @@ export function CreateMonitorDialog({
                   </FieldLabel>
                   <OsInput
                     type="url"
-                    placeholder="https://example.com/page"
+                    placeholder="https://docs.example.com/getting-started"
                     value={form.url}
                     onChange={(e) => setForm({ ...form, url: e.target.value })}
                     autoFocus
@@ -449,6 +460,7 @@ export function CreateMonitorDialog({
                       <p>{protectedWarning}</p>
                     </div>
                   )}
+                  <SupportedSitesGuide className="mt-3" />
                 </div>
                 <div>
                   <FieldLabel hint="A short name you’ll recognize in your dashboard.">

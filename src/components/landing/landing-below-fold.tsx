@@ -12,6 +12,12 @@ const OsFeatures = dynamic(
   { loading: () => <SectionSkeleton /> }
 );
 
+const OsSupportedWebsites = dynamic(
+  () =>
+    import("@/components/landing/os/supported-websites").then((m) => m.OsSupportedWebsites),
+  { loading: () => <SectionSkeleton /> }
+);
+
 const OsDashboardShowcase = dynamic(
   () =>
     import("@/components/landing/os/dashboard-showcase").then((m) => m.OsDashboardShowcase),
@@ -86,6 +92,7 @@ export function LandingBelowFold() {
           <OsFeatures />
           {showRest ? (
             <>
+              <OsSupportedWebsites />
               <OsDashboardShowcase />
               <OsPricing />
               <OsFaq />

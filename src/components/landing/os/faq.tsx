@@ -1,8 +1,7 @@
 "use client";
 
-import { useRef } from "react";
-import { motion, useInView, AnimatePresence } from "framer-motion";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { motion, useInView } from "framer-motion";
 
 const FAQS = [
   {
@@ -10,12 +9,16 @@ const FAQS = [
     a: "Most website monitoring tools only tell you that something changed. WatchFlowing’s AI explains what changed, classifies it, and rates importance — like an analyst watching every page.",
   },
   {
-    q: "Can I use WatchFlowing for competitor monitoring?",
-    a: "Yes. Track competitor pricing pages, careers, policies, and product updates. You get intelligent website alerts when something meaningful moves.",
+    q: "What sites work best with WatchFlowing?",
+    a: "Public HTML pages: corporate sites, documentation, blogs, news, government and university sites, GitHub/GitLab, Wikipedia, and common builders (WordPress, Webflow, Wix, Squarespace). Marketplaces and strong anti-bot sites are often unreliable.",
+  },
+  {
+    q: "Can I monitor competitor websites?",
+    a: "Yes — public competitor pages such as documentation, careers, blogs, announcements, features, and company pricing pages. Marketplace product pages (Amazon, eBay, and similar) are not a reliable use case.",
   },
   {
     q: "What can this website monitoring tool watch?",
-    a: "Entire pages, CSS selectors, XPath targets, prices, keywords, tables, job listings, or AI Smart Mode where the system decides what matters.",
+    a: "Entire pages, text changes, CSS/XPath sections, documentation, job listings, keywords, tables, public pricing pages, and AI Smart Mode where you describe what matters in plain language.",
   },
   {
     q: "How does noise filtering work?",
@@ -23,7 +26,7 @@ const FAQS = [
   },
   {
     q: "How fast can it check pages?",
-    a: "Free tier: every 12 hours. Pro and Business: as fast as every 5 minutes — ideal when timing matters for SEO monitoring or price tracking.",
+    a: "Free: every 24 hours. Pro: as often as every 30 minutes. Business: as often as every 1 minute — ideal for docs, news, and public announcements where timing matters.",
   },
 ];
 
@@ -40,50 +43,39 @@ export function OsFaq() {
           animate={inView ? { opacity: 1, y: 0 } : {}}
           className="mb-12 text-center"
         >
-          <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.35em] text-cyan-500/70">Intel</p>
-          <h2 className="text-3xl font-light text-zinc-100">FAQ</h2>
-          <p className="mx-auto mt-3 max-w-lg text-sm text-zinc-500">
-            Common questions about AI website monitoring, alerts, and how WatchFlowing works.
+          <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.35em] text-cyan-500/70">
+            FAQ
           </p>
+          <h2 className="text-3xl font-light text-zinc-100">Common questions</h2>
         </motion.div>
 
         <div className="space-y-2">
-          {FAQS.map((faq, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 12 }}
-              animate={inView ? { opacity: 1, y: 0 } : {}}
-              transition={{ delay: i * 0.08 }}
-              className="overflow-hidden rounded-xl border border-white/[0.06] bg-[#0c0c0c]"
-            >
-              <button
-                onClick={() => setOpen(open === i ? null : i)}
-                className="flex w-full items-center justify-between px-5 py-4 text-left text-sm text-zinc-300 transition-colors hover:text-cyan-100"
+          {FAQS.map((faq, i) => {
+            const isOpen = open === i;
+            return (
+              <motion.div
+                key={faq.q}
+                initial={{ opacity: 0, y: 12 }}
+                animate={inView ? { opacity: 1, y: 0 } : {}}
+                transition={{ delay: i * 0.05 }}
+                className="overflow-hidden rounded-xl border border-white/[0.06] bg-white/[0.02]"
               >
-                {faq.q}
-                <motion.span
-                  animate={{ rotate: open === i ? 45 : 0 }}
-                  className="ml-4 shrink-0 text-cyan-500/60"
+                <button
+                  type="button"
+                  onClick={() => setOpen(isOpen ? null : i)}
+                  className="flex min-h-12 w-full items-center justify-between gap-4 px-5 py-4 text-left"
                 >
-                  +
-                </motion.span>
-              </button>
-              <AnimatePresence>
-                {open === i && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-                  >
-                    <p className="border-t border-white/[0.04] px-5 py-4 text-sm leading-relaxed text-zinc-500">
-                      {faq.a}
-                    </p>
-                  </motion.div>
+                  <span className="text-sm font-medium text-zinc-200">{faq.q}</span>
+                  <span className="font-mono text-xs text-cyan-500/60">{isOpen ? "−" : "+"}</span>
+                </button>
+                {isOpen && (
+                  <div className="border-t border-white/[0.04] px-5 pb-4 pt-1">
+                    <p className="text-sm leading-relaxed text-zinc-500">{faq.a}</p>
+                  </div>
                 )}
-              </AnimatePresence>
-            </motion.div>
-          ))}
+              </motion.div>
+            );
+          })}
         </div>
       </div>
     </section>

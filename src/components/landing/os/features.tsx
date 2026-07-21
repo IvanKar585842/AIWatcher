@@ -5,12 +5,12 @@ import { motion, useInView, useScroll, useTransform } from "framer-motion";
 
 const MODES = [
   { id: "01", title: "Entire Page", desc: "Full-spectrum observation with noise stripped at the source." },
-  { id: "02", title: "CSS / XPath", desc: "Surgical targeting. One element. Zero distraction." },
-  { id: "03", title: "Price Detection", desc: "Currency shifts, sales, and pricing experiments — captured instantly." },
+  { id: "02", title: "CSS / XPath", desc: "Surgical targeting. One element or section. Zero distraction." },
+  { id: "03", title: "Public Pricing Pages", desc: "Plan and price wording on company pricing pages — not marketplaces." },
   { id: "04", title: "Keyword Watch", desc: "Terms appear, disappear, or spike. You know first." },
-  { id: "05", title: "Table Diff", desc: "Structured data changes parsed into human-readable signals." },
+  { id: "05", title: "Documentation", desc: "Docs, changelogs, and API references tracked for meaningful edits." },
   { id: "06", title: "Job Listings", desc: "New roles, removed postings, updated requirements." },
-  { id: "07", title: "AI Smart Mode", desc: "The system decides what matters. You review the verdict." },
+  { id: "07", title: "AI Smart Mode", desc: "Describe what matters. The system decides what to surface." },
   { id: "08", title: "Meaningful Diff", desc: "Ads, trackers, timestamps — filtered before analysis begins." },
 ];
 
@@ -45,8 +45,8 @@ export function OsFeatures() {
             <span className="text-zinc-500">One AI intelligence layer.</span>
           </h2>
           <p className="mt-4 max-w-xl text-sm leading-relaxed text-zinc-500">
-            From competitor monitoring to SEO-sensitive pages — WatchFlowing tracks what matters and
-            filters noise before you see an alert.
+            From documentation and government notices to corporate sites and GitHub releases —
+            WatchFlowing tracks what matters and filters noise before you see an alert.
           </p>
         </motion.div>
 

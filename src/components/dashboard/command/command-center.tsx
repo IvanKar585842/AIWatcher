@@ -14,6 +14,7 @@ import { CommandCenterSkeleton } from "./dashboard-skeletons";
 import { MonitoringHealth } from "./monitoring-health";
 import { QuickActions } from "./quick-actions";
 import { StatReadouts } from "./stat-readouts";
+import { PopularMonitoringExamples } from "@/components/dashboard/popular-monitoring-examples";
 
 const NetworkMap = dynamic(
   () => import("./network-map").then((m) => m.NetworkMap),
@@ -344,6 +345,8 @@ export function CommandCenter() {
           )}
         </div>
       </div>
+
+      <PopularMonitoringExamples />
 
       <div className="lg:hidden">
         <StatReadouts

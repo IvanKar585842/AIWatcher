@@ -12,7 +12,7 @@ import {
 export const PLAN_LIMITS = {
   FREE: {
     maxMonitors: 3,
-    minInterval: MonitoringInterval.TWELVE_HOURS,
+    minInterval: MonitoringInterval.TWENTY_FOUR_HOURS,
     historyDays: 7 as number | null,
     telegram: false,
     aiSummaries: false,
@@ -22,7 +22,7 @@ export const PLAN_LIMITS = {
   },
   PRO: {
     maxMonitors: 100,
-    minInterval: MonitoringInterval.FIVE_MIN,
+    minInterval: MonitoringInterval.THIRTY_MIN,
     historyDays: null as number | null,
     telegram: true,
     aiSummaries: true,
@@ -32,7 +32,7 @@ export const PLAN_LIMITS = {
   },
   BUSINESS: {
     maxMonitors: Infinity,
-    minInterval: MonitoringInterval.FIVE_MIN,
+    minInterval: MonitoringInterval.ONE_MIN,
     historyDays: null as number | null,
     telegram: true,
     aiSummaries: true,
@@ -43,6 +43,7 @@ export const PLAN_LIMITS = {
 } as const;
 
 export const INTERVAL_LABELS: Record<MonitoringInterval, string> = {
+  ONE_MIN: "1 minute",
   FIVE_MIN: "5 minutes",
   FIFTEEN_MIN: "15 minutes",
   THIRTY_MIN: "30 minutes",
@@ -53,6 +54,7 @@ export const INTERVAL_LABELS: Record<MonitoringInterval, string> = {
 };
 
 export const INTERVAL_MINUTES: Record<MonitoringInterval, number> = {
+  ONE_MIN: 1,
   FIVE_MIN: 5,
   FIFTEEN_MIN: 15,
   THIRTY_MIN: 30,
@@ -63,6 +65,7 @@ export const INTERVAL_MINUTES: Record<MonitoringInterval, number> = {
 };
 
 export const INTERVAL_ORDER: MonitoringInterval[] = [
+  MonitoringInterval.ONE_MIN,
   MonitoringInterval.FIVE_MIN,
   MonitoringInterval.FIFTEEN_MIN,
   MonitoringInterval.THIRTY_MIN,
@@ -114,6 +117,22 @@ export function getAllowedIntervals(plan: Plan): MonitoringInterval[] {
   return INTERVAL_ORDER.slice(minIndex);
 }
 
+/**
+ * Clamp a stored monitor interval to what the user's plan actually allows.
+ * Prevents faster-than-plan checks after downgrades.
+ */
+export function resolveEffectiveInterval(
+  plan: Plan,
+  interval: MonitoringInterval
+): MonitoringInterval {
+  if (isIntervalAllowed(plan, interval)) return interval;
+  return getPlanLimits(plan).minInterval;
+}
+
+export function intervalToMs(interval: MonitoringInterval): number {
+  return INTERVAL_MINUTES[interval] * 60 * 1000;
+}
+
 export const PRICING_PLANS = [
   {
     id: "free" as const,
@@ -123,7 +142,7 @@ export const PRICING_PLANS = [
     description: "Try WatchFlowing and see how monitoring feels in practice.",
     features: [
       "Basic website monitoring (3 sites)",
-      "Checks every 12 hours",
+      "Checks every 24 hours",
       "7-day change history",
       "Email notifications",
       "Basic change detection",
@@ -140,7 +159,7 @@ export const PRICING_PLANS = [
     description: "For owners and developers who need clarity, not just alerts.",
     features: [
       "Up to 100 monitors",
-      "Checks as often as every 5 minutes",
+      "Checks as often as every 30 minutes",
       "AI-powered change analysis",
       "Smart importance detection",
       "Visual & screenshot comparison",
@@ -162,6 +181,7 @@ export const PRICING_PLANS = [
       "Team members & shared monitors",
       "API access & webhooks",
       "Unlimited AI analysis",
+      "Checks as often as every 1 minute",
       "Priority check processing",
       "Custom notification rules",
       "Advanced reports & export",

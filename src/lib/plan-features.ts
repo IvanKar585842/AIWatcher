@@ -54,7 +54,7 @@ function feature(enabled: boolean, limit: number | null = null): PlanFeatureDef 
 export const PLAN_ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
   FREE: {
     maxMonitors: 3,
-    minInterval: MonitoringInterval.TWELVE_HOURS,
+    minInterval: MonitoringInterval.TWENTY_FOUR_HOURS,
     historyDays: 7,
     chatDailyMessages: 20,
     aiAnalysesPerMonth: 5,
@@ -88,7 +88,7 @@ export const PLAN_ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
   },
   PRO: {
     maxMonitors: 100,
-    minInterval: MonitoringInterval.FIVE_MIN,
+    minInterval: MonitoringInterval.THIRTY_MIN,
     historyDays: null,
     chatDailyMessages: 200,
     aiAnalysesPerMonth: 2000,
@@ -122,7 +122,7 @@ export const PLAN_ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
   },
   BUSINESS: {
     maxMonitors: Infinity,
-    minInterval: MonitoringInterval.FIVE_MIN,
+    minInterval: MonitoringInterval.ONE_MIN,
     historyDays: null,
     chatDailyMessages: 1000,
     aiAnalysesPerMonth: null,
@@ -388,6 +388,7 @@ export function requiredFeatureForMode(mode: MonitoringMode): PlanFeatureName | 
 
 export function planAllowsInterval(plan: Plan, interval: MonitoringInterval): boolean {
   const order: MonitoringInterval[] = [
+    MonitoringInterval.ONE_MIN,
     MonitoringInterval.FIVE_MIN,
     MonitoringInterval.FIFTEEN_MIN,
     MonitoringInterval.THIRTY_MIN,

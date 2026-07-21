@@ -135,9 +135,9 @@ export const MONITOR_TYPE_CATALOG: MonitorTypeDefinition[] = [
     id: "full-page",
     label: "Full Page Monitoring",
     description: "Watch the whole public page and surface meaningful changes automatically.",
-    exampleUsage: "https://example.com/pricing",
+    exampleUsage: "https://example.com/docs or /news",
     recommendedUsers: "Founders, marketers, site owners",
-    tooltip: "Best default. Works on most public pages without selectors.",
+    tooltip: "Best default. Works on most public pages without selectors — not marketplaces.",
     icon: Globe,
     category: "Website Monitoring",
     accent: "cyan",
@@ -148,7 +148,7 @@ export const MONITOR_TYPE_CATALOG: MonitorTypeDefinition[] = [
     id: "specific-section",
     label: "Specific Section Monitoring",
     description: "Track one block or element with a CSS selector.",
-    exampleUsage: "main .pricing-table or #announcements",
+    exampleUsage: "main .announcements or #release-notes",
     recommendedUsers: "Operators watching a single widget or module",
     tooltip: "Paste a CSS selector for the exact section you care about.",
     icon: Layers,
@@ -201,9 +201,10 @@ export const MONITOR_TYPE_CATALOG: MonitorTypeDefinition[] = [
   {
     id: "competitor-pricing",
     label: "Pricing Page",
-    description: "Monitor a competitor’s public pricing page for plan or price updates.",
-    exampleUsage: "competitor.com/pricing",
+    description: "Monitor a company’s public pricing or plans page for wording updates.",
+    exampleUsage: "company.com/pricing (SaaS plans — not marketplaces)",
     recommendedUsers: "Product, sales, and pricing teams",
+    tooltip: "For public plan pages. Amazon, eBay, and similar marketplaces are often blocked.",
     icon: Target,
     category: "Competitor Intelligence",
     accent: "emerald",
@@ -223,8 +224,8 @@ export const MONITOR_TYPE_CATALOG: MonitorTypeDefinition[] = [
   {
     id: "competitor-product",
     label: "Product Page",
-    description: "Track public product pages for positioning and offer changes.",
-    exampleUsage: "competitor.com/product/…",
+    description: "Track public product pages for positioning and messaging changes.",
+    exampleUsage: "company.com/product/… (public marketing pages)",
     recommendedUsers: "Product marketing and founders",
     icon: Package,
     category: "Competitor Intelligence",
@@ -422,13 +423,14 @@ const PROTECTED_HOST_PATTERNS = [
   /(^|\.)walmart\.com$/i,
   /(^|\.)aliexpress\./i,
   /(^|\.)alibaba\./i,
+  /(^|\.)temu\.com$/i,
 ];
 
 const PRIVATE_PATH_HINT =
   /\/(login|signin|sign-in|signup|sign-up|account|dashboard|app|portal|auth|oauth|checkout|cart)(\/|$)/i;
 
 export const PROTECTED_SITE_WARNING =
-  "This website may block automated monitoring. WatchFlowing works best with public pages without strong bot protection.";
+  "This website may use anti-bot protection. Monitoring can be limited or unavailable — WatchFlowing works best on public HTML pages (docs, news, government, corporate sites), not marketplaces.";
 
 /**
  * Returns a user-facing warning when the URL looks like a protected /

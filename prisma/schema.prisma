@@ -46,6 +46,7 @@ enum NotificationMethod {
 }
 
 enum MonitoringInterval {
+  ONE_MIN
   FIVE_MIN
   FIFTEEN_MIN
   THIRTY_MIN

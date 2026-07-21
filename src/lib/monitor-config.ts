@@ -249,8 +249,8 @@ export const MONITORING_MODES: ModeDefinition[] = [
   {
     mode: "PRICE_DETECTION",
     label: "Pricing Page Monitoring",
-    description: "Track price and plan changes on public pricing pages.",
-    tooltip: "Best for competitor pricing pages — not marketplaces.",
+    description: "Track price and plan wording on public company pricing pages.",
+    tooltip: "For SaaS / company plan pages — not Amazon, eBay, or other marketplaces.",
     icon: Target,
     primary: true,
   },
@@ -356,17 +356,17 @@ export function getSelectableMonitoringModes(
 }
 
 export const CREATE_AI_PROMPT_EXAMPLES = [
-  "Notify me only when pricing or plan names change.",
+  "Notify me when documentation or API examples change.",
+  "Notify when the page title or headings change.",
   "Ignore advertisements and cookie banners.",
   "Ignore layout and styling-only changes.",
-  "Notify when documentation or API examples change.",
-  "Notify when the page title or meta description changes.",
+  "Notify when Terms of Service or Privacy Policy text changes.",
   "Notify only when important information changes.",
 ];
 
 export const AI_PROMPT_EXAMPLES = [
-  "Notify me only when pricing or plan names change.",
   "Notify when documentation pages are updated.",
+  "Notify when Terms of Service or Privacy Policy text changes.",
   "Ignore layout changes.",
   "Ignore advertisements.",
   "Notify when the page title or headings change.",

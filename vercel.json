@@ -25,7 +25,7 @@
   "crons": [
     {
       "path": "/api/cron/monitoring",
-      "schedule": "0 6 * * *"
+      "schedule": "* * * * *"
     },
     {
       "path": "/api/cron/chat-cleanup",
