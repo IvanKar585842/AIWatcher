@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { SignUpCTA } from "@/components/auth/clerk-wrappers";
 import { usePrefersReducedMotion } from "@/components/landing/os/mouse-parallax";
 
 function NetworkCanvas() {
@@ -134,9 +133,12 @@ export function OsFooter() {
             Deploy your first monitor in under 60 seconds — free plan included.
           </p>
           <div className="mt-6 flex justify-center">
-            <SignUpCTA className="!rounded-full !border-cyan-400/30 !bg-cyan-500/10 !px-8 !text-cyan-100">
+            <Link
+              href="/sign-up"
+              className="inline-flex h-10 items-center justify-center rounded-full border border-cyan-400/30 bg-cyan-500/10 px-8 text-sm font-medium text-cyan-100 transition-colors hover:border-cyan-300/50 hover:bg-cyan-500/15"
+            >
               Create free account
-            </SignUpCTA>
+            </Link>
           </div>
         </motion.div>
 

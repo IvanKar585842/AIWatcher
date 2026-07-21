@@ -1,8 +1,3 @@
-"use client";
-
-import { useRef, useState } from "react";
-import { motion, useInView } from "framer-motion";
-
 const FAQS = [
   {
     q: "How is WatchFlowing different from basic website change detection tools?",
@@ -30,52 +25,39 @@ const FAQS = [
   },
 ];
 
+/**
+ * Server Component FAQ — native <details>, zero framer-motion / client JS.
+ */
 export function OsFaq() {
-  const ref = useRef<HTMLElement>(null);
-  const inView = useInView(ref, { once: true, margin: "-10%" });
-  const [open, setOpen] = useState<number | null>(0);
-
   return (
-    <section id="faq" ref={ref} className="scroll-mt-24 bg-[#090909] py-32">
+    <section id="faq" className="scroll-mt-24 bg-[#090909] py-32">
       <div className="mx-auto max-w-3xl px-4">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={inView ? { opacity: 1, y: 0 } : {}}
-          className="mb-12 text-center"
-        >
+        <div className="mb-12 text-center">
           <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.35em] text-cyan-500/70">
             FAQ
           </p>
           <h2 className="text-3xl font-light text-zinc-100">Common questions</h2>
-        </motion.div>
+        </div>
 
         <div className="space-y-2">
-          {FAQS.map((faq, i) => {
-            const isOpen = open === i;
-            return (
-              <motion.div
-                key={faq.q}
-                initial={{ opacity: 0, y: 12 }}
-                animate={inView ? { opacity: 1, y: 0 } : {}}
-                transition={{ delay: i * 0.05 }}
-                className="overflow-hidden rounded-xl border border-white/[0.06] bg-white/[0.02]"
-              >
-                <button
-                  type="button"
-                  onClick={() => setOpen(isOpen ? null : i)}
-                  className="flex min-h-12 w-full items-center justify-between gap-4 px-5 py-4 text-left"
-                >
-                  <span className="text-sm font-medium text-zinc-200">{faq.q}</span>
-                  <span className="font-mono text-xs text-cyan-500/60">{isOpen ? "−" : "+"}</span>
-                </button>
-                {isOpen && (
-                  <div className="border-t border-white/[0.04] px-5 pb-4 pt-1">
-                    <p className="text-sm leading-relaxed text-zinc-500">{faq.a}</p>
-                  </div>
-                )}
-              </motion.div>
-            );
-          })}
+          {FAQS.map((faq, i) => (
+            <details
+              key={faq.q}
+              className="group overflow-hidden rounded-xl border border-white/[0.06] bg-white/[0.02] open:border-white/[0.08]"
+              open={i === 0}
+            >
+              <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-left marker:content-none [&::-webkit-details-marker]:hidden">
+                <span className="text-sm font-medium text-zinc-200">{faq.q}</span>
+                <span className="font-mono text-xs text-cyan-500/60 group-open:hidden">+</span>
+                <span className="hidden font-mono text-xs text-cyan-500/60 group-open:inline">
+                  −
+                </span>
+              </summary>
+              <div className="border-t border-white/[0.04] px-5 pb-4 pt-1">
+                <p className="text-sm leading-relaxed text-zinc-500">{faq.a}</p>
+              </div>
+            </details>
+          ))}
         </div>
       </div>
     </section>

@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import {
   getReadImportantChangeIds,
@@ -15,7 +15,10 @@ import { MonitoringHealth } from "./monitoring-health";
 import { QuickActions } from "./quick-actions";
 import { StatReadouts } from "./stat-readouts";
 import { PopularMonitoringExamples } from "@/components/dashboard/popular-monitoring-examples";
-import { useVisibleInterval } from "@/hooks/use-visible-interval";
+import {
+  useDashboardBootstrap,
+  type DashboardBootstrapStats,
+} from "@/hooks/use-dashboard-bootstrap";
 
 const NetworkMap = dynamic(
   () => import("./network-map").then((m) => m.NetworkMap),
@@ -37,56 +40,7 @@ const IntelligenceCenter = dynamic(
   }
 );
 
-interface ImportantAlertChange {
-  id: string;
-  summary: string;
-  emoji: string;
-  importance: string;
-  createdAt: string;
-  monitor: { name: string };
-}
-
-interface CommandStats {
-  totalMonitors: number;
-  activeMonitors: number;
-  pausedMonitors: number;
-  errorMonitors: number;
-  changesToday: number;
-  importantAlerts: number;
-  importantAlertChanges: ImportantAlertChange[];
-  aiAccuracy: number;
-  monitoringHealth: number;
-  avgResponseTime: number;
-  recentChanges: Array<{
-    id: string;
-    summary: string;
-    emoji: string;
-    importance: string;
-    createdAt: string;
-    monitor: { name: string; url: string };
-  }>;
-  recentNotifications: Array<{
-    id: string;
-    channel: string;
-    status: string;
-    createdAt: string;
-    change: {
-      id: string;
-      summary: string;
-      emoji: string;
-      monitor: { name: string };
-    };
-  }>;
-  monitors: Array<{
-    id: string;
-    name: string;
-    url: string;
-    faviconUrl?: string | null;
-    status: string;
-    lastChangedAt: string | null;
-    _count?: { changes: number };
-  }>;
-}
+type CommandStats = DashboardBootstrapStats;
 
 const EMPTY_STATS: CommandStats = {
   totalMonitors: 0,
@@ -106,33 +60,19 @@ const EMPTY_STATS: CommandStats = {
 
 export function CommandCenter() {
   const router = useRouter();
-  const [stats, setStats] = useState<CommandStats>(EMPTY_STATS);
-  const [loading, setLoading] = useState(true);
+  const { data, error, isLoading, mutate } = useDashboardBootstrap();
+  const stats: CommandStats = data?.stats
+    ? {
+        ...EMPTY_STATS,
+        ...data.stats,
+        importantAlertChanges: data.stats.importantAlertChanges ?? [],
+        recentNotifications: data.stats.recentNotifications ?? [],
+        avgResponseTime: data.stats.avgResponseTime ?? 0,
+      }
+    : EMPTY_STATS;
+  const loading = isLoading && !data;
   const [heavyReady, setHeavyReady] = useState(false);
   const [readImportantIds, setReadImportantIds] = useState<Set<string>>(new Set());
-
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch("/api/dashboard/stats");
-      const data = await res.json();
-
-      if (res.ok && data.stats) {
-        setStats({
-          ...EMPTY_STATS,
-          ...data.stats,
-          importantAlertChanges: data.stats.importantAlertChanges ?? [],
-          avgResponseTime:
-            data.stats.avgResponseTime ?? data.stats.analytics?.avgAiResponseMs ?? 0,
-        });
-      } else {
-        setStats(EMPTY_STATS);
-      }
-    } catch {
-      setStats(EMPTY_STATS);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
 
   useEffect(() => {
     setReadImportantIds(getReadImportantChangeIds());
@@ -148,14 +88,21 @@ export function CommandCenter() {
   }, []);
 
   useEffect(() => {
-    const onMonitorsUpdated = () => load();
+    const onMonitorsUpdated = () => {
+      void mutate();
+    };
     window.addEventListener("monitors-updated", onMonitorsUpdated);
     return () => {
       window.removeEventListener("monitors-updated", onMonitorsUpdated);
     };
-  }, [load]);
+  }, [mutate]);
 
-  useVisibleInterval(load, 45_000);
+  // Clear stale empty state only after a hard failure with no cache
+  useEffect(() => {
+    if (error && !data) {
+      /* keep EMPTY_STATS via derived stats */
+    }
+  }, [error, data]);
 
   const unreadImportant = useMemo(() => {
     const list = stats.importantAlertChanges ?? [];
@@ -273,7 +220,7 @@ export function CommandCenter() {
         </div>
         <div className="hidden lg:block">
           <QuickActions
-            onRefresh={load}
+            onRefresh={() => void mutate()}
             activeCount={stats.activeMonitors}
             pausedCount={stats.pausedMonitors + stats.errorMonitors}
           />
@@ -368,7 +315,7 @@ export function CommandCenter() {
           totalMonitors={stats.totalMonitors}
         />
         <QuickActions
-          onRefresh={load}
+          onRefresh={() => void mutate()}
           activeCount={stats.activeMonitors}
           pausedCount={stats.pausedMonitors + stats.errorMonitors}
         />

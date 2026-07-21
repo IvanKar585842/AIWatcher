@@ -1,5 +1,6 @@
 "use client";
 
+import { SWRConfig } from "swr";
 import { cn } from "@/lib/utils";
 import { ToastProvider } from "@/components/ui/os-toast";
 import { ProductTourGate } from "@/components/dashboard/tour/product-tour-gate";
@@ -31,16 +32,25 @@ function CommandMain({ children }: { children: React.ReactNode }) {
 export function CommandShell({ children }: { children: React.ReactNode }) {
   return (
     <ToastProvider>
-      <CommandProvider>
-        <div
-          className="command-os dark min-h-screen bg-[#090909] text-zinc-300"
-          style={{ fontFamily: "var(--font-syne), system-ui, sans-serif" }}
-        >
-          <CommandSidebar />
-          <CommandMain>{children}</CommandMain>
-          <ProductTourGate />
-        </div>
-      </CommandProvider>
+      <SWRConfig
+        value={{
+          revalidateOnFocus: false,
+          dedupingInterval: 15_000,
+          keepPreviousData: true,
+          errorRetryCount: 2,
+        }}
+      >
+        <CommandProvider>
+          <div
+            className="command-os dark min-h-screen bg-[#090909] text-zinc-300"
+            style={{ fontFamily: "var(--font-syne), system-ui, sans-serif" }}
+          >
+            <CommandSidebar />
+            <CommandMain>{children}</CommandMain>
+            <ProductTourGate />
+          </div>
+        </CommandProvider>
+      </SWRConfig>
     </ToastProvider>
   );
 }

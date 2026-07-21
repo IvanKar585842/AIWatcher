@@ -4,6 +4,7 @@ import { memo, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bell, Brain, Sparkles } from "lucide-react";
+import { useFeedNotifications } from "@/hooks/use-dashboard-bootstrap";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import { EmptyState } from "./dashboard-skeletons";
 
@@ -54,7 +55,7 @@ function hostFromUrl(url: string): string {
 
 export const RecentActivityPanel = memo(function RecentActivityPanel({
   changes,
-  notifications,
+  notifications: notificationsProp,
   embedded = false,
 }: {
   changes: ActivityChange[];
@@ -62,10 +63,20 @@ export const RecentActivityPanel = memo(function RecentActivityPanel({
   embedded?: boolean;
 }) {
   const [tab, setTab] = useState<Tab>("detections");
+  const needNotifications = tab === "notifications";
+  const { data: notifData, isLoading: notifLoading } = useFeedNotifications(needNotifications);
+  const notifications =
+    notifData?.notifications ?? notificationsProp ?? [];
 
   const tabs: { id: Tab; label: string; short: string; count: number; icon: React.ElementType }[] = [
     { id: "detections", label: "AI Detections", short: "Detections", count: changes.length, icon: Brain },
-    { id: "notifications", label: "Notifications", short: "Alerts", count: notifications.length, icon: Bell },
+    {
+      id: "notifications",
+      label: "Notifications",
+      short: "Alerts",
+      count: notifications.length || notificationsProp.length,
+      icon: Bell,
+    },
   ];
 
   return (
@@ -208,7 +219,9 @@ export const RecentActivityPanel = memo(function RecentActivityPanel({
               transition={{ duration: 0.18 }}
               className="p-3 sm:p-5"
             >
-              {notifications.length === 0 ? (
+              {notifLoading && notifications.length === 0 ? (
+                <p className="py-8 text-center text-xs text-zinc-600">Loading alerts…</p>
+              ) : notifications.length === 0 ? (
                 <EmptyState
                   icon={Bell}
                   title="No notifications yet"

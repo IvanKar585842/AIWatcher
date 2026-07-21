@@ -10,6 +10,7 @@ const isPublicRoute = createRouteMatcher([
   "/api/status(.*)",
   "/api/public(.*)",
   "/api/health",
+  "/api/health/live",
   "/api/webhooks(.*)",
   "/api/stripe/webhook",
   "/api/telegram/webhook",
@@ -37,8 +38,28 @@ export default hasClerk
       if (!isPublicRoute(request)) {
         await auth.protect();
       }
+
+      const response = NextResponse.next();
+      const { pathname } = request.nextUrl;
+
+      // CDN-friendly caching for anonymous marketing HTML (TTFB)
+      if (
+        request.method === "GET" &&
+        (pathname === "/" ||
+          pathname === "/robots.txt" ||
+          pathname === "/sitemap.xml" ||
+          pathname === "/score" ||
+          pathname === "/monitored-by")
+      ) {
+        response.headers.set(
+          "Cache-Control",
+          "public, s-maxage=300, stale-while-revalidate=3600"
+        );
+      }
+
+      return response;
     })
-  : function middleware() {
+  : function middleware(request: Request) {
       if (process.env.NODE_ENV === "production") {
         return NextResponse.json(
           { error: "Authentication is not configured" },

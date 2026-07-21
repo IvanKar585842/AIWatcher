@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BarChart3,
@@ -20,6 +19,7 @@ import {
   Shield,
   User,
 } from "lucide-react";
+import { useDashboardBootstrap } from "@/hooks/use-dashboard-bootstrap";
 import { DashboardUserButton } from "@/components/auth/clerk-wrappers";
 import { cn } from "@/lib/utils";
 import { useCommand } from "./command-context";
@@ -52,28 +52,8 @@ function isNavItemActive(pathname: string, item: NavItem): boolean {
 export function CommandSidebar() {
   const pathname = usePathname();
   const { collapsed, setCollapsed, mobileOpen, setMobileOpen } = useCommand();
-  const [isAdmin, setIsAdmin] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadAdminFlag() {
-      try {
-        const res = await fetch("/api/user/context", { credentials: "same-origin" });
-        if (!res.ok || cancelled) return;
-        const data = await res.json();
-        if (!cancelled && data?.isAdmin) setIsAdmin(true);
-      } catch {
-        // ignore — Admin nav stays hidden for non-admins / failed loads
-      }
-    }
-
-    void loadAdminFlag();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
+  const { data } = useDashboardBootstrap();
+  const isAdmin = Boolean(data?.user?.isAdmin);
   const navItems: NavItem[] = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
     { href: "/dashboard/monitors", label: "Monitors", icon: Radio },
