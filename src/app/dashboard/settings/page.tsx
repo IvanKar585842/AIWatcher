@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { UserProfile, useUser } from "@clerk/nextjs";
 import {
@@ -23,7 +24,6 @@ import {
 import { MonitoringInterval, MonitoringMode, NotificationMethod } from "@prisma/client";
 import { CommandPageHeader } from "@/components/dashboard/command/command-page-header";
 import { OsExpandableSection, OsFieldLabel, OsInput } from "@/components/dashboard/os/os-primitives";
-import { AgencyBadgeSettings } from "@/components/growth/agency-badge-settings";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
@@ -84,6 +84,17 @@ function OsSelectTrigger({ className, ...props }: React.ComponentProps<typeof Se
 /** Set true to restore the Integrations settings section in the UI. */
 const SHOW_INTEGRATIONS_UI = false;
 
+const AgencyBadgeSettings = dynamic(
+  () =>
+    import("@/components/growth/agency-badge-settings").then((m) => m.AgencyBadgeSettings),
+  {
+    ssr: false,
+    loading: () => (
+      <p className="py-2 text-xs text-zinc-600">Loading badge settings…</p>
+    ),
+  }
+);
+
 /**
  * Preferences that only write to localStorage and do not affect server behavior yet.
  * Hidden until wiring exists — keep flags for easy restore.
@@ -139,6 +150,7 @@ export default function SettingsPage() {
     reportType: "BUSINESS" | "DEVELOPER" | "SEO" | "COMPETITOR";
   } | null>(null);
   const [reportPrefsSaving, setReportPrefsSaving] = useState(false);
+  const [agencySectionOpen, setAgencySectionOpen] = useState(false);
 
   useEffect(() => {
     setSettings(loadUserSettings());
@@ -261,6 +273,10 @@ export default function SettingsPage() {
   }, []);
 
   useEffect(() => {
+    if (!SHOW_INTEGRATIONS_UI) {
+      setStatusLoading(false);
+      return;
+    }
     const controller = new AbortController();
     fetch("/api/user/status-page", { signal: controller.signal })
       .then((r) => (r.ok ? r.json() : null))
@@ -280,36 +296,51 @@ export default function SettingsPage() {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch("/api/user/referrals", { signal: controller.signal })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (!data?.referralCode) return;
-        setReferral({
-          code: data.referralCode,
-          inviteUrl: data.inviteUrl,
-          signups: data.referralStats?.signups ?? 0,
-          note: data.note ?? "",
-        });
-      })
-      .catch(() => {})
-      .finally(() => setReferralLoading(false));
-    return () => controller.abort();
-  }, []);
+    let idleId: number | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
-  useEffect(() => {
-    const controller = new AbortController();
-    fetch("/api/reports/preferences", { signal: controller.signal })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (!data) return;
-        setReportPrefs({
-          weeklyReportEnabled: Boolean(data.weeklyReportEnabled),
-          reportFrequency: data.reportFrequency ?? "WEEKLY",
-          reportType: data.reportType ?? "BUSINESS",
-        });
-      })
-      .catch(() => {});
-    return () => controller.abort();
+    const loadDeferred = () => {
+      void Promise.all([
+        fetch("/api/user/referrals", { signal: controller.signal })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((data) => {
+            if (!data?.referralCode) return;
+            setReferral({
+              code: data.referralCode,
+              inviteUrl: data.inviteUrl,
+              signups: data.referralStats?.signups ?? 0,
+              note: data.note ?? "",
+            });
+          })
+          .catch(() => {})
+          .finally(() => setReferralLoading(false)),
+        fetch("/api/reports/preferences", { signal: controller.signal })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((data) => {
+            if (!data) return;
+            setReportPrefs({
+              weeklyReportEnabled: Boolean(data.weeklyReportEnabled),
+              reportFrequency: data.reportFrequency ?? "WEEKLY",
+              reportType: data.reportType ?? "BUSINESS",
+            });
+          })
+          .catch(() => {}),
+      ]);
+    };
+
+    if ("requestIdleCallback" in window) {
+      idleId = window.requestIdleCallback(loadDeferred, { timeout: 2000 });
+    } else {
+      timeoutId = setTimeout(loadDeferred, 350);
+    }
+
+    return () => {
+      controller.abort();
+      if (idleId !== undefined && "cancelIdleCallback" in window) {
+        window.cancelIdleCallback(idleId);
+      }
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, []);
 
   async function saveReportPrefs(
@@ -1058,8 +1089,9 @@ export default function SettingsPage() {
           title="Agency & badge"
           subtitle="Client-ready branding and embeddable trust badge"
           icon={<Plug className="h-5 w-5" />}
+          onOpenChange={setAgencySectionOpen}
         >
-          <AgencyBadgeSettings />
+          {agencySectionOpen ? <AgencyBadgeSettings /> : null}
         </OsExpandableSection>
 
         {/* Account */}

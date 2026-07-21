@@ -15,6 +15,7 @@ import { MonitoringHealth } from "./monitoring-health";
 import { QuickActions } from "./quick-actions";
 import { StatReadouts } from "./stat-readouts";
 import { PopularMonitoringExamples } from "@/components/dashboard/popular-monitoring-examples";
+import { useVisibleInterval } from "@/hooks/use-visible-interval";
 
 const NetworkMap = dynamic(
   () => import("./network-map").then((m) => m.NetworkMap),
@@ -147,15 +148,14 @@ export function CommandCenter() {
   }, []);
 
   useEffect(() => {
-    load();
-    const interval = setInterval(load, 30000);
     const onMonitorsUpdated = () => load();
     window.addEventListener("monitors-updated", onMonitorsUpdated);
     return () => {
-      clearInterval(interval);
       window.removeEventListener("monitors-updated", onMonitorsUpdated);
     };
   }, [load]);
+
+  useVisibleInterval(load, 45_000);
 
   const unreadImportant = useMemo(() => {
     const list = stats.importantAlertChanges ?? [];

@@ -41,11 +41,14 @@ export function MonitorList({
   showHeaderCreate = true,
   emptyStateShowCreate = true,
   emptyVariant = "dashboard",
+  /** Defer first /api/monitors fetch so dashboard stats can win the critical path. */
+  deferInitialFetch = false,
 }: {
   embedded?: boolean;
   showHeaderCreate?: boolean;
   emptyStateShowCreate?: boolean;
   emptyVariant?: "dashboard" | "monitors";
+  deferInitialFetch?: boolean;
 }) {
   const { isLoaded, isSignedIn } = useAuth();
   const { toast } = useToast();
@@ -117,8 +120,29 @@ export function MonitorList({
     }
 
     setLoadState("loading");
-    void fetchMonitors();
-  }, [isLoaded, isSignedIn, fetchMonitors]);
+
+    if (!deferInitialFetch) {
+      void fetchMonitors();
+      return;
+    }
+
+    let idleId: number | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const run = () => void fetchMonitors();
+
+    if ("requestIdleCallback" in window) {
+      idleId = window.requestIdleCallback(run, { timeout: 1800 });
+    } else {
+      timeoutId = setTimeout(run, 250);
+    }
+
+    return () => {
+      if (idleId !== undefined && "cancelIdleCallback" in window) {
+        window.cancelIdleCallback(idleId);
+      }
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [isLoaded, isSignedIn, fetchMonitors, deferInitialFetch]);
 
   useEffect(() => {
     if (!isSignedIn) return;

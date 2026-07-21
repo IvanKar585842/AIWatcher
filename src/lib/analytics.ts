@@ -51,6 +51,18 @@ export async function trackEvent(params: TrackEventParams): Promise<void> {
   }
 }
 
+/** Avoid write amplification from dashboard polls (one write per user per TTL). */
+const lastUserActiveAt = new Map<string, number>();
+const USER_ACTIVE_TTL_MS = 5 * 60 * 1000;
+
+export function trackUserActiveThrottled(userId: string): void {
+  const now = Date.now();
+  const prev = lastUserActiveAt.get(userId) ?? 0;
+  if (now - prev < USER_ACTIVE_TTL_MS) return;
+  lastUserActiveAt.set(userId, now);
+  void trackEvent({ type: "user.active", userId });
+}
+
 export async function getAnalyticsSummary(userId?: string) {
   try {
     const since = new Date();

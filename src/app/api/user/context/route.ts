@@ -10,15 +10,22 @@ export async function GET() {
     return withRateLimit(
       "user-context",
       async () =>
-        NextResponse.json({
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: (user as { role?: string }).role ?? "USER",
-          isAdmin: isAdminUser(user),
-          plan: getEffectivePlan(user),
-          onboardingCompleted: Boolean(user.onboardingCompleted),
-        }),
+        NextResponse.json(
+          {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: (user as { role?: string }).role ?? "USER",
+            isAdmin: isAdminUser(user),
+            plan: getEffectivePlan(user),
+            onboardingCompleted: Boolean(user.onboardingCompleted),
+          },
+          {
+            headers: {
+              "Cache-Control": "private, max-age=30, stale-while-revalidate=60",
+            },
+          }
+        ),
       user.id
     );
   } catch (error) {

@@ -1,17 +1,21 @@
 import { NextResponse } from "next/server";
-import { getAnalyticsSummary, trackEvent } from "@/lib/analytics";
+import { trackUserActiveThrottled } from "@/lib/analytics";
 import { MonitorStatus, ChangeImportance } from "@prisma/client";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { withRateLimit } from "@/lib/rate-limit";
 
+/**
+ * Lean command-center payload.
+ * Avoids nested analytics fan-out (was ~6–8 extra queries per request).
+ */
 export async function GET() {
   try {
     const user = await requireUser();
     return withRateLimit(
       "dashboard-stats",
       async () => {
-        void trackEvent({ type: "user.active", userId: user.id });
+        trackUserActiveThrottled(user.id);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
@@ -24,7 +28,6 @@ export async function GET() {
           monitorActivity,
           monitors,
           successfulChecks,
-          analytics,
         ] = await Promise.all([
           prisma.monitor.groupBy({
             by: ["status"],
@@ -117,13 +120,6 @@ export async function GET() {
               lastCheckedAt: { not: null },
             },
           }),
-          getAnalyticsSummary(user.id).catch(() => ({
-            activeUsers: 1,
-            activeMonitors: 0,
-            changesDetected: 0,
-            emailsSent: 0,
-            avgAiResponseMs: 0,
-          })),
         ]);
 
         const countByStatus = Object.fromEntries(
@@ -181,17 +177,20 @@ export async function GET() {
               recentChanges,
               recentNotifications,
               monitors,
+              // Stub kept for older clients; heavy analytics moved off the hot path
               analytics: {
-                ...analytics,
-                activeMonitors: analytics.activeMonitors || activeMonitors,
-                changesDetected: analytics.changesDetected || changesToday,
+                activeUsers: 1,
+                activeMonitors,
+                changesDetected: changesToday,
+                emailsSent: 0,
+                avgAiResponseMs: 0,
               },
-              avgResponseTime: analytics.avgAiResponseMs,
+              avgResponseTime: 0,
             },
           },
           {
             headers: {
-              "Cache-Control": "private, max-age=15, stale-while-revalidate=30",
+              "Cache-Control": "private, max-age=20, stale-while-revalidate=40",
             },
           }
         );

@@ -95,7 +95,7 @@ export function DashboardHome({
   return (
     <div className="space-y-8">
       <CommandCenter />
-      <MonitorList />
+      <MonitorList deferInitialFetch />
     </div>
   );
 }

@@ -40,8 +40,8 @@ export function ParticleField({ density = 0.00008 }: { density?: number }) {
     let particles: Particle[] = [];
     const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
     const effectiveDensity = isMobile ? density * 0.35 : density;
-    const maxParticles = isMobile ? 28 : 55;
-    const drawLinks = !isMobile;
+    const maxParticles = isMobile ? 20 : 32;
+    const drawLinks = false;
 
     function resize() {
       const parent = canvasEl.parentElement;

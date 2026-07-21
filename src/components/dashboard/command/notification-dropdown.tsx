@@ -12,6 +12,7 @@ import {
   READ_STATE_EVENT,
 } from "@/lib/notification-read-state";
 import { formatRelativeTime } from "@/lib/utils";
+import { useVisibleInterval } from "@/hooks/use-visible-interval";
 
 interface NotificationItem {
   id: string;
@@ -70,16 +71,15 @@ export function NotificationDropdown() {
 
   useEffect(() => {
     syncReadIds();
-    loadNotifications();
-    const interval = setInterval(loadNotifications, 30_000);
     window.addEventListener(READ_STATE_EVENT, syncReadIds);
     window.addEventListener("storage", syncReadIds);
     return () => {
-      clearInterval(interval);
       window.removeEventListener(READ_STATE_EVENT, syncReadIds);
       window.removeEventListener("storage", syncReadIds);
     };
-  }, [loadNotifications, syncReadIds]);
+  }, [syncReadIds]);
+
+  useVisibleInterval(loadNotifications, 45_000);
 
   useEffect(() => {
     if (open) loadNotifications();

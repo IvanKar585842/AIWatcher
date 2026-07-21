@@ -54,6 +54,7 @@ export function OsExpandableSection({
   children,
   defaultOpen = false,
   danger,
+  onOpenChange,
 }: {
   title: string;
   subtitle?: string;
@@ -61,8 +62,17 @@ export function OsExpandableSection({
   children: React.ReactNode;
   defaultOpen?: boolean;
   danger?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+
+  function toggle() {
+    setOpen((prev) => {
+      const next = !prev;
+      onOpenChange?.(next);
+      return next;
+    });
+  }
 
   return (
     <OsCard
@@ -70,7 +80,7 @@ export function OsExpandableSection({
     >
       <button
         type="button"
-        onClick={() => setOpen(!open)}
+        onClick={toggle}
         aria-expanded={open}
         className="flex w-full min-h-12 items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.02] sm:gap-4 sm:px-5 sm:py-4"
       >

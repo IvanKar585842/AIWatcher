@@ -8,7 +8,7 @@ const SOURCE_KEY = "wf_signup_source";
 /**
  * Quiet growth helper:
  * - stores ?ref= for referrals
- * - claims referral once the user is authenticated
+ * - claims referral once the user is in the authenticated app
  * - records signup_from_report source without popups
  */
 export function GrowthCapture() {
@@ -22,6 +22,12 @@ export function GrowthCapture() {
     } catch {
       /* ignore */
     }
+
+    const path = window.location.pathname;
+    const inApp = path.startsWith("/dashboard") || path.startsWith("/admin");
+
+    // Skip network on marketing / auth pages — keep the code until the app shell loads
+    if (!inApp) return;
 
     async function claim() {
       try {
