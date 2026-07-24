@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { AppProviders } from "@/components/providers/app-providers";
 import { siteConfig } from "@/lib/seo";
 
 export const metadata: Metadata = {
@@ -9,6 +8,7 @@ export const metadata: Metadata = {
   alternates: { canonical: `${siteConfig.url}/sign-in` },
 };
 
+/** No AppProviders — widget bundles its own ClerkProvider (faster first paint). */
 export default function SignInLayout({ children }: { children: React.ReactNode }) {
-  return <AppProviders>{children}</AppProviders>;
+  return children;
 }

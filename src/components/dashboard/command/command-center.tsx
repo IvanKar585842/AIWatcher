@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import {
   getReadImportantChangeIds,
@@ -17,6 +17,7 @@ import { StatReadouts } from "./stat-readouts";
 import { PopularMonitoringExamples } from "@/components/dashboard/popular-monitoring-examples";
 import {
   useDashboardBootstrap,
+  type DashboardBootstrap,
   type DashboardBootstrapStats,
 } from "@/hooks/use-dashboard-bootstrap";
 
@@ -58,9 +59,15 @@ const EMPTY_STATS: CommandStats = {
   monitors: [],
 };
 
-export function CommandCenter() {
+export function CommandCenter({
+  initialBootstrap = null,
+}: {
+  initialBootstrap?: DashboardBootstrap | null;
+}) {
   const router = useRouter();
-  const { data, error, isLoading, mutate } = useDashboardBootstrap();
+  const { data, error, isLoading, mutate } = useDashboardBootstrap({
+    fallbackData: initialBootstrap ?? undefined,
+  });
   const stats: CommandStats = data?.stats
     ? {
         ...EMPTY_STATS,
@@ -70,8 +77,10 @@ export function CommandCenter() {
         avgResponseTime: data.stats.avgResponseTime ?? 0,
       }
     : EMPTY_STATS;
-  const loading = isLoading && !data;
+  // With SSR seed, never block the whole page on a client loading state
+  const loading = isLoading && !data && !initialBootstrap;
   const [heavyReady, setHeavyReady] = useState(false);
+  const heavySentinelRef = useRef<HTMLDivElement>(null);
   const [readImportantIds, setReadImportantIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -131,39 +140,48 @@ export function CommandCenter() {
       router.push("/dashboard/notifications");
     }
   }
-  // Defer map + intelligence until after first paint / idle (longer for LCP/INP)
+  // Load map + intelligence only when the widgets scroll near the viewport.
+  // A timed auto-enable (~2s) made the huge map the LCP element.
   useEffect(() => {
+    const el = heavySentinelRef.current;
+    if (!el) return;
+
     let idleId: number | undefined;
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    let enabled = false;
 
-    const enable = () => setHeavyReady(true);
+    const enable = () => {
+      if (enabled) return;
+      enabled = true;
+      setHeavyReady(true);
+    };
 
-    if (document.readyState === "complete") {
-      if ("requestIdleCallback" in window) {
-        idleId = window.requestIdleCallback(enable, { timeout: 2500 });
-      } else {
-        timeoutId = setTimeout(enable, 500);
-      }
+    let observer: IntersectionObserver | null = null;
+
+    if (typeof IntersectionObserver !== "undefined") {
+      observer = new IntersectionObserver(
+        ([entry]) => {
+          if (!entry?.isIntersecting) return;
+          observer?.disconnect();
+          if ("requestIdleCallback" in window) {
+            idleId = window.requestIdleCallback(enable, { timeout: 1500 });
+          } else {
+            timeoutId = setTimeout(enable, 200);
+          }
+        },
+        { rootMargin: "120px 0px", threshold: 0.01 }
+      );
+      observer.observe(el);
     } else {
-      const onLoad = () => {
-        if ("requestIdleCallback" in window) {
-          idleId = window.requestIdleCallback(enable, { timeout: 2500 });
-        } else {
-          timeoutId = setTimeout(enable, 500);
-        }
-      };
-      window.addEventListener("load", onLoad, { once: true });
-      timeoutId = setTimeout(enable, 2200);
-      return () => {
-        window.removeEventListener("load", onLoad);
-        if (idleId !== undefined && "cancelIdleCallback" in window) {
-          window.cancelIdleCallback(idleId);
-        }
-        if (timeoutId) clearTimeout(timeoutId);
-      };
+      timeoutId = setTimeout(enable, 800);
     }
 
+    // Late safety net — after typical LCP window
+    const safety = setTimeout(enable, 8000);
+
     return () => {
+      observer?.disconnect();
+      clearTimeout(safety);
       if (idleId !== undefined && "cancelIdleCallback" in window) {
         window.cancelIdleCallback(idleId);
       }
@@ -266,7 +284,10 @@ export function CommandCenter() {
         />
       </div>
 
-      <div className="grid grid-cols-1 items-stretch gap-3 lg:grid-cols-2 lg:gap-5">
+      <div
+        ref={heavySentinelRef}
+        className="grid grid-cols-1 items-stretch gap-3 lg:grid-cols-2 lg:gap-5"
+      >
         <div className="order-2 min-w-0 lg:order-1">
           {heavyReady ? (
             <Suspense

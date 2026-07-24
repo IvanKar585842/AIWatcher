@@ -89,11 +89,19 @@ const defaultConfig: SWRConfiguration = {
 };
 
 /** Shared by sidebar + command center — one network request, SWR dedupes. */
-export function useDashboardBootstrap(options?: { refreshMs?: number }) {
+export function useDashboardBootstrap(options?: {
+  refreshMs?: number;
+  fallbackData?: DashboardBootstrap;
+}) {
   const swr = useSWR<DashboardBootstrap>(
     DASHBOARD_BOOTSTRAP_KEY,
     jsonFetcher,
-    defaultConfig
+    {
+      ...defaultConfig,
+      fallbackData: options?.fallbackData,
+      // When SSR seeded, avoid blocking first paint on revalidate
+      revalidateOnMount: !options?.fallbackData,
+    }
   );
 
   useVisibleInterval(

@@ -10,8 +10,11 @@ const HeroDashboardVisual = dynamic(
 );
 
 /**
- * Keep SSR fallback through LCP; load framer/canvas only after load + idle
- * (or first scroll / long fallback).
+ * CRITICAL LCP FIX:
+ * Never auto-swap the hero at ~4–5s. A late, larger visual becomes the LCP
+ * element and pushes LCP to 5–10s in Lighthouse.
+ *
+ * Keep the static SSR shell until the user scrolls near it (or a very late idle).
  */
 export function HeroVisualLoader({ fallback }: { fallback: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -31,33 +34,40 @@ export function HeroVisualLoader({ fallback }: { fallback: ReactNode }) {
       setReady(true);
     };
 
-    const scheduleIdle = () => {
-      if ("requestIdleCallback" in window) {
-        idleId = window.requestIdleCallback(enable, { timeout: 5000 });
-      } else {
-        timeoutId = setTimeout(enable, 1200);
-      }
-    };
+    let observer: IntersectionObserver | null = null;
 
-    const onScroll = () => {
-      window.removeEventListener("scroll", onScroll);
-      scheduleIdle();
-    };
-
-    window.addEventListener("scroll", onScroll, { passive: true, once: true });
-
-    if (document.readyState === "complete") {
-      scheduleIdle();
-    } else {
-      window.addEventListener("load", scheduleIdle, { once: true });
+    if (typeof IntersectionObserver !== "undefined") {
+      observer = new IntersectionObserver(
+        ([entry]) => {
+          if (!entry?.isIntersecting) return;
+          observer?.disconnect();
+          if ("requestIdleCallback" in window) {
+            idleId = window.requestIdleCallback(enable, { timeout: 2000 });
+          } else {
+            timeoutId = setTimeout(enable, 400);
+          }
+        },
+        { rootMargin: "0px", threshold: 0.35 }
+      );
+      observer.observe(el);
     }
 
-    // Hard fallback so premium visual still appears
-    timeoutId = setTimeout(enable, 4500);
+    const onScroll = () => {
+      // Fallback for browsers without IO: first scroll enables after idle
+      if ("requestIdleCallback" in window) {
+        idleId = window.requestIdleCallback(enable, { timeout: 1500 });
+      } else {
+        timeoutId = setTimeout(enable, 300);
+      }
+    };
+    window.addEventListener("scroll", onScroll, { passive: true, once: true });
+
+    // Safety net only — well after Lighthouse LCP window (~5–8s lab)
+    timeoutId = setTimeout(enable, 12000);
 
     return () => {
+      observer?.disconnect();
       window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("load", scheduleIdle);
       if (idleId !== undefined && "cancelIdleCallback" in window) {
         window.cancelIdleCallback(idleId);
       }

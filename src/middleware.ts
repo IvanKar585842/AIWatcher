@@ -14,7 +14,11 @@ const CDN_MARKETING_PATHS = new Set([
   "/sitemap.xml",
 ]);
 
+/** Public auth shells — skip Clerk middleware cold start (auth is client-side). */
+const CDN_AUTH_SHELL_PATHS = new Set(["/sign-in", "/sign-up"]);
+
 const CDN_CACHE_CONTROL = "public, s-maxage=300, stale-while-revalidate=3600";
+const AUTH_SHELL_CACHE = "public, s-maxage=60, stale-while-revalidate=600";
 
 const PUBLIC_PATH_MATCHERS = [
   "/",
@@ -52,10 +56,25 @@ function withMarketingCache(response: NextResponse): NextResponse {
   return response;
 }
 
+function withAuthShellCache(response: NextResponse): NextResponse {
+  response.headers.set("Cache-Control", AUTH_SHELL_CACHE);
+  response.headers.set("CDN-Cache-Control", AUTH_SHELL_CACHE);
+  response.headers.set("Vercel-CDN-Cache-Control", AUTH_SHELL_CACHE);
+  response.headers.set("Vary", "Cookie");
+  return response;
+}
+
 function isCdnMarketingGet(request: NextRequest): boolean {
   return (
     request.method === "GET" && CDN_MARKETING_PATHS.has(request.nextUrl.pathname)
   );
+}
+
+function isAuthShellGet(request: NextRequest): boolean {
+  if (request.method !== "GET") return false;
+  const path = request.nextUrl.pathname;
+  if (CDN_AUTH_SHELL_PATHS.has(path)) return true;
+  return path.startsWith("/sign-in/") || path.startsWith("/sign-up/");
 }
 
 const hasClerk =
@@ -102,6 +121,11 @@ export default hasClerk
         return withMarketingCache(NextResponse.next());
       }
 
+      // Fast path: auth page shells are public + client-auth — skip Clerk edge cold start
+      if (isAuthShellGet(request) && !hasRealClerkSession(request)) {
+        return withAuthShellCache(NextResponse.next());
+      }
+
       const handler = await loadClerkHandler();
       return handler(request, event);
     }
@@ -114,6 +138,9 @@ export default hasClerk
       }
       if (isCdnMarketingGet(request)) {
         return withMarketingCache(NextResponse.next());
+      }
+      if (isAuthShellGet(request)) {
+        return withAuthShellCache(NextResponse.next());
       }
       return NextResponse.next();
     };

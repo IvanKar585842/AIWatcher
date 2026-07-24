@@ -3,9 +3,14 @@
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { SWRConfig } from "swr";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/os-toast";
 import { PRODUCT_TOUR_EVENTS } from "@/lib/product-tour";
+import {
+  DASHBOARD_BOOTSTRAP_KEY,
+  type DashboardBootstrap,
+} from "@/hooks/use-dashboard-bootstrap";
 
 const CommandCenter = dynamic(
   () =>
@@ -47,8 +52,10 @@ const ONBOARDING_CACHE_KEY = "wf-onboarding-done";
 
 export function DashboardHome({
   initialShowOnboarding = false,
+  initialBootstrap = null,
 }: {
   initialShowOnboarding?: boolean;
+  initialBootstrap?: DashboardBootstrap | null;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -93,9 +100,17 @@ export function DashboardHome({
   }
 
   return (
-    <div className="space-y-8">
-      <CommandCenter />
-      <MonitorList deferInitialFetch />
-    </div>
+    <SWRConfig
+      value={
+        initialBootstrap
+          ? { fallback: { [DASHBOARD_BOOTSTRAP_KEY]: initialBootstrap } }
+          : undefined
+      }
+    >
+      <div className="space-y-8">
+        <CommandCenter initialBootstrap={initialBootstrap} />
+        <MonitorList deferInitialFetch />
+      </div>
+    </SWRConfig>
   );
 }
