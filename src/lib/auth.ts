@@ -1,13 +1,36 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { Plan } from "@prisma/client";
-import { ensureAdminPrivileges } from "@/lib/admin";
+import { ensureAdminPrivileges, isAdminEmail } from "@/lib/admin";
 import { trackEvent } from "@/lib/analytics";
 import { prisma } from "@/lib/db";
 import { UnauthorizedError } from "@/lib/errors";
 
+/**
+ * Hot path for authenticated API/dashboard:
+ * 1) Prisma lookup by clerkId (no Clerk API round-trip)
+ * 2) Only call currentUser() when the row is missing
+ * Avoids previous: currentUser + upsert + findUniqueOrThrow on every request.
+ */
 export async function getOrCreateUser() {
   const { userId } = await auth();
   if (!userId) return null;
+
+  const existing = await prisma.user.findUnique({
+    where: { clerkId: userId },
+    include: { subscription: true },
+  });
+
+  if (existing) {
+    // Bootstrap allowlisted admins once; skip for everyone else
+    if (existing.role !== "ADMIN" && isAdminEmail(existing.email)) {
+      await ensureAdminPrivileges(existing.id, existing.email);
+      return prisma.user.findUniqueOrThrow({
+        where: { id: existing.id },
+        include: { subscription: true },
+      });
+    }
+    return existing;
+  }
 
   const clerkUser = await currentUser();
   if (!clerkUser) return null;
@@ -18,20 +41,8 @@ export async function getOrCreateUser() {
 
   if (!email) return null;
 
-  const existing = await prisma.user.findUnique({
-    where: { clerkId: userId },
-    select: { id: true },
-  });
-  const isNewUser = !existing;
-
-  let user = await prisma.user.upsert({
-    where: { clerkId: userId },
-    update: {
-      email,
-      name: clerkUser.fullName ?? clerkUser.firstName ?? null,
-      imageUrl: clerkUser.imageUrl ?? null,
-    },
-    create: {
+  const user = await prisma.user.create({
+    data: {
       clerkId: userId,
       email,
       name: clerkUser.fullName ?? clerkUser.firstName ?? null,
@@ -45,29 +56,26 @@ export async function getOrCreateUser() {
 
   await ensureAdminPrivileges(user.id, email);
 
-  user = await prisma.user.findUniqueOrThrow({
+  const fresh = await prisma.user.findUniqueOrThrow({
     where: { id: user.id },
     include: { subscription: true },
   });
 
-  if (isNewUser) {
-    void trackEvent({
-      type: "user.signup",
-      userId: user.id,
-      metadata: { emailDomain: email.split("@")[1] ?? null },
-    });
+  void trackEvent({
+    type: "user.signup",
+    userId: fresh.id,
+    metadata: { emailDomain: email.split("@")[1] ?? null },
+  });
 
-    // Welcome email — never block login
-    if (process.env.RESEND_API_KEY?.trim()) {
-      void import("@/lib/notifications/email")
-        .then(({ sendWelcomeEmail }) =>
-          sendWelcomeEmail(email, user.name ?? email.split("@")[0] ?? "there")
-        )
-        .catch((err) => console.error("[auth] welcome email failed:", err));
-    }
+  if (process.env.RESEND_API_KEY?.trim()) {
+    void import("@/lib/notifications/email")
+      .then(({ sendWelcomeEmail }) =>
+        sendWelcomeEmail(email, fresh.name ?? email.split("@")[0] ?? "there")
+      )
+      .catch((err) => console.error("[auth] welcome email failed:", err));
   }
 
-  return user;
+  return fresh;
 }
 
 export async function requireUser() {

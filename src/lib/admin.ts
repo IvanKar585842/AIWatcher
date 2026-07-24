@@ -116,6 +116,23 @@ export function isIntervalAllowedForUser(
 export async function ensureAdminPrivileges(userId: string, email: string): Promise<void> {
   if (!isAdminEmail(email)) return;
 
+  const current = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      role: true,
+      subscription: { select: { plan: true, status: true } },
+    },
+  });
+
+  // Already promoted — skip write amplification on every authenticated request
+  if (
+    current?.role === UserRole.ADMIN &&
+    current.subscription?.plan === Plan.BUSINESS &&
+    current.subscription?.status === "active"
+  ) {
+    return;
+  }
+
   await prisma.user.update({
     where: { id: userId },
     data: { role: UserRole.ADMIN },

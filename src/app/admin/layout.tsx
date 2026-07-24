@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
+import { AppProviders } from "@/components/providers/app-providers";
 import { CommandShell } from "@/components/dashboard/command/command-shell";
 import { requireAdmin } from "@/lib/admin";
 import { AdminForbidden } from "@/components/dashboard/admin/admin-forbidden";
@@ -17,8 +19,17 @@ export default async function AdminLayout({
   try {
     await requireAdmin();
   } catch {
-    return <AdminForbidden />;
+    return (
+      <AppProviders>
+        <AdminForbidden />
+      </AppProviders>
+    );
   }
 
-  return <CommandShell>{children}</CommandShell>;
+  return (
+    <AppProviders>
+      <CommandShell>{children}</CommandShell>
+      <SpeedInsights />
+    </AppProviders>
+  );
 }

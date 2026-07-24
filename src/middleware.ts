@@ -1,7 +1,22 @@
 import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server";
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
-const isPublicRoute = createRouteMatcher([
+/**
+ * Anonymous marketing HTML — skip Clerk middleware entirely (TTFB / CDN).
+ * NOTE: Clerk sets `__client_uat=0` for signed-out users. Treating any
+ * `__client_uat` as a session previously forced every visitor through Clerk
+ * and defeated CDN Cache-Control.
+ */
+const CDN_MARKETING_PATHS = new Set([
+  "/",
+  "/score",
+  "/monitored-by",
+  "/robots.txt",
+  "/sitemap.xml",
+]);
+
+const CDN_CACHE_CONTROL = "public, s-maxage=300, stale-while-revalidate=3600";
+
+const PUBLIC_PATH_MATCHERS = [
   "/",
   "/status(.*)",
   "/report(.*)",
@@ -19,25 +34,14 @@ const isPublicRoute = createRouteMatcher([
   "/sign-up(.*)",
   "/sitemap.xml",
   "/robots.txt",
-]);
+];
 
-/** Anonymous marketing HTML — skip Clerk work so CDN can cache (TTFB). */
-const isCdnMarketingGet = createRouteMatcher([
-  "/",
-  "/score",
-  "/monitored-by",
-  "/robots.txt",
-  "/sitemap.xml",
-]);
-
-const CDN_CACHE_CONTROL = "public, s-maxage=300, stale-while-revalidate=3600";
-
-function hasClerkSessionCookie(request: NextRequest): boolean {
-  return Boolean(
-    request.cookies.get("__session")?.value ||
-      request.cookies.get("__client_uat")?.value ||
-      request.cookies.get("__clerk_db_jwt")?.value
-  );
+function hasRealClerkSession(request: NextRequest): boolean {
+  if (request.cookies.get("__session")?.value) return true;
+  if (request.cookies.get("__clerk_db_jwt")?.value) return true;
+  const uat = request.cookies.get("__client_uat")?.value;
+  // Signed-out Clerk clients use "0" — not a session
+  return Boolean(uat && uat !== "0");
 }
 
 function withMarketingCache(response: NextResponse): NextResponse {
@@ -46,6 +50,12 @@ function withMarketingCache(response: NextResponse): NextResponse {
   response.headers.set("Vercel-CDN-Cache-Control", CDN_CACHE_CONTROL);
   response.headers.set("Vary", "Cookie");
   return response;
+}
+
+function isCdnMarketingGet(request: NextRequest): boolean {
+  return (
+    request.method === "GET" && CDN_MARKETING_PATHS.has(request.nextUrl.pathname)
+  );
 }
 
 const hasClerk =
@@ -58,39 +68,42 @@ if (!hasClerk && process.env.NODE_ENV !== "production") {
   );
 }
 
-const clerkHandler = clerkMiddleware(async (auth, request) => {
-  if (!isPublicRoute(request)) {
-    await auth.protect();
+type ClerkHandler = (req: NextRequest, evt: NextFetchEvent) => Response | Promise<Response>;
+
+let clerkHandlerPromise: Promise<ClerkHandler> | null = null;
+
+function loadClerkHandler(): Promise<ClerkHandler> {
+  if (!clerkHandlerPromise) {
+    clerkHandlerPromise = import("@clerk/nextjs/server").then(
+      ({ clerkMiddleware, createRouteMatcher }) => {
+        const isPublicRoute = createRouteMatcher(PUBLIC_PATH_MATCHERS);
+
+        return clerkMiddleware(async (auth, request) => {
+          if (!isPublicRoute(request)) {
+            await auth.protect();
+          }
+
+          const response = NextResponse.next();
+          if (isCdnMarketingGet(request) && !hasRealClerkSession(request)) {
+            return withMarketingCache(response);
+          }
+          return response;
+        }) as ClerkHandler;
+      }
+    );
   }
-
-  const response = NextResponse.next();
-  const { pathname } = request.nextUrl;
-
-  if (
-    request.method === "GET" &&
-    (pathname === "/" ||
-      pathname === "/robots.txt" ||
-      pathname === "/sitemap.xml" ||
-      pathname === "/score" ||
-      pathname === "/monitored-by") &&
-    !hasClerkSessionCookie(request)
-  ) {
-    return withMarketingCache(response);
-  }
-
-  return response;
-});
+  return clerkHandlerPromise;
+}
 
 export default hasClerk
-  ? function middleware(request: NextRequest, event: NextFetchEvent) {
-      if (
-        request.method === "GET" &&
-        isCdnMarketingGet(request) &&
-        !hasClerkSessionCookie(request)
-      ) {
+  ? async function middleware(request: NextRequest, event: NextFetchEvent) {
+      // Fast path: no Clerk module load for anonymous marketing HTML
+      if (isCdnMarketingGet(request) && !hasRealClerkSession(request)) {
         return withMarketingCache(NextResponse.next());
       }
-      return clerkHandler(request, event);
+
+      const handler = await loadClerkHandler();
+      return handler(request, event);
     }
   : function middleware(request: NextRequest) {
       if (process.env.NODE_ENV === "production") {
@@ -99,7 +112,7 @@ export default hasClerk
           { status: 503 }
         );
       }
-      if (request.method === "GET" && isCdnMarketingGet(request)) {
+      if (isCdnMarketingGet(request)) {
         return withMarketingCache(NextResponse.next());
       }
       return NextResponse.next();

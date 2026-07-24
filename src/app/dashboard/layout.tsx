@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
+import { AppProviders } from "@/components/providers/app-providers";
 import { CommandShell } from "@/components/dashboard/command/command-shell";
 
 export const dynamic = "force-dynamic";
@@ -21,5 +23,10 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <CommandShell>{children}</CommandShell>;
+  return (
+    <AppProviders>
+      <CommandShell>{children}</CommandShell>
+      <SpeedInsights />
+    </AppProviders>
+  );
 }
