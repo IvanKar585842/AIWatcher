@@ -103,8 +103,15 @@ export function DashboardHome({
     <SWRConfig
       value={
         initialBootstrap
-          ? { fallback: { [DASHBOARD_BOOTSTRAP_KEY]: initialBootstrap } }
-          : undefined
+          ? {
+              fallback: { [DASHBOARD_BOOTSTRAP_KEY]: initialBootstrap },
+              revalidateOnFocus: false,
+              dedupingInterval: 15_000,
+            }
+          : {
+              revalidateOnFocus: false,
+              dedupingInterval: 15_000,
+            }
       }
     >
       <div className="space-y-8">

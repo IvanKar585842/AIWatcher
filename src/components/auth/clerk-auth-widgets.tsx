@@ -4,6 +4,7 @@ import { useEffect, useState, type ComponentType, type ReactNode } from "react";
 
 type ClerkProviderComponent = ComponentType<{
   children: ReactNode;
+  publishableKey?: string;
   appearance?: { variables?: Record<string, string> };
 }>;
 
@@ -59,13 +60,14 @@ function useClerkAuthModules() {
 
 export function ClerkSignInWidget() {
   const mods = useClerkAuthModules();
-  if (!mods) {
+  const key = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  if (!mods || !key || key.includes("placeholder")) {
     return <AuthWidgetSkeleton label="Loading sign in" />;
   }
   const { ClerkProvider, SignIn } = mods;
   return (
     <div className="w-full max-w-md">
-      <ClerkProvider appearance={{ variables: { colorPrimary: "#22d3ee" } }}>
+      <ClerkProvider publishableKey={key} appearance={{ variables: { colorPrimary: "#22d3ee" } }}>
         <SignIn />
       </ClerkProvider>
     </div>
@@ -74,13 +76,14 @@ export function ClerkSignInWidget() {
 
 export function ClerkSignUpWidget() {
   const mods = useClerkAuthModules();
-  if (!mods) {
+  const key = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  if (!mods || !key || key.includes("placeholder")) {
     return <AuthWidgetSkeleton label="Loading sign up" />;
   }
   const { ClerkProvider, SignUp } = mods;
   return (
     <div className="w-full max-w-md">
-      <ClerkProvider appearance={{ variables: { colorPrimary: "#22d3ee" } }}>
+      <ClerkProvider publishableKey={key} appearance={{ variables: { colorPrimary: "#22d3ee" } }}>
         <SignUp />
       </ClerkProvider>
     </div>
