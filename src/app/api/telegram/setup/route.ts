@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin";
 import { apiErrorResponse } from "@/lib/api-response";
+import { safeEqualString } from "@/lib/security/timing-safe";
 import {
   getTelegramConfigStatus,
   getTelegramWebhookUrl,
@@ -16,7 +17,7 @@ import { getTelegramWebhookInfo } from "@/lib/notifications/telegram";
 async function authorizeSetup(request: NextRequest): Promise<boolean> {
   const cronSecret = process.env.CRON_SECRET?.trim();
   const auth = request.headers.get("authorization");
-  if (cronSecret && auth === `Bearer ${cronSecret}`) {
+  if (cronSecret && safeEqualString(auth, `Bearer ${cronSecret}`)) {
     return true;
   }
   try {

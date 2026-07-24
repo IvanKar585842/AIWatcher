@@ -117,6 +117,7 @@ export function MonitorHeaderSearch({ className }: { className?: string }) {
       <input
         ref={inputRef}
         type="search"
+        role="combobox"
         value={query}
         onChange={(e) => {
           setQuery(e.target.value);
@@ -129,6 +130,7 @@ export function MonitorHeaderSearch({ className }: { className?: string }) {
         aria-autocomplete="list"
         aria-controls={listId}
         aria-expanded={showPanel}
+        aria-haspopup="listbox"
         autoComplete="off"
         className="h-9 w-44 rounded-full border border-white/[0.06] bg-white/[0.03] pl-9 pr-4 text-xs text-zinc-300 placeholder:text-zinc-600 outline-none transition-colors focus:border-cyan-400/30 focus:ring-1 focus:ring-cyan-400/20 md:w-52 lg:w-64"
       />

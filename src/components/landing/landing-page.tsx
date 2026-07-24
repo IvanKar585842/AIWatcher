@@ -46,20 +46,20 @@ export function LandingPage() {
 
           <div className="relative z-10 mx-auto max-w-7xl px-4">
             <div className="mb-10 flex flex-col items-center text-center">
-              <p className="wf-enter mb-4 font-mono text-[11px] uppercase tracking-[0.35em] text-cyan-400/70">
+              <p className="mb-4 font-mono text-[11px] uppercase tracking-[0.35em] text-cyan-400/70">
                 AI Website Monitoring · Online
               </p>
-              <h1 className="wf-enter-delay-1 max-w-4xl text-4xl font-light tracking-tight text-zinc-100 sm:text-5xl md:text-6xl">
+              <h1 className="max-w-4xl text-4xl font-light tracking-tight text-zinc-100 sm:text-5xl md:text-6xl">
                 AI website monitoring
                 <br />
                 <span className="font-normal text-cyan-300">that explains every change.</span>
               </h1>
-              <p className="wf-enter-delay-2 mt-5 max-w-xl text-base leading-relaxed text-zinc-500">
+              <p className="mt-5 max-w-xl text-base leading-relaxed text-zinc-500">
                 WatchFlowing is an AI website tracker — detect important updates on public pages
                 (docs, news, government, corporate sites), analyze what changed, and get smart
                 alerts without the noise.
               </p>
-              <div className="wf-enter-delay-3 mt-8 flex flex-wrap items-center justify-center gap-4">
+              <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
                 <Link
                   href="/sign-up"
                   className="inline-flex min-h-11 items-center justify-center rounded-full border border-cyan-400/30 bg-cyan-500/10 px-8 py-3 text-sm font-medium text-cyan-50 transition-all duration-200 hover:border-cyan-300/50 hover:bg-cyan-500/15"
@@ -75,7 +75,7 @@ export function LandingPage() {
               </div>
             </div>
 
-            <div className="wf-enter-delay-4">
+            <div>
               <HeroVisualLoader fallback={<HeroVisualShell />} />
             </div>
           </div>

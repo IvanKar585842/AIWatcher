@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ChangeImportance } from "@prisma/client";
 import { StatusPageView } from "@/components/status/status-page-view";
 import { prisma } from "@/lib/db";
+import { siteConfig } from "@/lib/seo";
 import {
   estimateUptimePercent,
   monitorPublicStatus,
@@ -100,10 +101,34 @@ async function loadStatusPage(usernameRaw: string) {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { username } = await params;
   const data = await loadStatusPage(username);
-  if (!data) return { title: "Status — Not found" };
+  if (!data) {
+    return {
+      title: "Status — Not found",
+      robots: { index: false, follow: false },
+    };
+  }
+
+  const canonical = `${siteConfig.url}/status/${data.username}`;
+  const description = `Public monitoring status for @${data.username} on WatchFlowing — ${data.overallLabel.toLowerCase()}.`;
+
   return {
-    title: `${data.title} | WatchFlowing`,
-    description: `Public monitoring status for ${data.username}`,
+    title: data.title,
+    description,
+    alternates: { canonical },
+    openGraph: {
+      title: data.title,
+      description,
+      url: canonical,
+      siteName: siteConfig.name,
+      type: "website",
+      images: [{ url: siteConfig.ogImage, width: 1200, height: 630 }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: data.title,
+      description,
+      images: [siteConfig.ogImage],
+    },
   };
 }
 

@@ -1,5 +1,6 @@
 import { telegramLog } from "@/lib/telegram/config";
 import { getTelegramBotToken } from "@/lib/telegram/env";
+import { escapeHtml } from "@/lib/security/html";
 
 const TELEGRAM_API = "https://api.telegram.org/bot";
 
@@ -164,13 +165,6 @@ export async function sendTelegramChangeNotification(
       inline_keyboard: [[{ text: "Open Dashboard", url: changeDetailUrl }]],
     },
   });
-}
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
 }
 
 export async function setTelegramWebhook(url: string, secretToken?: string) {

@@ -6,9 +6,16 @@ import { AnimatePresence, motion, useInView } from "framer-motion";
 const TIMELINE = [
   { time: "14:32:01", site: "docs.example.com", change: "API auth section rewritten", importance: "HIGH" },
   { time: "14:28:44", site: "jobs.apple.com", change: "New role: Vision Pro Engineer", importance: "MEDIUM" },
-  { time: "14:15:12", site: "harvard.edu/finaid", change: "Scholarship deadline extended", importance: "CRITICAL" },
-  { time: "13:58:33", site: "company.com/legal", change: "Privacy Policy — Section 4.2 modified", importance: "HIGH" },
+  { time: "14:15:12", site: "checkout.shop.com", change: "Login page returned 503", importance: "CRITICAL" },
+  { time: "13:58:33", site: "company.com", change: "Footer copyright year updated", importance: "LOW" },
 ];
+
+const IMPORTANCE_PILL: Record<string, string> = {
+  CRITICAL: "bg-red-500/15 text-red-400",
+  HIGH: "bg-amber-500/15 text-amber-400",
+  MEDIUM: "bg-cyan-500/15 text-cyan-300",
+  LOW: "bg-zinc-500/15 text-zinc-500",
+};
 
 const CHART = [32, 45, 38, 62, 55, 78, 71, 89, 84, 95, 88, 102];
 
@@ -93,11 +100,7 @@ export function OsDashboardShowcase() {
                           </div>
                           <span
                             className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] ${
-                              item.importance === "CRITICAL"
-                                ? "bg-red-500/15 text-red-400"
-                                : item.importance === "HIGH"
-                                  ? "bg-amber-500/15 text-amber-400"
-                                  : "bg-zinc-500/15 text-zinc-400"
+                              IMPORTANCE_PILL[item.importance] ?? IMPORTANCE_PILL.LOW
                             }`}
                           >
                             {item.importance}

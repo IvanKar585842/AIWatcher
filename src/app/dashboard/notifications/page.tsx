@@ -12,7 +12,7 @@ import {
   Search,
 } from "lucide-react";
 import { CommandPageHeader } from "@/components/dashboard/command/command-page-header";
-import { Badge } from "@/components/ui/badge";
+import { ImportanceBadge } from "@/components/dashboard/importance-badge";
 import {
   getReadNotificationIds,
   markAlertOpened,
@@ -42,19 +42,6 @@ interface NotificationItem {
     createdAt: string;
     monitor: { name: string; url: string; mode?: string };
   };
-}
-
-function importanceVariant(imp: string) {
-  switch (imp) {
-    case "CRITICAL":
-      return "destructive" as const;
-    case "HIGH":
-      return "warning" as const;
-    case "MEDIUM":
-      return "default" as const;
-    default:
-      return "secondary" as const;
-  }
 }
 
 export default function NotificationsPage() {
@@ -232,9 +219,7 @@ export default function NotificationsPage() {
                     {isUnread && (
                       <span className="h-1.5 w-1.5 rounded-full bg-cyan-400" title="Unread" />
                     )}
-                    <Badge variant={importanceVariant(item.change.importance)} className="text-[10px]">
-                      {item.change.importance}
-                    </Badge>
+                    <ImportanceBadge importance={item.change.importance} size="sm" />
                     <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-600">
                       {modeLabel}
                     </span>

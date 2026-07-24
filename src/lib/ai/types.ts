@@ -186,11 +186,38 @@ Also set category to the closest internal enum:
 PRICE | CONTENT | JOBS | POLICY | CONTACT_INFO | PRODUCT | DOCUMENTATION | FEATURES | OTHER
 (Examples: Pricing→PRICE, Careers→JOBS, Privacy Policy→POLICY, Blog→CONTENT, Navigation→OTHER)
 
-Importance:
-- LOW: noise — cookies, ads, timestamps, counters, loading states, tiny formatting
-- MEDIUM: real but non-urgent (small copy, minor UI)
-- HIGH: important user-facing change (pricing, CTA, key content, policy)
-- CRITICAL: urgent business impact (outage/error page, large price swing, security/legal)
+Importance — pick exactly one. Prefer LOWER when unsure. Most routine edits are MEDIUM or LOW, not HIGH.
+
+CRITICAL (rare — urgent business / availability / money / security):
+- Login / signup / checkout unavailable or broken
+- Pricing or plan price changes
+- Security advisories, breaches, critical legal notices
+- Major product launch or urgent company announcement
+- Site outage, error/maintenance takeover pages
+
+HIGH (material but not emergency):
+- New feature or product capability
+- Meaningful documentation / API updates
+- Careers / hiring page material updates
+- Important UI / navigation / CTA changes on core pages
+
+MEDIUM (normal, actionable later):
+- Text edits, small layout tweaks
+- New blog/article or FAQ updates
+- Non-critical content refreshes
+
+LOW (noise — almost never notify):
+- Footer, copyright year, cookie/consent banners
+- Analytics / tracking / tag scripts
+- Whitespace, tiny styling, timestamps, counters, ads
+
+Also weigh Monitoring Mode:
+- PRICE_DETECTION / PRODUCT_AVAILABILITY → bias toward HIGH/CRITICAL for price/stock
+- JOB_LISTINGS → HIGH for real job changes; LOW for chrome noise
+- DOCUMENTATION_CHANGES → HIGH for API/docs substance; MEDIUM for typography
+- VISUAL_CHANGES / SCREENSHOT_DIFF → score by visual magnitude; tiny shifts ≤ LOW/MEDIUM
+- TEXT_CHANGES / HTML_DIFF → avoid HIGH unless substance is clear
+- AI_SMART / ENTIRE_PAGE → use semantic impact, not change volume alone
 
 potentialImpact:
 - 1–2 sentences explaining WHY this could matter

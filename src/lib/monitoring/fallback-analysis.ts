@@ -3,6 +3,7 @@ import { MonitoringMode } from "@prisma/client";
 import type { ChangeAnalysis } from "@/lib/ai/types";
 import { defaultPotentialImpact, defaultRecommendedAction } from "@/lib/ai/types";
 import { hostnameFromUrl } from "@/lib/ai/change-insight";
+import { scoreImportance } from "@/lib/importance";
 import { extractTextFromHtml } from "./content-cleaner";
 
 function toPlainText(content: string): string {
@@ -29,7 +30,9 @@ function isVisualMode(mode: string, oldContent: string, newContent: string): boo
 }
 
 function looksLikeNoise(text: string): boolean {
-  return /cookie|consent|gdpr|advertisement|\bad\b|timestamp|loading|spinner/i.test(text);
+  return /cookie|consent|gdpr|advertisement|\bad\b|timestamp|loading|spinner|copyright|©\s*20\d{2}|analytics|gtag|tracking\s+script|footer/i.test(
+    text
+  );
 }
 
 /** Exported for cost control — skip paid AI on obvious noise packages */
@@ -44,20 +47,26 @@ function classifyFallbackCategory(
   if (mode === MonitoringMode.PRICE_DETECTION || /price|pricing|\$|€|£/.test(packageText)) {
     return { category: "PRICE", categoryLabel: "Pricing" };
   }
-  if (/privacy|terms of service|cookie policy|gdpr|legal/.test(packageText)) {
-    return { category: "POLICY", categoryLabel: "Legal" };
+  if (/privacy|terms of service|cookie policy|gdpr|legal|security\s+update|cve-/i.test(packageText)) {
+    return { category: "POLICY", categoryLabel: /security|cve-/i.test(packageText) ? "Security" : "Legal" };
   }
-  if (/career|hiring|job opening|we.?re hiring/.test(packageText)) {
+  if (/career|hiring|job opening|we.?re hiring/i.test(packageText)) {
     return { category: "JOBS", categoryLabel: "Careers" };
   }
-  if (/api reference|changelog|documentation|endpoint/.test(packageText)) {
+  if (/api reference|changelog|documentation|endpoint/i.test(packageText)) {
     return { category: "DOCUMENTATION", categoryLabel: "Documentation" };
   }
-  if (/contact@|phone:|mailto:|address/.test(packageText)) {
+  if (/contact@|phone:|mailto:|address/i.test(packageText)) {
     return { category: "CONTACT_INFO", categoryLabel: "Contact Information" };
+  }
+  if (/product\s+launch|new\s+feature|launching/i.test(packageText)) {
+    return { category: "FEATURES", categoryLabel: "Features" };
   }
   if (mode === MonitoringMode.DOCUMENTATION_CHANGES) {
     return { category: "DOCUMENTATION", categoryLabel: "Documentation" };
+  }
+  if (/footer|copyright/i.test(packageText)) {
+    return { category: "OTHER", categoryLabel: "Footer" };
   }
   return { category: "CONTENT", categoryLabel: "Content" };
 }
@@ -75,8 +84,14 @@ export function buildFallbackAnalysis(params: {
 
   if (visual) {
     const pct = params.visualDiffPercent;
-    const small = pct != null && pct < 4;
-    const importance = small ? "MEDIUM" : "HIGH";
+    const importance = scoreImportance({
+      mode: params.mode,
+      packageText: `visual difference ${pct ?? ""}% layout imagery ui`,
+      category: "OTHER",
+      categoryLabel: "Design",
+      visualDiffPercent: pct,
+      changeCount: pct != null && pct >= 8 ? 6 : pct != null && pct >= 4 ? 3 : 1,
+    });
     const changes = [
       pct != null
         ? `Visible layout or imagery shifted (~${pct.toFixed(1)}% difference)`
@@ -93,22 +108,20 @@ export function buildFallbackAnalysis(params: {
       categoryLabel: "Design",
       changes,
       bullet_points: changes,
-      shouldNotify: !small,
+      shouldNotify: importance === "HIGH" || importance === "CRITICAL",
       old_value: null,
       new_value: null,
       emoji: "👁️",
-      recommendedAction: small
-        ? "Review when convenient — visual shift looks minor."
-        : "Compare screenshots in the dashboard and confirm the update is expected.",
+      recommendedAction: defaultRecommendedAction(importance, "OTHER"),
       potentialImpact: defaultPotentialImpact(importance, "OTHER", changes),
     };
   }
 
   const packageText = `${params.oldContent}\n${params.newContent}`;
-  if (looksLikeNoise(packageText) && !/price|pricing|available|stock|job|policy/i.test(packageText)) {
-    const changes = ["Likely non-critical page noise (ads, cookies, or dynamic counters)"];
+  if (looksLikeNoise(packageText) && !/price|pricing|available|stock|job|policy|login|security/i.test(packageText)) {
+    const changes = ["Likely non-critical page noise (ads, cookies, footer, or dynamic counters)"];
     return {
-      summary: `A minor, likely non-critical update appeared on ${params.monitorName} (${host}). The differences resemble cookie banners, ads, or dynamic counters rather than core product content. These are usually safe to ignore unless you specifically track them.`,
+      summary: `A minor, likely non-critical update appeared on ${params.monitorName} (${host}). The differences resemble cookie banners, ads, footer chrome, or dynamic counters rather than core product content. These are usually safe to ignore unless you specifically track them.`,
       importance: "LOW",
       category: "OTHER",
       categoryLabel: "Other",
@@ -125,6 +138,7 @@ export function buildFallbackAnalysis(params: {
 
   const oldPlain = toPlainText(params.oldContent).slice(0, 4000);
   const newPlain = toPlainText(params.newContent).slice(0, 4000);
+  const charDelta = Math.abs(newPlain.length - oldPlain.length);
 
   const parts = Diff.diffLines(oldPlain, newPlain);
   const added: string[] = [];
@@ -166,10 +180,15 @@ export function buildFallbackAnalysis(params: {
 
   const { category, categoryLabel } = classifyFallbackCategory(params.mode, packageText);
   const changeCount = added.length + removed.length + structureHints.length;
-  const importance: ChangeAnalysis["importance"] =
-    changeCount > 5 || /price|pricing|available|stock/i.test(packageText)
-      ? "HIGH"
-      : "MEDIUM";
+  const importance = scoreImportance({
+    mode: params.mode,
+    packageText: `${packageText}\n${bullets.join("\n")}`,
+    changes: bullets,
+    category,
+    categoryLabel,
+    changeCount,
+    charDelta,
+  });
 
   const focus =
     added[0]?.slice(0, 120) ||
@@ -186,9 +205,11 @@ export function buildFallbackAnalysis(params: {
         : removed.length
           ? `Material was removed from the page, including “${focus}”.`
           : `Structural or text differences were found around “${focus}”.`,
-    importance === "HIGH"
+    importance === "CRITICAL" || importance === "HIGH"
       ? "This looks material enough to review soon."
-      : "Confirm whether the update is expected for your monitoring goal.",
+      : importance === "LOW"
+        ? "This looks like low-priority chrome or noise."
+        : "Confirm whether the update is expected for your monitoring goal.",
   ].join(" ");
 
   return {
@@ -198,10 +219,10 @@ export function buildFallbackAnalysis(params: {
     categoryLabel,
     changes: bullets.slice(0, 6),
     bullet_points: bullets.slice(0, 6),
-    shouldNotify: importance === "HIGH",
+    shouldNotify: importance === "HIGH" || importance === "CRITICAL",
     old_value: removed[0]?.slice(0, 500) ?? null,
     new_value: added[0]?.slice(0, 500) ?? null,
-    emoji: category === "PRICE" ? "💰" : "🔔",
+    emoji: category === "PRICE" ? "💰" : importance === "CRITICAL" ? "🚨" : "🔔",
     recommendedAction: defaultRecommendedAction(importance, category),
     potentialImpact: defaultPotentialImpact(importance, category, bullets),
   };

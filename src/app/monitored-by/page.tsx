@@ -1,5 +1,35 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Activity, Shield } from "lucide-react";
+import { siteConfig } from "@/lib/seo";
+
+export const metadata: Metadata = {
+  title: "Monitored by WatchFlowing",
+  description:
+    "Websites displaying the WatchFlowing badge use AI monitoring to detect meaningful changes and surface intelligent alerts.",
+  alternates: {
+    canonical: `${siteConfig.url}/monitored-by`,
+  },
+  openGraph: {
+    title: "Monitored by WatchFlowing",
+    description:
+      "Trust signal for sites monitored by WatchFlowing AI website monitoring.",
+    url: `${siteConfig.url}/monitored-by`,
+    siteName: siteConfig.name,
+    images: [{ url: siteConfig.ogImage, width: 1200, height: 630 }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Monitored by WatchFlowing",
+    description:
+      "Trust signal for sites monitored by WatchFlowing AI website monitoring.",
+    images: [siteConfig.ogImage],
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+};
 
 export default async function MonitoredByPage({
   searchParams,

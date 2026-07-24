@@ -1,7 +1,6 @@
-import { SignIn } from "@clerk/nextjs";
+import { ClerkSignInWidget } from "@/components/auth/clerk-auth-widgets";
 
-export const dynamic = "force-dynamic";
-
+/** Static shell — Clerk widget loads client-side to cut TTFB. */
 export default function SignInPage() {
   const hasClerk =
     process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
@@ -18,8 +17,8 @@ export default function SignInPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <SignIn />
+    <div className="flex min-h-screen items-center justify-center bg-[#090909] p-4">
+      <ClerkSignInWidget />
     </div>
   );
 }

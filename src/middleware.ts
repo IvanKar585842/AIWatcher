@@ -1,5 +1,5 @@
+import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server";
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-import { NextResponse } from "next/server";
 
 const isPublicRoute = createRouteMatcher([
   "/",
@@ -21,7 +21,32 @@ const isPublicRoute = createRouteMatcher([
   "/robots.txt",
 ]);
 
-// Auth UI (/sign-in, /sign-up) is rate-limited by Clerk. API abuse is handled in withRateLimit.
+/** Anonymous marketing HTML — skip Clerk work so CDN can cache (TTFB). */
+const isCdnMarketingGet = createRouteMatcher([
+  "/",
+  "/score",
+  "/monitored-by",
+  "/robots.txt",
+  "/sitemap.xml",
+]);
+
+const CDN_CACHE_CONTROL = "public, s-maxage=300, stale-while-revalidate=3600";
+
+function hasClerkSessionCookie(request: NextRequest): boolean {
+  return Boolean(
+    request.cookies.get("__session")?.value ||
+      request.cookies.get("__client_uat")?.value ||
+      request.cookies.get("__clerk_db_jwt")?.value
+  );
+}
+
+function withMarketingCache(response: NextResponse): NextResponse {
+  response.headers.set("Cache-Control", CDN_CACHE_CONTROL);
+  response.headers.set("CDN-Cache-Control", CDN_CACHE_CONTROL);
+  response.headers.set("Vercel-CDN-Cache-Control", CDN_CACHE_CONTROL);
+  response.headers.set("Vary", "Cookie");
+  return response;
+}
 
 const hasClerk =
   process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
@@ -33,38 +58,49 @@ if (!hasClerk && process.env.NODE_ENV !== "production") {
   );
 }
 
+const clerkHandler = clerkMiddleware(async (auth, request) => {
+  if (!isPublicRoute(request)) {
+    await auth.protect();
+  }
+
+  const response = NextResponse.next();
+  const { pathname } = request.nextUrl;
+
+  if (
+    request.method === "GET" &&
+    (pathname === "/" ||
+      pathname === "/robots.txt" ||
+      pathname === "/sitemap.xml" ||
+      pathname === "/score" ||
+      pathname === "/monitored-by") &&
+    !hasClerkSessionCookie(request)
+  ) {
+    return withMarketingCache(response);
+  }
+
+  return response;
+});
+
 export default hasClerk
-  ? clerkMiddleware(async (auth, request) => {
-      if (!isPublicRoute(request)) {
-        await auth.protect();
-      }
-
-      const response = NextResponse.next();
-      const { pathname } = request.nextUrl;
-
-      // CDN-friendly caching for anonymous marketing HTML (TTFB)
+  ? function middleware(request: NextRequest, event: NextFetchEvent) {
       if (
         request.method === "GET" &&
-        (pathname === "/" ||
-          pathname === "/robots.txt" ||
-          pathname === "/sitemap.xml" ||
-          pathname === "/score" ||
-          pathname === "/monitored-by")
+        isCdnMarketingGet(request) &&
+        !hasClerkSessionCookie(request)
       ) {
-        response.headers.set(
-          "Cache-Control",
-          "public, s-maxage=300, stale-while-revalidate=3600"
-        );
+        return withMarketingCache(NextResponse.next());
       }
-
-      return response;
-    })
-  : function middleware(request: Request) {
+      return clerkHandler(request, event);
+    }
+  : function middleware(request: NextRequest) {
       if (process.env.NODE_ENV === "production") {
         return NextResponse.json(
           { error: "Authentication is not configured" },
           { status: 503 }
         );
+      }
+      if (request.method === "GET" && isCdnMarketingGet(request)) {
+        return withMarketingCache(NextResponse.next());
       }
       return NextResponse.next();
     };

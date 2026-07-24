@@ -5,6 +5,10 @@ import Link from "next/link";
 import { Eye, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { HistoryEmptyState } from "@/components/dashboard/history-empty-state";
+import {
+  ImportanceBadge,
+  importanceDotClass,
+} from "@/components/dashboard/importance-badge";
 import { OsInput } from "@/components/dashboard/os/os-primitives";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -34,32 +38,6 @@ interface ChangeItem {
   visualDiffPercent?: number | null;
   hasScreenshots?: boolean;
   monitor: { id: string; name: string; url: string; mode?: string };
-}
-
-function importanceDotClass(importance: string) {
-  switch (importance) {
-    case "CRITICAL":
-      return "border-red-400 bg-red-500 shadow-[0_0_12px_rgba(248,113,113,0.55)]";
-    case "HIGH":
-      return "border-amber-300 bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.5)]";
-    case "MEDIUM":
-      return "border-cyan-300 bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.45)]";
-    default:
-      return "border-white/20 bg-zinc-700";
-  }
-}
-
-function importanceVariant(imp: string) {
-  switch (imp) {
-    case "CRITICAL":
-      return "destructive" as const;
-    case "HIGH":
-      return "warning" as const;
-    case "MEDIUM":
-      return "default" as const;
-    default:
-      return "secondary" as const;
-  }
 }
 
 function changeTypeLabel(change: ChangeItem): string {
@@ -199,9 +177,7 @@ export function ChangeHistory() {
                             <Badge variant="outline" className="text-xs capitalize">
                               {categoryLabel}
                             </Badge>
-                            <Badge variant={importanceVariant(change.importance)} className="text-xs">
-                              {est.emoji} {est.label}
-                            </Badge>
+                            <ImportanceBadge importance={change.importance} size="sm" />
                             {change.hasScreenshots && (
                               <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-cyan-400/80">
                                 <Eye className="h-3 w-3" />

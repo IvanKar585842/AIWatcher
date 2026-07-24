@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { handleTelegramUpdate } from "@/lib/telegram/bot";
 import { telegramLog } from "@/lib/telegram/config";
 import { getTelegramBotToken, getTelegramWebhookSecret } from "@/lib/telegram/env";
+import { safeEqualString } from "@/lib/security/timing-safe";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,7 +37,7 @@ export async function POST(request: NextRequest) {
   }
 
   const headerSecret = request.headers.get("x-telegram-bot-api-secret-token");
-  if (!headerSecret || headerSecret !== secret) {
+  if (!safeEqualString(headerSecret, secret)) {
     telegramLog("webhook_unauthorized", {
       hasHeader: Boolean(headerSecret),
     });

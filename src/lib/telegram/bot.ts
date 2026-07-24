@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { sendTelegramMessage } from "@/lib/notifications/telegram";
 import { INTERVAL_LABELS, MODE_LABELS } from "@/lib/constants";
+import { escapeHtml } from "@/lib/security/html";
 import { formatRelativeTime } from "@/lib/utils";
 import { verifyTelegramLinkCode } from "@/lib/telegram/link-token";
 import { telegramLog } from "@/lib/telegram/config";
@@ -94,7 +95,7 @@ export async function handleTelegramUpdate(update: TelegramUpdate) {
       const list = monitors
         .map((m, i) => {
           const status = m.status === "ACTIVE" ? "🟢" : m.status === "PAUSED" ? "⏸️" : "🔴";
-          return `${i + 1}. ${status} <b>${m.name}</b>\n   ID: <code>${m.id.slice(-8)}</code>\n   ${MODE_LABELS[m.mode]} · ${INTERVAL_LABELS[m.interval]}`;
+          return `${i + 1}. ${status} <b>${escapeHtml(m.name)}</b>\n   ID: <code>${escapeHtml(m.id.slice(-8))}</code>\n   ${escapeHtml(MODE_LABELS[m.mode])} · ${escapeHtml(INTERVAL_LABELS[m.interval])}`;
         })
         .join("\n\n");
 
@@ -177,16 +178,16 @@ export async function handleTelegramUpdate(update: TelegramUpdate) {
 
       const bullets =
         change.bulletPoints.length > 0
-          ? "\n\n" + change.bulletPoints.map((bp) => `• ${bp}`).join("\n")
+          ? "\n\n" + change.bulletPoints.map((bp) => `• ${escapeHtml(bp)}`).join("\n")
           : "";
 
       await sendTelegramMessage(
         chatId,
-        `${change.emoji} <b>Latest Change</b>\n\n` +
-          `<b>${change.monitor.name}</b>\n` +
-          `${formatRelativeTime(change.createdAt)}\n\n` +
-          `${change.summary}${bullets}\n\n` +
-          `<a href="${change.monitor.url}">Open Website →</a>`
+        `${escapeHtml(change.emoji)} <b>Latest Change</b>\n\n` +
+          `<b>${escapeHtml(change.monitor.name)}</b>\n` +
+          `${escapeHtml(formatRelativeTime(change.createdAt))}\n\n` +
+          `${escapeHtml(change.summary)}${bullets}\n\n` +
+          `<a href="${escapeHtml(change.monitor.url)}">Open Website →</a>`
       );
       break;
     }
@@ -275,19 +276,11 @@ async function tryLinkTelegramAccount(params: {
 }
 
 /**
- * Accepts:
- * - start=USER_ID (cuid)
- * - start=link_... signed codes (legacy / more secure TTL tokens)
+ * Only signed `link_…` start payloads are accepted (prevents account takeover
+ * via guessing another user's database id).
  */
 function resolveStartPayloadUserId(payload: string): string | null {
-  if (payload.startsWith("link_")) {
-    return verifyTelegramLinkCode(payload);
-  }
-  // Prisma cuid() ids are typically 25 chars; reject obvious garbage
-  if (/^[a-z0-9]{20,36}$/i.test(payload)) {
-    return payload;
-  }
-  return null;
+  return verifyTelegramLinkCode(payload);
 }
 
 async function resolveMonitorId(userId: string, partialId?: string): Promise<string | null> {

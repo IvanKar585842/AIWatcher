@@ -28,8 +28,8 @@ export async function POST(request: NextRequest) {
   try {
     event = getStripe().webhooks.constructEvent(body, signature, webhookSecret);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Invalid signature";
-    return NextResponse.json({ error: message }, { status: 400 });
+    console.error("[stripe/webhook] signature verification failed", err);
+    return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
   const existing = await prisma.processedStripeEvent.findUnique({

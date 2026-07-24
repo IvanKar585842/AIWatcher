@@ -10,9 +10,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ChangeInsightBrief } from "@/components/dashboard/change-insight-brief";
 import { DiffViewer } from "@/components/dashboard/diff-viewer";
 import { EmptyState } from "@/components/dashboard/command/dashboard-skeletons";
+import { ImportanceBadge } from "@/components/dashboard/importance-badge";
 import { ShareInsightButton } from "@/components/dashboard/share-insight-report";
 import { UpgradePrompt } from "@/components/dashboard/upgrade-prompt";
-import { defaultCategoryLabel, formatImportanceEstimate } from "@/lib/ai/change-insight";
+import { defaultCategoryLabel } from "@/lib/ai/change-insight";
 import { markAlertOpened } from "@/lib/notification-read-state";
 import { MODE_LABELS } from "@/lib/constants";
 import { FileQuestion } from "lucide-react";
@@ -135,7 +136,6 @@ export default function ChangeDetailPage({
   const modeLabel = change.monitor.mode
     ? MODE_LABELS[change.monitor.mode as MonitoringMode] ?? change.monitor.mode
     : change.category.replace(/_/g, " ");
-  const estimate = formatImportanceEstimate(change.importance);
   const categoryLabel =
     change.categoryLabel?.trim() || defaultCategoryLabel(change.category);
 
@@ -158,9 +158,7 @@ export default function ChangeDetailPage({
             </h1>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline">
-              {estimate.emoji} {estimate.label}
-            </Badge>
+            <ImportanceBadge importance={change.importance} />
             <Badge variant="outline">{categoryLabel}</Badge>
             <Badge variant="outline">{modeLabel}</Badge>
             {change.comparisonReason && (

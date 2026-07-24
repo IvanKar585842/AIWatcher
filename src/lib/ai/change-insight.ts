@@ -94,15 +94,15 @@ export function formatImportanceEstimate(
 ): { tone: "minor" | "medium" | "high" | "critical"; label: string; emoji: string } {
   switch (String(importance).toUpperCase()) {
     case "LOW":
-      return { tone: "minor", label: "Minor", emoji: "🟢" };
+      return { tone: "minor", label: "Low", emoji: "⚪" };
     case "MEDIUM":
-      return { tone: "medium", label: "Medium", emoji: "🟡" };
+      return { tone: "medium", label: "Medium", emoji: "🔵" };
     case "HIGH":
-      return { tone: "high", label: "High", emoji: "🔴" };
+      return { tone: "high", label: "High", emoji: "🟠" };
     case "CRITICAL":
       return { tone: "critical", label: "Critical", emoji: "🔴" };
     default:
-      return { tone: "medium", label: "Medium", emoji: "🟡" };
+      return { tone: "medium", label: "Medium", emoji: "🔵" };
   }
 }
 

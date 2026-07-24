@@ -23,6 +23,8 @@ export default function robots(): MetadataRoute.Robots {
           // Auth UI (noindex) + private tokenized shares
           "/sign-in",
           "/sign-in/",
+          "/sign-up",
+          "/sign-up/",
           "/report/",
           "/score/",
         ],

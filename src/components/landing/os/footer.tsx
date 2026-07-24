@@ -1,131 +1,23 @@
-"use client";
-
-import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
-import { usePrefersReducedMotion } from "@/components/landing/os/mouse-parallax";
 
-function NetworkCanvas() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const reducedMotion = usePrefersReducedMotion();
-
-  useEffect(() => {
-    if (reducedMotion) return;
-    if (typeof window !== "undefined" && window.innerWidth < 768) return;
-
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    let id = 0;
-    const nodes = Array.from({ length: 24 }, () => ({
-      x: Math.random(),
-      y: Math.random(),
-      vx: (Math.random() - 0.5) * 0.00035,
-      vy: (Math.random() - 0.5) * 0.00035,
-    }));
-
-    const canvasEl = canvas;
-    const context = ctx;
-    function resize() {
-      const parent = canvasEl.parentElement;
-      if (!parent) return;
-      canvasEl.width = parent.clientWidth;
-      canvasEl.height = parent.clientHeight;
-    }
-
-    function draw() {
-      context.clearRect(0, 0, canvasEl.width, canvasEl.height);
-      for (const n of nodes) {
-        n.x += n.vx;
-        n.y += n.vy;
-        if (n.x < 0 || n.x > 1) n.vx *= -1;
-        if (n.y < 0 || n.y > 1) n.vy *= -1;
-      }
-
-      for (let i = 0; i < nodes.length; i++) {
-        for (let j = i + 1; j < nodes.length; j++) {
-          const a = nodes[i];
-          const b = nodes[j];
-          const dx = (a.x - b.x) * canvasEl.width;
-          const dy = (a.y - b.y) * canvasEl.height;
-          const d = Math.sqrt(dx * dx + dy * dy);
-          if (d < 100) {
-            context.strokeStyle = `rgba(56,189,248,${0.05 * (1 - d / 100)})`;
-            context.beginPath();
-            context.moveTo(a.x * canvasEl.width, a.y * canvasEl.height);
-            context.lineTo(b.x * canvasEl.width, b.y * canvasEl.height);
-            context.stroke();
-          }
-        }
-      }
-
-      for (const n of nodes) {
-        context.beginPath();
-        context.arc(n.x * canvasEl.width, n.y * canvasEl.height, 1.2, 0, Math.PI * 2);
-        context.fillStyle = "rgba(125,211,252,0.3)";
-        context.fill();
-      }
-
-      id = requestAnimationFrame(draw);
-    }
-
-    resize();
-    draw();
-    window.addEventListener("resize", resize);
-    return () => {
-      cancelAnimationFrame(id);
-      window.removeEventListener("resize", resize);
-    };
-  }, [reducedMotion]);
-
-  if (reducedMotion) return null;
-  return (
-    <canvas
-      ref={canvasRef}
-      className="absolute inset-0 h-full w-full opacity-50"
-      aria-hidden
-    />
-  );
-}
-
+/**
+ * Server Component footer — no framer-motion / canvas on the marketing critical path.
+ */
 export function OsFooter() {
-  const [showCanvas, setShowCanvas] = useState(false);
-
-  useEffect(() => {
-    const el = document.getElementById("os-footer");
-    if (!el || typeof IntersectionObserver === "undefined") {
-      setShowCanvas(true);
-      return;
-    }
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting)) {
-          setShowCanvas(true);
-          io.disconnect();
-        }
-      },
-      { rootMargin: "120px" }
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
+  const year = new Date().getFullYear();
 
   return (
     <footer
       id="os-footer"
       className="relative overflow-hidden border-t border-white/[0.04] bg-[#090909]"
     >
-      <div className="relative h-36 md:h-48">{showCanvas ? <NetworkCanvas /> : null}</div>
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(ellipse_at_top,rgba(56,189,248,0.08),transparent_70%)]"
+        aria-hidden
+      />
 
-      <div className="relative mx-auto max-w-7xl px-4 pb-16 pt-8">
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-40px" }}
-          className="mb-16 text-center"
-        >
+      <div className="relative mx-auto max-w-7xl px-4 pb-16 pt-16">
+        <div className="mb-16 text-center">
           <h2 className="text-2xl font-light text-zinc-200 md:text-3xl">
             Start AI website monitoring today
           </h2>
@@ -140,13 +32,13 @@ export function OsFooter() {
               Create free account
             </Link>
           </div>
-        </motion.div>
+        </div>
 
         <div className="flex flex-col items-center justify-between gap-6 border-t border-white/[0.04] pt-8 md:flex-row">
           <p className="font-mono text-[10px] tracking-widest text-zinc-600">
-            WatchFlowing © {new Date().getFullYear()} · watchflowing.com
+            WatchFlowing © {year} · watchflowing.com
           </p>
-          <div className="flex gap-8">
+          <div className="flex flex-wrap justify-center gap-8">
             {[
               { label: "Features", href: "#os-features" },
               { label: "Pricing", href: "#pricing" },

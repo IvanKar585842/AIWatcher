@@ -28,17 +28,11 @@ import { buildFallbackAnalysis, isLikelyTechnicalNoise } from "./fallback-analys
 import { monitorLog, monitorLogError } from "./logger";
 import { readStoredHtml } from "./snapshot-store";
 import { buildChangePackageForAI, comparePageStructures } from "./structural-diff";
+import { IMPORTANCE_RANK, recalibrateImportance } from "@/lib/importance";
 
 /** Prevent concurrent / duplicate AI analysis of the same change in one process */
 const analyzingChangeIds = new Set<string>();
 const MAX_AI_BATCH = 5;
-
-const IMPORTANCE_RANK: Record<string, number> = {
-  LOW: 0,
-  MEDIUM: 1,
-  HIGH: 2,
-  CRITICAL: 3,
-};
 
 function applyImportancePolicy(
   analysis: ChangeAnalysis,
@@ -48,8 +42,8 @@ function applyImportancePolicy(
   let shouldNotify =
     analysis.importance === "HIGH" || analysis.importance === "CRITICAL";
 
-  const minRank = IMPORTANCE_RANK[minImportance] ?? 1;
-  const rank = IMPORTANCE_RANK[analysis.importance] ?? 1;
+  const minRank = IMPORTANCE_RANK[minImportance as keyof typeof IMPORTANCE_RANK] ?? 1;
+  const rank = IMPORTANCE_RANK[analysis.importance as keyof typeof IMPORTANCE_RANK] ?? 1;
   if (rank < minRank || analysis.importance === "LOW") {
     shouldNotify = false;
   }
@@ -407,6 +401,15 @@ async function resolveAnalysis(
 
     const provider = getAIProviderType();
 
+    const calibrated = recalibrateImportance(analysis, {
+      mode: monitor.mode,
+      packageText: `${changePackage}\n${contextPackage}`,
+      visualDiffPercent,
+      charDelta: Math.abs(
+        contextPackage.replace(/\s+/g, " ").length - changePackage.replace(/\s+/g, " ").length
+      ),
+    });
+
     await trackEvent({
       type: "ai.analysis",
       userId: monitor.userId,
@@ -414,14 +417,15 @@ async function resolveAnalysis(
       metadata: {
         monitorId: monitor.id,
         changeId: change.id,
-        importance: analysis.importance,
-        shouldNotify: analysis.shouldNotify,
+        importance: calibrated.importance,
+        aiImportance: analysis.importance,
+        shouldNotify: calibrated.shouldNotify,
         provider,
       },
     });
 
     return {
-      analysis: applyImportancePolicy(analysis, minImportance),
+      analysis: applyImportancePolicy(calibrated, minImportance),
       provider,
       upgradePreview: false,
     };

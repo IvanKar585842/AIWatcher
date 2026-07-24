@@ -12,8 +12,8 @@ export async function GET(request: NextRequest) {
     const deleted = await cleanupOldChatConversations();
     return NextResponse.json({ success: true, deleted });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Cleanup failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("[cron/chat-cleanup] failed", error);
+    return NextResponse.json({ error: "Cleanup failed" }, { status: 500 });
   }
 }
 

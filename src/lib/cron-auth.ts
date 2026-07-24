@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { safeEqualString } from "@/lib/security/timing-safe";
 
 /** Shared Bearer CRON_SECRET check for /api/cron/* routes. */
 export function authorizeCron(request: NextRequest): NextResponse | null {
@@ -8,7 +9,8 @@ export function authorizeCron(request: NextRequest): NextResponse | null {
   }
 
   const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${cronSecret}`) {
+  const expected = `Bearer ${cronSecret}`;
+  if (!safeEqualString(authHeader, expected)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

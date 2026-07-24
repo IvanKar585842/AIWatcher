@@ -1,16 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import { apiErrorResponse } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { withRateLimit } from "@/lib/rate-limit";
 import { getTelegramConfigStatus } from "@/lib/telegram/config";
 import { getTelegramBotUsername } from "@/lib/telegram/env";
+import { createTelegramLinkCode } from "@/lib/telegram/link-token";
 import { ensureTelegramWebhook, probeTelegramBot } from "@/lib/telegram/setup";
 
 const DEFAULT_BOT_USERNAME = "WatchFlowAlertsBot";
 
-function buildConnectUrl(userId: string, botUsername: string): string {
-  return `https://t.me/${botUsername}?start=${userId}`;
+const prefsSchema = z
+  .object({
+    telegramNotificationsEnabled: z.boolean().optional(),
+    emailNotificationsEnabled: z.boolean().optional(),
+  })
+  .strict();
+
+function buildConnectUrl(linkCode: string, botUsername: string): string {
+  return `https://t.me/${botUsername}?start=${encodeURIComponent(linkCode)}`;
+}
+
+function safeLinkUrl(userId: string, botUsername: string): string | null {
+  try {
+    return buildConnectUrl(createTelegramLinkCode(userId), botUsername);
+  } catch {
+    return null;
+  }
 }
 
 export async function GET() {
@@ -22,7 +39,6 @@ export async function GET() {
         const config = getTelegramConfigStatus();
         const probe = await probeTelegramBot();
 
-        // Best-effort: keep Telegram pointing at our webhook when config is ready
         if (config.botConfigured && config.webhookConfigured && config.publicAppUrlConfigured && probe.ok) {
           void ensureTelegramWebhook(false).catch(() => {
             /* logged inside ensure */
@@ -63,6 +79,7 @@ export async function GET() {
         }
 
         const botReady = config.botConfigured && probe.ok;
+        const linkUrl = botReady && !connected ? safeLinkUrl(user.id, botUsername) : null;
 
         return NextResponse.json({
           linked: connected,
@@ -73,7 +90,7 @@ export async function GET() {
           telegramNotificationsEnabled: fresh?.telegramNotificationsEnabled ?? true,
           emailNotificationsEnabled: fresh?.emailNotificationsEnabled ?? true,
           email: fresh?.email ?? user.email,
-          linkUrl: botReady ? buildConnectUrl(user.id, botUsername) : null,
+          linkUrl,
           botUsername,
           botConfigured: botReady,
           webhookConfigured: config.webhookConfigured,
@@ -81,7 +98,10 @@ export async function GET() {
           configError: !probe.ok && config.botConfigured
             ? "Invalid bot configuration"
             : config.configError,
-          userMessage,
+          userMessage:
+            botReady && !connected && !linkUrl
+              ? "Telegram link secret is not configured"
+              : userMessage,
           statusLabel: connected ? "Connected" : "Not connected",
         });
       },
@@ -99,21 +119,22 @@ export async function PATCH(request: NextRequest) {
     return withRateLimit(
       "telegram-prefs",
       async () => {
-        const body = (await request.json().catch(() => ({}))) as {
-          telegramNotificationsEnabled?: boolean;
-          emailNotificationsEnabled?: boolean;
-        };
+        const body = await request.json().catch(() => ({}));
+        const parsed = prefsSchema.safeParse(body);
+        if (!parsed.success) {
+          return NextResponse.json({ error: "Invalid preferences payload" }, { status: 400 });
+        }
 
         const data: {
           telegramNotificationsEnabled?: boolean;
           emailNotificationsEnabled?: boolean;
         } = {};
 
-        if (typeof body.telegramNotificationsEnabled === "boolean") {
-          data.telegramNotificationsEnabled = body.telegramNotificationsEnabled;
+        if (typeof parsed.data.telegramNotificationsEnabled === "boolean") {
+          data.telegramNotificationsEnabled = parsed.data.telegramNotificationsEnabled;
         }
-        if (typeof body.emailNotificationsEnabled === "boolean") {
-          data.emailNotificationsEnabled = body.emailNotificationsEnabled;
+        if (typeof parsed.data.emailNotificationsEnabled === "boolean") {
+          data.emailNotificationsEnabled = parsed.data.emailNotificationsEnabled;
         }
 
         if (Object.keys(data).length === 0) {
@@ -172,9 +193,7 @@ export async function DELETE() {
           linked: false,
           connected: false,
           statusLabel: "Not connected",
-          linkUrl: config.botConfigured
-            ? buildConnectUrl(user.id, botUsername)
-            : null,
+          linkUrl: config.botConfigured ? safeLinkUrl(user.id, botUsername) : null,
           botConfigured: config.botConfigured,
           webhookConfigured: config.webhookConfigured,
           userMessage: config.botConfigured

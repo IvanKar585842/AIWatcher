@@ -4,6 +4,7 @@ import { memo, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bell, Brain, Sparkles } from "lucide-react";
+import { ImportanceBadge } from "@/components/dashboard/importance-badge";
 import { useFeedNotifications } from "@/hooks/use-dashboard-bootstrap";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import { EmptyState } from "./dashboard-skeletons";
@@ -36,13 +37,6 @@ const STATUS_STYLES: Record<string, string> = {
   SENT: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
   PENDING: "border-amber-500/30 bg-amber-500/10 text-amber-300",
   FAILED: "border-red-500/30 bg-red-500/10 text-red-300",
-};
-
-const IMPORTANCE_STYLES: Record<string, string> = {
-  CRITICAL: "border-red-400/30 bg-red-500/10 text-red-300",
-  HIGH: "border-amber-400/30 bg-amber-500/10 text-amber-300",
-  MEDIUM: "border-cyan-400/20 bg-cyan-500/10 text-cyan-300",
-  LOW: "border-white/10 bg-white/[0.04] text-zinc-500",
 };
 
 function hostFromUrl(url: string): string {
@@ -178,14 +172,7 @@ export const RecentActivityPanel = memo(function RecentActivityPanel({
                           <span className="mt-0.5 text-base leading-none">{change.emoji}</span>
                           <div className="min-w-0 flex-1 overflow-hidden">
                             <div className="flex flex-wrap items-center gap-2">
-                              <span
-                                className={`inline-flex rounded-full border px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider ${
-                                  IMPORTANCE_STYLES[change.importance] ??
-                                  IMPORTANCE_STYLES.LOW
-                                }`}
-                              >
-                                {change.importance || "LOW"}
-                              </span>
+                              <ImportanceBadge importance={change.importance} size="sm" />
                               <span className="ml-auto shrink-0 font-mono text-[10px] text-zinc-600">
                                 {formatRelativeTime(change.createdAt)}
                               </span>

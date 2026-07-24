@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Edge liveness probe — no DB, minimal cold start / TTFB.
- * Use /api/health for full readiness (database + integrations).
+ * Use /api/health for database readiness (no integration disclosure).
  */
 export async function GET() {
   return NextResponse.json(
