@@ -84,6 +84,8 @@ export function ClerkSignUpWidget() {
   return (
     <div className="w-full max-w-md">
       <ClerkProvider publishableKey={key} appearance={{ variables: { colorPrimary: "#22d3ee" } }}>
+        {/* Clerk invisible CAPTCHA / Turnstile mount point */}
+        <div id="clerk-captcha" />
         <SignUp />
       </ClerkProvider>
     </div>

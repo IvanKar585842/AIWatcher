@@ -68,14 +68,17 @@ const nextConfig: NextConfig = {
           "base-uri 'self'",
           "object-src 'none'",
           "frame-ancestors 'none'",
+          // Clerk CAPTCHA uses Cloudflare Turnstile — must allow challenges.cloudflare.com
+          // and Clerk abuse protection (*.protect.clerk.com) or signup shows CAPTCHA failed.
           "form-action 'self' https://*.clerk.com https://*.clerk.accounts.dev https://clerk.watchflowing.com https://accounts.google.com",
           "img-src 'self' data: blob: https:",
           "font-src 'self' data: https://fonts.gstatic.com",
-          "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-          "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.com https://*.clerk.accounts.dev https://clerk.watchflowing.com https://js.stripe.com https://www.clarity.ms https://scripts.clarity.ms https://*.vercel-scripts.com https://va.vercel-scripts.com",
-          "connect-src 'self' https://*.clerk.com https://*.clerk.accounts.dev https://clerk.watchflowing.com https://api.stripe.com https://www.clarity.ms https://*.clarity.ms https://*.upstash.io https://*.vercel-insights.com https://vitals.vercel-insights.com wss: https:",
-          "frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://*.clerk.com https://*.clerk.accounts.dev https://clerk.watchflowing.com https://challenges.cloudflare.com https://accounts.google.com",
+          "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://challenges.cloudflare.com",
+          "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.com https://*.clerk.accounts.dev https://clerk.watchflowing.com https://*.protect.clerk.com https://challenges.cloudflare.com https://js.stripe.com https://www.clarity.ms https://scripts.clarity.ms https://*.vercel-scripts.com https://va.vercel-scripts.com",
+          "connect-src 'self' https://*.clerk.com https://*.clerk.accounts.dev https://clerk.watchflowing.com https://*.protect.clerk.com https://challenges.cloudflare.com https://api.stripe.com https://www.clarity.ms https://*.clarity.ms https://*.upstash.io https://*.vercel-insights.com https://vitals.vercel-insights.com wss: https:",
+          "frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://*.clerk.com https://*.clerk.accounts.dev https://clerk.watchflowing.com https://*.protect.clerk.com https://challenges.cloudflare.com https://accounts.google.com",
           "worker-src 'self' blob:",
+          "child-src 'self' blob: https://challenges.cloudflare.com",
         ].join("; "),
       },
     ];
