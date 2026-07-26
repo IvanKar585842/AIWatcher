@@ -15,6 +15,7 @@ import {
   prepareMonitorConfigForStorage,
   sanitizeMonitorConfigForClient,
 } from "@/lib/monitoring/session-cookies";
+import { invalidateUserMonitoringContext } from "@/lib/ai/chat-user-context";
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -171,6 +172,7 @@ export async function PATCH(
                 : {}),
             },
           });
+          invalidateUserMonitoringContext(user.id);
           return NextResponse.json({
             monitor: {
               ...monitor,
@@ -210,6 +212,7 @@ export async function DELETE(
         // Ownership check — prevents deleting another user's monitor
         await assertMonitorOwnedBy(user.id, id);
         await prisma.monitor.delete({ where: { id } });
+        invalidateUserMonitoringContext(user.id);
         return NextResponse.json({ success: true });
       },
       user.id,

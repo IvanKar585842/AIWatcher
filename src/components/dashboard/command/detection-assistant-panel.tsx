@@ -5,6 +5,10 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { Bot, Loader2, MessageSquare, Send, Sparkles, Trash2 } from "lucide-react";
 import { useToast } from "@/components/ui/os-toast";
+import {
+  AssistantBriefingPanel,
+  useAssistantBriefing,
+} from "@/components/dashboard/assistant/assistant-briefing";
 import { cn } from "@/lib/utils";
 
 interface ChatMessage {
@@ -12,13 +16,6 @@ interface ChatMessage {
   role: "USER" | "ASSISTANT" | "SYSTEM";
   content: string;
 }
-
-const SUGGESTIONS = [
-  "What changed today?",
-  "Which changes are important?",
-  "Which websites need attention?",
-  "Why did I receive a notification?",
-];
 
 /**
  * Compact AI chat for the Detection / Command Center dashboard.
@@ -36,6 +33,8 @@ export function DetectionAssistantPanel({ embedded = false }: { embedded?: boole
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const didBootScrollRef = useRef(false);
+  const showBriefing = !booting && messages.length === 0 && !streaming && !sending;
+  const { briefing, loading: briefingLoading } = useAssistantBriefing(showBriefing || booting);
 
   // Keep chat end in view without scrolling the whole dashboard page.
   useEffect(() => {
@@ -254,27 +253,21 @@ export function DetectionAssistantPanel({ embedded = false }: { embedded?: boole
         )}
 
         {!booting && messages.length === 0 && !streaming && !sending && (
-          <div className="flex flex-col justify-center py-4 sm:py-8">
+          <div className="flex flex-col justify-center py-4 sm:py-6">
             <div className="mb-3 flex justify-center">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-cyan-400/25 bg-cyan-500/10">
                 <Bot className="h-6 w-6 text-cyan-400" />
               </div>
             </div>
-            <p className="px-2 text-center text-sm text-zinc-500">
-              I can read your detections and explain what matters.
+            <p className="mb-4 px-2 text-center text-sm text-zinc-500">
+              Live insights from your monitors — ask anything about them.
             </p>
-            <div className="mt-4 grid gap-2">
-              {SUGGESTIONS.map((q) => (
-                <button
-                  key={q}
-                  type="button"
-                  onClick={() => void sendMessage(q)}
-                  className="min-h-11 rounded-xl border border-white/[0.06] bg-black/30 px-3 py-2.5 text-left text-xs text-zinc-400 transition-colors hover:border-cyan-400/20 hover:text-cyan-200"
-                >
-                  {q}
-                </button>
-              ))}
-            </div>
+            <AssistantBriefingPanel
+              briefing={briefing}
+              loading={briefingLoading}
+              compact
+              onAsk={(q) => void sendMessage(q)}
+            />
           </div>
         )}
 

@@ -33,7 +33,7 @@ interface NodePosition {
 
 /** Responsive layout metrics from monitor density. */
 export type MapScale = {
-  /** 1 = few monitors, ~0.42 = dense */
+  /** 1 = few monitors, ~0.32 = dense */
   factor: number;
   iconBox: number;
   logoSize: number;
@@ -57,6 +57,7 @@ function clamp(n: number, min: number, max: number) {
 
 /**
  * Smooth density scale: large at ≤5, medium ~20, compact at 100+.
+ * Also shrinks so node cards fit the chord length of a bounded circle.
  */
 export function computeMapScale(count: number): MapScale {
   const n = Math.max(0, count);
@@ -67,21 +68,31 @@ export function computeMapScale(count: number): MapScale {
   else if (n <= 50) factor = 0.72 - ((n - 20) / 30) * 0.18; // → 0.54
   else factor = clamp(0.54 - ((n - 50) / 80) * 0.12, 0.42, 0.54);
 
-  const iconBox = Math.round(clamp(40 * factor, 22, 40));
-  const logoSize = Math.round(clamp(22 * factor, 12, 22));
-  const coreOuter = Math.round(clamp(64 * factor, 34, 64));
-  const coreInner = Math.round(clamp(44 * factor, 26, 44));
-  const coreLogo = Math.round(clamp(28 * factor, 16, 28));
-  const coreCpu = Math.round(clamp(20 * factor, 12, 20));
+  // Fit cards to arc chord on the ring radius this count will actually use
+  if (n >= 2) {
+    const density = clamp((n - 1) / 18, 0, 1);
+    const approxR = 110 + 120 * (0.28 + 0.72 * density);
+    const chord = 2 * approxR * Math.sin(Math.PI / n);
+    const targetCard = clamp(chord * 0.9, 36, 136);
+    const chordFactor = targetCard / 136;
+    factor = Math.min(factor, clamp(chordFactor, 0.32, 1));
+  }
+
+  const iconBox = Math.round(clamp(40 * factor, 18, 40));
+  const logoSize = Math.round(clamp(22 * factor, 10, 22));
+  const coreOuter = Math.round(clamp(64 * factor, 30, 64));
+  const coreInner = Math.round(clamp(44 * factor, 22, 44));
+  const coreLogo = Math.round(clamp(28 * factor, 14, 28));
+  const coreCpu = Math.round(clamp(20 * factor, 11, 20));
 
   return {
     factor,
     iconBox,
     logoSize,
-    cardMaxW: Math.round(clamp(136 * factor, 56, 136)),
-    showDomain: n <= 18,
-    showStatus: n <= 12,
-    nameFont: clamp(11 * factor, 8, 11),
+    cardMaxW: Math.round(clamp(136 * factor, 40, 136)),
+    showDomain: n <= 14,
+    showStatus: n <= 10,
+    nameFont: clamp(11 * factor, 7, 11),
     coreOuter,
     coreInner,
     coreLogo,
@@ -89,18 +100,9 @@ export function computeMapScale(count: number): MapScale {
     // SVG radii follow the visible HTML core so chip sits inside the glow
     glowR: coreOuter * 0.82,
     coreR: coreOuter / 2,
-    labelGap: Math.round(clamp(18 * factor, 10, 18)),
+    labelGap: Math.round(clamp(18 * factor, 8, 18)),
     pulseR: 18 * factor,
   };
-}
-
-function hashAngle(id: string): number {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) {
-    hash = (hash << 5) - hash + id.charCodeAt(i);
-    hash |= 0;
-  }
-  return ((hash >>> 0) % 360) * (Math.PI / 180);
 }
 
 function isRecentlyChanged(lastChangedAt: string | null): boolean {
@@ -127,79 +129,87 @@ const VIEW_H = 600;
 const CX = 400;
 const CY = 300;
 
+export type RadialLayoutPoint = { x: number; y: number; angle: number; radius: number };
+
 /**
- * Place nodes on 1–3 rings with even spacing; keep clear of AI Core and edges.
+ * Even circular layout around a fixed center.
+ * Angle = (2π / count) * index (offset −π/2 so index 0 sits at top).
+ * Radius grows with count but never exceeds container bounds.
  */
+export function calculateRadialLayout(
+  count: number,
+  scale: MapScale,
+  opts?: { cx?: number; cy?: number; viewW?: number; viewH?: number }
+): RadialLayoutPoint[] {
+  if (count <= 0) return [];
+
+  const cx = opts?.cx ?? CX;
+  const cy = opts?.cy ?? CY;
+  const viewW = opts?.viewW ?? VIEW_W;
+  const viewH = opts?.viewH ?? VIEW_H;
+
+  // Approximate node card height (icon + labels + padding)
+  const cardH =
+    scale.iconBox +
+    10 +
+    scale.nameFont +
+    (scale.showDomain ? 12 : 0) +
+    (scale.showStatus ? 11 : 0);
+  const halfW = scale.cardMaxW / 2;
+  const halfH = cardH / 2;
+
+  // Keep cards fully inside the map; extra room for overlays
+  const padX = halfW + 10;
+  const padTop = halfH + 36;
+  const padBottom = halfH + 52;
+
+  const maxRadius = Math.max(
+    40,
+    Math.min(cx - padX, viewW - cx - padX, cy - padTop, viewH - cy - padBottom)
+  );
+
+  // Clear of AI Core (+ label) and neighboring nodes
+  const coreClearance =
+    scale.coreOuter / 2 + scale.labelGap + 14 + scale.iconBox / 2 + 10 * scale.factor;
+  const minRadius = Math.min(maxRadius, Math.max(coreClearance, 72 * scale.factor + 28));
+
+  // Arc spacing: chord ≈ node footprint along the circumference
+  const footprint = Math.max(scale.iconBox, scale.cardMaxW * 0.55) + 14 * scale.factor;
+  const radiusForSpacing = count <= 1 ? minRadius : (count * footprint) / (2 * Math.PI);
+
+  // Few monitors → tighter ring; many → push toward max (still clamped)
+  const density = clamp((count - 1) / 18, 0, 1);
+  const preferred = minRadius + (maxRadius - minRadius) * (0.28 + 0.72 * density);
+  const radius = clamp(Math.max(preferred, radiusForSpacing), minRadius, maxRadius);
+
+  return Array.from({ length: count }, (_, index) => {
+    const angle = (2 * Math.PI * index) / count - Math.PI / 2;
+    return {
+      x: cx + Math.cos(angle) * radius,
+      y: cy + Math.sin(angle) * radius,
+      angle,
+      radius,
+    };
+  });
+}
+
 function layoutNodes(
   monitors: NetworkMonitor[],
   scale: MapScale,
   pulseId: string | null
 ): NodePosition[] {
-  const count = monitors.length;
-  if (count === 0) return [];
-
-  const cardHalf = scale.cardMaxW / 2;
-  // Extra bottom pad for focus strip; keep clear of AI Core diameter
-  const edgePad = Math.max(cardHalf + 8, 36 * scale.factor);
-  const coreClearance = scale.coreOuter / 2 + scale.iconBox / 2 + 24 * scale.factor + 12;
-
-  const rings = count <= 8 ? 1 : count <= 24 ? 2 : 3;
-  const ringSpacing = clamp(44 * scale.factor + 8, 28, 56);
-  const baseRadius = Math.max(coreClearance, 120 * scale.factor + 40);
-
-  // Assign each monitor to a ring (round-robin density)
-  const ringCounts = Array.from({ length: rings }, () => 0);
-  const assignments: number[] = [];
-  for (let i = 0; i < count; i++) {
-    const ring = i % rings;
-    assignments.push(ring);
-    ringCounts[ring]!++;
-  }
-  const ringIndex = Array.from({ length: rings }, () => 0);
+  const points = calculateRadialLayout(monitors.length, scale);
 
   return monitors.map((m, i) => {
-    const ring = assignments[i]!;
-    const idxOnRing = ringIndex[ring]!;
-    ringIndex[ring]!++;
-    const onRing = Math.max(1, ringCounts[ring]!);
-    const angle =
-      (idxOnRing / onRing) * Math.PI * 2 +
-      hashAngle(m.id) * 0.02 +
-      ring * 0.35;
-
-    let radius = baseRadius + ring * ringSpacing;
-    // Slight bounded offset so rings don't look like a rigid lattice
-    const jitter =
-      ((((hashAngle(m.id) * 1000) | 0) % 17) - 8) * 0.6 * scale.factor;
-    radius += jitter;
-
-    let x = CX + Math.cos(angle) * radius;
-    let y = CY + Math.sin(angle) * radius;
-
-    // Keep inside container — push inward if outside pad box
-    x = clamp(x, edgePad, VIEW_W - edgePad);
-    y = clamp(y, edgePad + 28, VIEW_H - edgePad);
-
-    // Push away from core if too close after clamp
-    const dx = x - CX;
-    const dy = y - CY;
-    const dist = Math.hypot(dx, dy) || 1;
-    if (dist < coreClearance) {
-      const push = coreClearance / dist;
-      x = CX + dx * push;
-      y = CY + dy * push;
-      x = clamp(x, edgePad, VIEW_W - edgePad);
-      y = clamp(y, edgePad + 28, VIEW_H - edgePad);
-    }
-
+    const p = points[i]!;
     return {
       id: m.id,
       name: m.name,
       url: m.url,
       faviconUrl: m.faviconUrl,
       domain: getDomainFromUrl(m.url),
-      x,
-      y,
+      x: p.x,
+      y: p.y,
       status: m.status,
       pulsing: isRecentlyChanged(m.lastChangedAt) || pulseId === m.id,
       changes: m._count?.changes ?? 0,
@@ -352,7 +362,7 @@ export function NetworkMap({ monitors }: { monitors: NetworkMonitor[] }) {
                 const scanDur = 2.6 + (i % 7) * 0.32;
                 const scanDelay = (i % 11) * 0.18;
                 const pulseR = Math.max(1.6, 2.4 * scale.factor);
-                // Slight curve so spokes don’t look like a flat star
+                // Slight curve so spokes don’t look like a flat star; ends stay on centers
                 const dx = node.x - core.x;
                 const dy = node.y - core.y;
                 const len = Math.hypot(dx, dy) || 1;
@@ -363,6 +373,7 @@ export function NetworkMap({ monitors }: { monitors: NetworkMonitor[] }) {
                 return (
                   <g key={`line-${node.id}`}>
                     <motion.path
+                      initial={false}
                       d={pathD}
                       fill="none"
                       stroke={
@@ -376,15 +387,25 @@ export function NetworkMap({ monitors }: { monitors: NetworkMonitor[] }) {
                       strokeLinecap="round"
                       animate={
                         reduceMotion
-                          ? { strokeOpacity: isHot ? 0.45 : 0.18 }
-                          : isHot
-                            ? { strokeOpacity: [0.28, 0.72, 0.28] }
-                            : { strokeOpacity: [0.12, 0.24, 0.12] }
+                          ? { d: pathD, strokeOpacity: isHot ? 0.45 : 0.18 }
+                          : {
+                              d: pathD,
+                              strokeOpacity: isHot
+                                ? [0.28, 0.72, 0.28]
+                                : [0.12, 0.24, 0.12],
+                            }
                       }
                       transition={
                         reduceMotion
-                          ? { duration: 0 }
-                          : { duration: isHot ? 2 : 3.2, repeat: Infinity, ease: "easeInOut" }
+                          ? { d: { duration: 0 }, strokeOpacity: { duration: 0 } }
+                          : {
+                              d: { type: "spring", stiffness: 220, damping: 28 },
+                              strokeOpacity: {
+                                duration: isHot ? 2 : 3.2,
+                                repeat: Infinity,
+                                ease: "easeInOut",
+                              },
+                            }
                       }
                     />
                     {!reduceMotion && (
@@ -524,14 +545,19 @@ export function NetworkMap({ monitors }: { monitors: NetworkMonitor[] }) {
 
             {nodes.map((node, i) => {
               const isSelected = selectedId === node.id;
+              const leftPct = (node.x / VIEW_W) * 100;
+              const topPct = (node.y / VIEW_H) * 100;
               return (
                 <motion.button
                   key={node.id}
                   type="button"
-                  initial={{ opacity: 0, scale: 0.6 }}
+                  initial={{ opacity: 0, scale: 0.6, left: `${leftPct}%`, top: `${topPct}%` }}
                   animate={{
                     opacity: 1,
                     scale: 1,
+                    left: `${leftPct}%`,
+                    top: `${topPct}%`,
+                    width: scale.cardMaxW,
                     y: monitors.length <= 24 ? [0, -3, 0] : 0,
                   }}
                   transition={{
@@ -542,11 +568,13 @@ export function NetworkMap({ monitors }: { monitors: NetworkMonitor[] }) {
                       stiffness: 320,
                       damping: 28,
                     },
+                    left: { type: "spring", stiffness: 220, damping: 28 },
+                    top: { type: "spring", stiffness: 220, damping: 28 },
+                    width: { type: "spring", stiffness: 280, damping: 30 },
                     y:
                       monitors.length <= 24
                         ? { duration: 3 + (i % 3), repeat: Infinity, ease: "easeInOut" }
                         : undefined,
-                    width: { type: "spring", stiffness: 280, damping: 30 },
                   }}
                   className={cn(
                     "absolute z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-0.5 rounded-xl border px-1 py-1 text-center backdrop-blur-sm transition-[border-color,background-color,box-shadow] duration-300 sm:px-1.5 sm:py-1.5",
@@ -556,10 +584,7 @@ export function NetworkMap({ monitors }: { monitors: NetworkMonitor[] }) {
                     node.pulsing && !isSelected && "border-cyan-400/35"
                   )}
                   style={{
-                    left: `${(node.x / VIEW_W) * 100}%`,
-                    top: `${(node.y / VIEW_H) * 100}%`,
                     maxWidth: scale.cardMaxW,
-                    width: scale.cardMaxW,
                   }}
                   onClick={() => setSelectedId((curr) => (curr === node.id ? null : node.id))}
                   onDoubleClick={() => router.push(`/dashboard/monitors/${node.id}`)}

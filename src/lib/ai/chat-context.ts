@@ -4,7 +4,6 @@ import { CHAT_LIMITS, getChatModelId } from "./chat-config";
 import { buildSystemPrompt } from "./chat-knowledge";
 import {
   buildUserMonitoringContext,
-  isAccountSpecificQuestion,
 } from "./chat-user-context";
 import {
   calculateCostUsd,
@@ -165,13 +164,19 @@ export async function buildOptimizedContext(
   let userSnapshot = "";
   let usedAccountContext = false;
 
-  // Only attach live account data when the question needs it (saves DB + tokens)
-  if (ownerId && isAccountSpecificQuestion(userMessage)) {
+  // Always attach the authenticated user's read-only monitoring snapshot
+  if (ownerId) {
     try {
       userSnapshot = await buildUserMonitoringContext(ownerId);
       usedAccountContext = Boolean(userSnapshot);
-    } catch {
-      userSnapshot = "";
+    } catch (error) {
+      console.error("[chat] failed to build user monitoring context:", error);
+      userSnapshot = [
+        "USER_MONITORING_SNAPSHOT:",
+        "Temporarily unavailable. Do not invent monitors, changes, notifications, or account facts.",
+        "Tell the user you could not load their live monitoring data and suggest retrying.",
+      ].join("\n");
+      usedAccountContext = true;
     }
   }
 

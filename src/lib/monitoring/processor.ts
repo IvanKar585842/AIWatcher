@@ -25,6 +25,7 @@ import {
 } from "./lock";
 import { classifyMonitoringError, serializeMonitorError } from "./error-messages";
 import { monitorLog, monitorLogError } from "./logger";
+import { invalidateUserMonitoringContext } from "@/lib/ai/chat-user-context";
 import {
   claimDueMonitors,
   releaseMonitorQueue,
@@ -458,6 +459,8 @@ async function processMonitorInternal(monitorId: string): Promise<ProcessMonitor
         },
       },
     });
+
+    invalidateUserMonitoringContext(monitor.userId);
 
     monitorLog({
       step: "change_stored",

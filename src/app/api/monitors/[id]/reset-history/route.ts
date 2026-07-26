@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { apiErrorResponse } from "@/lib/api-response";
 import { withRateLimit } from "@/lib/rate-limit";
+import { invalidateUserMonitoringContext } from "@/lib/ai/chat-user-context";
 
 export async function POST(
   _request: NextRequest,
@@ -32,6 +33,7 @@ export async function POST(
           }),
         ]);
 
+        invalidateUserMonitoringContext(user.id);
         return NextResponse.json({ success: true });
       },
       user.id

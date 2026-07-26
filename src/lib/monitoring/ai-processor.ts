@@ -8,6 +8,7 @@ import {
 } from "@prisma/client";
 import { getAIProvider, getAIProviderType, isAIConfigured, toPrismaCategory, toPrismaImportance, defaultRecommendedAction } from "@/lib/ai";
 import type { ChangeAnalysis } from "@/lib/ai/types";
+import { invalidateUserMonitoringContext } from "@/lib/ai/chat-user-context";
 import { getEffectivePlan, getUserPlanEntitlements, isAdminUser } from "@/lib/admin";
 import { trackEvent } from "@/lib/analytics";
 import { prisma } from "@/lib/db";
@@ -473,6 +474,7 @@ async function analyzeChangeRecord(change: ChangeWithMonitor): Promise<void> {
         analysisStatus: AnalysisStatus.SKIPPED,
       },
     });
+    invalidateUserMonitoringContext(monitor.userId);
     return;
   }
 
@@ -537,6 +539,8 @@ async function analyzeChangeRecord(change: ChangeWithMonitor): Promise<void> {
       },
     });
 
+    invalidateUserMonitoringContext(monitor.userId);
+
     monitorLog({
       step: "ai_analysis_complete",
       monitorId: monitor.id,
@@ -563,6 +567,8 @@ async function analyzeChangeRecord(change: ChangeWithMonitor): Promise<void> {
       analysisStatus: AnalysisStatus.COMPLETED,
     },
   });
+
+  invalidateUserMonitoringContext(monitor.userId);
 
   monitorLog({
     step: "ai_analysis_complete",

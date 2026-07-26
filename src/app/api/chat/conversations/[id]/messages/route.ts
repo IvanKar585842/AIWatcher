@@ -152,7 +152,7 @@ export async function POST(
               }
             );
 
-            if (result.model !== "cache" && !usedAccountContext) {
+            if (result.model !== "cache") {
               await storeCachedAnswerIfWorthwhile(userContent, result.content);
             }
 

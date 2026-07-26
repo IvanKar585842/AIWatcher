@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { apiErrorResponse } from "@/lib/api-response";
 import { parseJsonBody } from "@/lib/errors";
 import { withRateLimit } from "@/lib/rate-limit";
+import { invalidateUserMonitoringContext } from "@/lib/ai/chat-user-context";
 import { z } from "zod";
 
 const bulkSchema = z.object({
@@ -31,6 +32,7 @@ export async function POST(request: NextRequest) {
             where: { userId: user.id, status: MonitorStatus.ACTIVE },
             data: { status: MonitorStatus.PAUSED },
           });
+          invalidateUserMonitoringContext(user.id);
           return NextResponse.json({ success: true, count: result.count });
         }
 
@@ -42,6 +44,7 @@ export async function POST(request: NextRequest) {
             },
             data: { status: MonitorStatus.ACTIVE, errorCount: 0, errorMessage: null },
           });
+          invalidateUserMonitoringContext(user.id);
           return NextResponse.json({ success: true, count: result.count });
         }
 

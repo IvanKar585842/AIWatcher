@@ -22,6 +22,7 @@ import {
   prepareMonitorConfigForStorage,
   sanitizeMonitorConfigForClient,
 } from "@/lib/monitoring/session-cookies";
+import { invalidateUserMonitoringContext } from "@/lib/ai/chat-user-context";
 
 function isSchemaMismatch(error: unknown): boolean {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -234,6 +235,8 @@ export async function POST(request: NextRequest) {
               nextCheckAt,
             },
           });
+
+          invalidateUserMonitoringContext(user.id);
 
           await syncMonitorQueue(monitor.id, nextCheckAt);
 

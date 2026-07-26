@@ -16,6 +16,10 @@ import {
 import { CommandPageHeader } from "@/components/dashboard/command/command-page-header";
 import { os } from "@/components/dashboard/os/os-primitives";
 import { useToast } from "@/components/ui/os-toast";
+import {
+  AssistantBriefingPanel,
+  useAssistantBriefing,
+} from "@/components/dashboard/assistant/assistant-briefing";
 import { cn } from "@/lib/utils";
 
 interface ChatMessage {
@@ -64,6 +68,7 @@ export function AssistantChat() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const { briefing, loading: briefingLoading } = useAssistantBriefing(true);
 
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -262,7 +267,7 @@ export function AssistantChat() {
       <CommandPageHeader
         label="AI Assistant"
         title="WatchFlowing Assistant"
-        description="Ask anything about monitoring, settings, notifications, or troubleshooting."
+        description="Context-aware help based on your monitors, alerts, and notifications."
       />
 
       <div className="relative flex h-[calc(100dvh-13.5rem)] min-h-[360px] w-full min-w-0 overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] sm:h-[calc(100dvh-12rem)] sm:min-h-[480px] lg:h-[calc(100vh-11rem)] lg:min-h-[520px]">
@@ -431,30 +436,19 @@ export function AssistantChat() {
                     <Sparkles className="h-8 w-8 text-cyan-400" />
                   </div>
                 </div>
-                <h2 className="text-lg font-semibold text-zinc-100">How can I help?</h2>
+                <h2 className="text-lg font-semibold text-zinc-100">Your monitoring briefing</h2>
                 <p className="mt-2 max-w-md text-sm text-zinc-500">
-                  Ask about creating monitors, choosing modes, notifications, billing, or
-                  troubleshooting.
+                  Insights below are generated from your live account data — ask a follow-up anytime.
                 </p>
-                <div className="mt-8 grid w-full max-w-lg gap-2 sm:grid-cols-2">
-                  {[
-                    "What changed today?",
-                    "Which changes are important?",
-                    "Which websites need attention?",
-                    "Why did I receive a notification?",
-                  ].map((q) => (
-                    <button
-                      key={q}
-                      type="button"
-                      onClick={() => {
-                        setInput(q);
-                        inputRef.current?.focus();
-                      }}
-                      className="min-h-12 rounded-xl border border-white/[0.06] bg-black/30 px-4 py-3 text-left text-xs text-zinc-400 transition-colors hover:border-cyan-400/20 hover:text-cyan-200"
-                    >
-                      {q}
-                    </button>
-                  ))}
+                <div className="mt-6 w-full max-w-lg">
+                  <AssistantBriefingPanel
+                    briefing={briefing}
+                    loading={briefingLoading}
+                    onAsk={(q) => {
+                      setInput(q);
+                      inputRef.current?.focus();
+                    }}
+                  />
                 </div>
               </motion.div>
             )}

@@ -8,6 +8,7 @@ import { getTelegramConfigStatus } from "@/lib/telegram/config";
 import { getTelegramBotUsername } from "@/lib/telegram/env";
 import { createTelegramLinkCode } from "@/lib/telegram/link-token";
 import { ensureTelegramWebhook, probeTelegramBot } from "@/lib/telegram/setup";
+import { invalidateUserMonitoringContext } from "@/lib/ai/chat-user-context";
 
 const DEFAULT_BOT_USERNAME = "WatchFlowAlertsBot";
 
@@ -153,6 +154,8 @@ export async function PATCH(request: NextRequest) {
           },
         });
 
+        invalidateUserMonitoringContext(user.id);
+
         const connected = Boolean(updated.telegramChatId);
         return NextResponse.json({
           success: true,
@@ -188,6 +191,7 @@ export async function DELETE() {
             telegramConnectedAt: null,
           },
         });
+        invalidateUserMonitoringContext(user.id);
         return NextResponse.json({
           success: true,
           linked: false,
