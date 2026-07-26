@@ -26,14 +26,16 @@ interface NodePosition {
   domain: string;
   x: number;
   y: number;
+  angle: number;
+  radius: number;
   status: string;
-  pulsing: boolean;
+  active: boolean;
+  recentlyChanged: boolean;
   changes: number;
 }
 
 /** Responsive layout metrics from monitor density. */
 export type MapScale = {
-  /** 1 = few monitors, ~0.32 = dense */
   factor: number;
   iconBox: number;
   logoSize: number;
@@ -48,7 +50,6 @@ export type MapScale = {
   glowR: number;
   coreR: number;
   labelGap: number;
-  pulseR: number;
 };
 
 function clamp(n: number, min: number, max: number) {
@@ -56,53 +57,55 @@ function clamp(n: number, min: number, max: number) {
 }
 
 /**
- * Smooth density scale: large at ≤5, medium ~20, compact at 100+.
- * Also shrinks so node cards fit the chord length of a bounded circle.
+ * Node / core scale: fewer monitors → larger nodes; denser → smaller.
  */
 export function computeMapScale(count: number): MapScale {
   const n = Math.max(0, count);
-  // Piecewise map → factor in [0.42, 1]
   let factor = 1;
   if (n <= 5) factor = 1;
-  else if (n <= 20) factor = 1 - ((n - 5) / 15) * 0.28; // → 0.72
-  else if (n <= 50) factor = 0.72 - ((n - 20) / 30) * 0.18; // → 0.54
-  else factor = clamp(0.54 - ((n - 50) / 80) * 0.12, 0.42, 0.54);
+  else if (n <= 10) factor = 0.88;
+  else if (n <= 20) factor = 0.68;
+  else if (n <= 40) factor = 0.48;
+  else factor = clamp(0.48 - ((n - 40) / 60) * 0.12, 0.34, 0.48);
 
-  // Fit cards to arc chord on the ring radius this count will actually use
+  // Fit card width to chord on the expected ring radius
   if (n >= 2) {
-    const density = clamp((n - 1) / 18, 0, 1);
-    const approxR = 110 + 120 * (0.28 + 0.72 * density);
-    const chord = 2 * approxR * Math.sin(Math.PI / n);
-    const targetCard = clamp(chord * 0.9, 36, 136);
-    const chordFactor = targetCard / 136;
-    factor = Math.min(factor, clamp(chordFactor, 0.32, 1));
+    const targetR = targetRingRadius(n);
+    const chord = 2 * targetR * Math.sin(Math.PI / n);
+    factor = Math.min(factor, clamp((chord * 0.85) / 120, 0.34, 1));
   }
 
-  const iconBox = Math.round(clamp(40 * factor, 18, 40));
+  const iconBox = Math.round(clamp(40 * factor, 16, 40));
   const logoSize = Math.round(clamp(22 * factor, 10, 22));
-  const coreOuter = Math.round(clamp(64 * factor, 30, 64));
-  const coreInner = Math.round(clamp(44 * factor, 22, 44));
+  const coreOuter = Math.round(clamp(64 * factor, 32, 64));
+  const coreInner = Math.round(clamp(44 * factor, 24, 44));
   const coreLogo = Math.round(clamp(28 * factor, 14, 28));
-  const coreCpu = Math.round(clamp(20 * factor, 11, 20));
+  const coreCpu = Math.round(clamp(20 * factor, 12, 20));
 
   return {
     factor,
     iconBox,
     logoSize,
-    cardMaxW: Math.round(clamp(136 * factor, 40, 136)),
-    showDomain: n <= 14,
-    showStatus: n <= 10,
+    cardMaxW: Math.round(clamp(120 * factor, 36, 120)),
+    showDomain: n <= 12,
+    showStatus: n <= 8,
     nameFont: clamp(11 * factor, 7, 11),
     coreOuter,
     coreInner,
     coreLogo,
     coreCpu,
-    // SVG radii follow the visible HTML core so chip sits inside the glow
     glowR: coreOuter * 0.82,
     coreR: coreOuter / 2,
-    labelGap: Math.round(clamp(18 * factor, 8, 18)),
-    pulseR: 18 * factor,
+    labelGap: Math.round(clamp(16 * factor, 8, 16)),
   };
+}
+
+/** Spec tiers for ring radius (viewBox units ≈ px at 1:1). */
+function targetRingRadius(count: number): number {
+  if (count <= 5) return 160;
+  if (count <= 10) return 210;
+  if (count <= 20) return 260;
+  return 260 + (count - 20) * 3.5;
 }
 
 function isRecentlyChanged(lastChangedAt: string | null): boolean {
@@ -124,69 +127,63 @@ function statusDotClass(status: string): string {
   return "bg-zinc-500";
 }
 
-const VIEW_W = 800;
-const VIEW_H = 600;
-const CX = 400;
-const CY = 300;
+/** Square viewBox — true circle symmetry around the AI Core. */
+const VIEW = 800;
+const CX = VIEW / 2;
+const CY = VIEW / 2;
 
 export type RadialLayoutPoint = { x: number; y: number; angle: number; radius: number };
 
 /**
- * Even circular layout around a fixed center.
- * Angle = (2π / count) * index (offset −π/2 so index 0 sits at top).
- * Radius grows with count but never exceeds container bounds.
+ * Perfect circular ring around a fixed center.
+ * angle = (2π / count) * index
+ * x = cx + r * cos(angle)
+ * y = cy + r * sin(angle)
  */
 export function calculateRadialLayout(
   count: number,
   scale: MapScale,
-  opts?: { cx?: number; cy?: number; viewW?: number; viewH?: number }
+  opts?: { cx?: number; cy?: number; view?: number }
 ): RadialLayoutPoint[] {
   if (count <= 0) return [];
 
   const cx = opts?.cx ?? CX;
   const cy = opts?.cy ?? CY;
-  const viewW = opts?.viewW ?? VIEW_W;
-  const viewH = opts?.viewH ?? VIEW_H;
+  const view = opts?.view ?? VIEW;
 
-  // Approximate node card height (icon + labels + padding)
   const cardH =
     scale.iconBox +
-    10 +
+    8 +
     scale.nameFont +
-    (scale.showDomain ? 12 : 0) +
-    (scale.showStatus ? 11 : 0);
+    (scale.showDomain ? 11 : 0) +
+    (scale.showStatus ? 10 : 0);
   const halfW = scale.cardMaxW / 2;
   const halfH = cardH / 2;
+  const nodePad = Math.max(halfW, halfH) + 6;
 
-  // Keep cards fully inside the map; extra room for overlays
-  const padX = halfW + 10;
-  const padTop = halfH + 36;
-  const padBottom = halfH + 52;
-
-  const maxRadius = Math.max(
-    40,
-    Math.min(cx - padX, viewW - cx - padX, cy - padTop, viewH - cy - padBottom)
+  // Largest radius that keeps every node fully inside the container
+  const maxInside = Math.max(
+    80,
+    Math.min(cx, cy, view - cx, view - cy) - nodePad
   );
 
-  // Clear of AI Core (+ label) and neighboring nodes
-  const coreClearance =
-    scale.coreOuter / 2 + scale.labelGap + 14 + scale.iconBox / 2 + 10 * scale.factor;
-  const minRadius = Math.min(maxRadius, Math.max(coreClearance, 72 * scale.factor + 28));
+  // Ring occupies ~75–85% of available map space, following tier targets
+  const bandMin = maxInside * 0.75;
+  const bandMax = maxInside * 0.85;
+  const tier = targetRingRadius(count);
 
-  // Arc spacing: chord ≈ node footprint along the circumference
-  const footprint = Math.max(scale.iconBox, scale.cardMaxW * 0.55) + 14 * scale.factor;
-  const radiusForSpacing = count <= 1 ? minRadius : (count * footprint) / (2 * Math.PI);
-
-  // Few monitors → tighter ring; many → push toward max (still clamped)
-  const density = clamp((count - 1) / 18, 0, 1);
-  const preferred = minRadius + (maxRadius - minRadius) * (0.28 + 0.72 * density);
-  const radius = clamp(Math.max(preferred, radiusForSpacing), minRadius, maxRadius);
+  let radius = clamp(tier, bandMin, bandMax);
+  // Prefer the tier when it already sits inside the safe band
+  if (tier >= bandMin && tier <= maxInside) {
+    radius = Math.min(tier, bandMax);
+  }
+  radius = Math.min(radius, maxInside);
 
   return Array.from({ length: count }, (_, index) => {
-    const angle = (2 * Math.PI * index) / count - Math.PI / 2;
+    const angle = ((2 * Math.PI) / count) * index;
     return {
-      x: cx + Math.cos(angle) * radius,
-      y: cy + Math.sin(angle) * radius,
+      x: cx + radius * Math.cos(angle),
+      y: cy + radius * Math.sin(angle),
       angle,
       radius,
     };
@@ -195,8 +192,7 @@ export function calculateRadialLayout(
 
 function layoutNodes(
   monitors: NetworkMonitor[],
-  scale: MapScale,
-  pulseId: string | null
+  scale: MapScale
 ): NodePosition[] {
   const points = calculateRadialLayout(monitors.length, scale);
 
@@ -210,8 +206,11 @@ function layoutNodes(
       domain: getDomainFromUrl(m.url),
       x: p.x,
       y: p.y,
+      angle: p.angle,
+      radius: p.radius,
       status: m.status,
-      pulsing: isRecentlyChanged(m.lastChangedAt) || pulseId === m.id,
+      active: m.status === "ACTIVE",
+      recentlyChanged: isRecentlyChanged(m.lastChangedAt),
       changes: m._count?.changes ?? 0,
     };
   });
@@ -219,8 +218,6 @@ function layoutNodes(
 
 export function NetworkMap({ monitors }: { monitors: NetworkMonitor[] }) {
   const router = useRouter();
-  const [pulseId, setPulseId] = useState<string | null>(null);
-  const [tick, setTick] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [reduceMotion, setReduceMotion] = useState(false);
 
@@ -231,20 +228,6 @@ export function NetworkMap({ monitors }: { monitors: NetworkMonitor[] }) {
     mq.addEventListener("change", apply);
     return () => mq.removeEventListener("change", apply);
   }, []);
-
-  useEffect(() => {
-    if (reduceMotion) return;
-    const id = setInterval(() => setTick((t) => t + 1), 3000);
-    return () => clearInterval(id);
-  }, [reduceMotion]);
-
-  useEffect(() => {
-    const recent = monitors.filter((m) => isRecentlyChanged(m.lastChangedAt));
-    if (recent.length > 0) {
-      const idx = tick % recent.length;
-      setPulseId(recent[idx]?.id ?? null);
-    }
-  }, [monitors, tick]);
 
   useEffect(() => {
     if (selectedId && !monitors.some((m) => m.id === selectedId)) {
@@ -258,12 +241,7 @@ export function NetworkMap({ monitors }: { monitors: NetworkMonitor[] }) {
   );
 
   const scale = useMemo(() => computeMapScale(monitors.length), [monitors.length]);
-
-  const nodes = useMemo(
-    () => layoutNodes(monitors, scale, pulseId),
-    [monitors, scale, pulseId]
-  );
-
+  const nodes = useMemo(() => layoutNodes(monitors, scale), [monitors, scale]);
   const core = { x: CX, y: CY };
 
   const recentChangeCount = useMemo(
@@ -324,9 +302,9 @@ export function NetworkMap({ monitors }: { monitors: NetworkMonitor[] }) {
         </div>
       ) : (
         <div className="relative mx-auto flex h-full min-h-[420px] w-full max-w-full items-center justify-center overflow-hidden sm:min-h-[520px] lg:min-h-[640px]">
-          <div className="relative aspect-[800/600] h-auto w-full max-h-[min(640px,92vw)] min-w-0">
+          <div className="relative aspect-square h-auto w-full max-h-[min(640px,92vw)] min-w-0">
             <svg
-              viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
+              viewBox={`0 0 ${VIEW} ${VIEW}`}
               className="absolute inset-0 h-full w-full"
               preserveAspectRatio="xMidYMid meet"
               aria-hidden
@@ -337,7 +315,7 @@ export function NetworkMap({ monitors }: { monitors: NetworkMonitor[] }) {
                   <stop offset="100%" stopColor="rgba(34,211,238,0)" />
                 </radialGradient>
                 <filter id="nodeGlow">
-                  <feGaussianBlur stdDeviation="3" result="blur" />
+                  <feGaussianBlur stdDeviation="2.5" result="blur" />
                   <feMerge>
                     <feMergeNode in="blur" />
                     <feMergeNode in="SourceGraphic" />
@@ -345,12 +323,12 @@ export function NetworkMap({ monitors }: { monitors: NetworkMonitor[] }) {
                 </filter>
               </defs>
 
-              {Array.from({ length: 14 }).map((_, row) =>
-                Array.from({ length: 20 }).map((__, col) => (
+              {Array.from({ length: 16 }).map((_, row) =>
+                Array.from({ length: 16 }).map((__, col) => (
                   <circle
                     key={`${row}-${col}`}
-                    cx={40 + col * 38}
-                    cy={40 + row * 40}
+                    cx={40 + col * 48}
+                    cy={40 + row * 48}
                     r="0.6"
                     fill="rgba(125,211,252,0.08)"
                   />
@@ -358,98 +336,63 @@ export function NetworkMap({ monitors }: { monitors: NetworkMonitor[] }) {
               )}
 
               {nodes.map((node, i) => {
-                const isHot = node.pulsing || selectedId === node.id;
-                const scanDur = 2.6 + (i % 7) * 0.32;
-                const scanDelay = (i % 11) * 0.18;
-                const pulseR = Math.max(1.6, 2.4 * scale.factor);
-                // Slight curve so spokes don’t look like a flat star; ends stay on centers
-                const dx = node.x - core.x;
-                const dy = node.y - core.y;
-                const len = Math.hypot(dx, dy) || 1;
-                const bend = Math.min(16 * scale.factor, len * 0.09);
-                const cpx = (core.x + node.x) / 2 + (-dy / len) * bend;
-                const cpy = (core.y + node.y) / 2 + (dx / len) * bend;
-                const pathD = `M${core.x},${core.y} Q${cpx},${cpy} ${node.x},${node.y}`;
+                const isSelected = selectedId === node.id;
+                const pathD = `M${core.x},${core.y} L${node.x},${node.y}`;
+                const pulseDur = 1.5 + (i % 5) * 0.1;
+                const pulseDelay = (i % 8) * 0.18;
+                const pulseR = Math.max(1.8, 2.6 * scale.factor);
+
                 return (
                   <g key={`line-${node.id}`}>
-                    <motion.path
+                    <motion.line
                       initial={false}
-                      d={pathD}
-                      fill="none"
+                      x1={core.x}
+                      y1={core.y}
+                      animate={{
+                        x2: node.x,
+                        y2: node.y,
+                        strokeOpacity: isSelected
+                          ? 0.55
+                          : node.active
+                            ? 0.32
+                            : 0.14,
+                      }}
+                      transition={{
+                        x2: { type: "spring", stiffness: 220, damping: 28 },
+                        y2: { type: "spring", stiffness: 220, damping: 28 },
+                        strokeOpacity: { duration: 0.35 },
+                      }}
                       stroke={
-                        selectedId === node.id
-                          ? "rgba(34,211,238,0.55)"
-                          : node.pulsing
-                            ? "rgba(34,211,238,0.42)"
-                            : "rgba(56,189,248,0.16)"
+                        isSelected
+                          ? "rgba(34,211,238,0.65)"
+                          : node.active
+                            ? "rgba(34,211,238,0.35)"
+                            : "rgba(56,189,248,0.14)"
                       }
-                      strokeWidth={isHot ? 1.45 : 0.9}
+                      strokeWidth={isSelected || node.active ? 1.35 : 0.85}
                       strokeLinecap="round"
-                      animate={
-                        reduceMotion
-                          ? { d: pathD, strokeOpacity: isHot ? 0.45 : 0.18 }
-                          : {
-                              d: pathD,
-                              strokeOpacity: isHot
-                                ? [0.28, 0.72, 0.28]
-                                : [0.12, 0.24, 0.12],
-                            }
-                      }
-                      transition={
-                        reduceMotion
-                          ? { d: { duration: 0 }, strokeOpacity: { duration: 0 } }
-                          : {
-                              d: { type: "spring", stiffness: 220, damping: 28 },
-                              strokeOpacity: {
-                                duration: isHot ? 2 : 3.2,
-                                repeat: Infinity,
-                                ease: "easeInOut",
-                              },
-                            }
-                      }
                     />
-                    {!reduceMotion && (
+
+                    {/* Energy pulse: ACTIVE monitors only */}
+                    {!reduceMotion && node.active && (
                       <circle
                         r={pulseR}
-                        fill={isHot ? "#67e8f9" : "#22d3ee"}
+                        fill={node.recentlyChanged ? "#a5f3fc" : "#22d3ee"}
                         filter="url(#nodeGlow)"
                         opacity={0}
                       >
                         <animateMotion
-                          dur={`${scanDur}s`}
-                          begin={`${scanDelay}s`}
+                          dur={`${pulseDur}s`}
+                          begin={`${pulseDelay}s`}
                           repeatCount="indefinite"
                           path={pathD}
                         />
                         <animate
                           attributeName="opacity"
-                          values="0;0.95;0.85;0"
-                          keyTimes="0;0.1;0.82;1"
-                          dur={`${scanDur}s`}
-                          begin={`${scanDelay}s`}
-                          repeatCount="indefinite"
-                        />
-                      </circle>
-                    )}
-                    {!reduceMotion && node.pulsing && (
-                      <circle
-                        r={pulseR * 1.25}
-                        fill="#a5f3fc"
-                        filter="url(#nodeGlow)"
-                        opacity={0}
-                      >
-                        <animateMotion
-                          dur={`${Math.max(1.6, scanDur * 0.72)}s`}
-                          begin={`${scanDelay + 0.55}s`}
-                          repeatCount="indefinite"
-                          path={pathD}
-                        />
-                        <animate
-                          attributeName="opacity"
-                          values="0;1;0"
-                          keyTimes="0;0.35;1"
-                          dur={`${Math.max(1.6, scanDur * 0.72)}s`}
-                          begin={`${scanDelay + 0.55}s`}
+                          values="0;1;0.9;0"
+                          keyTimes="0;0.12;0.78;1"
+                          dur={`${pulseDur}s`}
+                          begin={`${pulseDelay}s`}
                           repeatCount="indefinite"
                         />
                       </circle>
@@ -459,7 +402,7 @@ export function NetworkMap({ monitors }: { monitors: NetworkMonitor[] }) {
               })}
 
               <motion.g
-                animate={{ scale: [1, 1.04, 1] }}
+                animate={reduceMotion ? undefined : { scale: [1, 1.04, 1] }}
                 transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
                 style={{ transformOrigin: `${core.x}px ${core.y}px` }}
               >
@@ -482,11 +425,18 @@ export function NetworkMap({ monitors }: { monitors: NetworkMonitor[] }) {
               </motion.g>
             </svg>
 
-            {/* AI Core — chip perfectly centered; label sits outside without shifting the icon */}
+            {/* AI Core — exact center of the map */}
             <div className="pointer-events-none absolute inset-0 z-[5]">
               <div
-                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
-                style={{ width: scale.coreOuter, height: scale.coreOuter }}
+                className="absolute"
+                style={{
+                  left: "50%",
+                  top: "50%",
+                  width: scale.coreOuter,
+                  height: scale.coreOuter,
+                  marginLeft: -scale.coreOuter / 2,
+                  marginTop: -scale.coreOuter / 2,
+                }}
               >
                 <motion.div
                   className="relative flex h-full w-full items-center justify-center"
@@ -533,9 +483,13 @@ export function NetworkMap({ monitors }: { monitors: NetworkMonitor[] }) {
                 </motion.div>
               </div>
               <p
-                className="absolute left-1/2 -translate-x-1/2 font-mono tracking-[0.3em] text-sky-300/70"
+                className="absolute font-mono tracking-[0.3em] text-sky-300/70"
                 style={{
+                  left: "50%",
                   top: `calc(50% + ${scale.coreOuter / 2 + scale.labelGap}px)`,
+                  marginLeft: "-3.5em",
+                  width: "7em",
+                  textAlign: "center",
                   fontSize: clamp(8 * scale.factor, 7, 10),
                 }}
               >
@@ -545,25 +499,26 @@ export function NetworkMap({ monitors }: { monitors: NetworkMonitor[] }) {
 
             {nodes.map((node, i) => {
               const isSelected = selectedId === node.id;
-              const leftPct = (node.x / VIEW_W) * 100;
-              const topPct = (node.y / VIEW_H) * 100;
+              const leftPct = (node.x / VIEW) * 100;
+              const topPct = (node.y / VIEW) * 100;
               return (
                 <motion.button
                   key={node.id}
                   type="button"
-                  initial={{ opacity: 0, scale: 0.6, left: `${leftPct}%`, top: `${topPct}%` }}
+                  initial={{ opacity: 0, scale: 0.6, x: "-50%", y: "-50%" }}
                   animate={{
                     opacity: 1,
                     scale: 1,
                     left: `${leftPct}%`,
                     top: `${topPct}%`,
                     width: scale.cardMaxW,
-                    y: monitors.length <= 24 ? [0, -3, 0] : 0,
+                    x: "-50%",
+                    y: "-50%",
                   }}
                   transition={{
-                    opacity: { delay: Math.min(i * 0.04, 0.6) },
+                    opacity: { delay: Math.min(i * 0.03, 0.5), duration: 0.25 },
                     scale: {
-                      delay: Math.min(i * 0.04, 0.6),
+                      delay: Math.min(i * 0.03, 0.5),
                       type: "spring",
                       stiffness: 320,
                       damping: 28,
@@ -571,17 +526,14 @@ export function NetworkMap({ monitors }: { monitors: NetworkMonitor[] }) {
                     left: { type: "spring", stiffness: 220, damping: 28 },
                     top: { type: "spring", stiffness: 220, damping: 28 },
                     width: { type: "spring", stiffness: 280, damping: 30 },
-                    y:
-                      monitors.length <= 24
-                        ? { duration: 3 + (i % 3), repeat: Infinity, ease: "easeInOut" }
-                        : undefined,
                   }}
                   className={cn(
-                    "absolute z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-0.5 rounded-xl border px-1 py-1 text-center backdrop-blur-sm transition-[border-color,background-color,box-shadow] duration-300 sm:px-1.5 sm:py-1.5",
+                    "absolute z-10 flex flex-col items-center gap-0.5 rounded-xl border px-1 py-1 text-center backdrop-blur-sm transition-[border-color,background-color,box-shadow] duration-300 sm:px-1.5 sm:py-1.5",
                     isSelected
                       ? "border-cyan-400/50 bg-cyan-500/15 shadow-[0_0_20px_-6px_rgba(34,211,238,0.5)]"
                       : "border-white/[0.08] bg-[#090909]/85 hover:border-cyan-400/30 hover:bg-cyan-500/[0.08]",
-                    node.pulsing && !isSelected && "border-cyan-400/35"
+                    node.recentlyChanged && !isSelected && "border-cyan-400/35",
+                    !node.active && "opacity-80"
                   )}
                   style={{
                     maxWidth: scale.cardMaxW,
@@ -666,8 +618,8 @@ export function NetworkMap({ monitors }: { monitors: NetworkMonitor[] }) {
               </div>
             ) : (
               <p className="text-center text-[11px] text-zinc-500 sm:text-left">
-                Select a site for quick intel · double-click to open · pulsing nodes changed
-                recently
+                Select a site for quick intel · double-click to open · energy pulses flow to
+                active monitors
               </p>
             )}
           </div>
