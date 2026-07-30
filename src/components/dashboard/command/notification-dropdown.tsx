@@ -16,15 +16,22 @@ import { useVisibleInterval } from "@/hooks/use-visible-interval";
 
 interface NotificationItem {
   id: string;
+  type?: "change" | "monitor_error";
   channel: string;
   status: string;
   createdAt: string;
-  change: {
+  change?: {
     id: string;
     summary: string;
     emoji: string;
     importance?: string;
     monitor: { name: string };
+  };
+  monitorAlert?: {
+    title: string;
+    explanation: string;
+    resolvedAt: string | null;
+    monitor: { id: string; name: string };
   };
 }
 
@@ -55,7 +62,10 @@ export function NotificationDropdown() {
         const read = getReadNotificationIds();
         for (const item of items) {
           if (!knownIdsRef.current.has(item.id) && !read.has(item.id)) {
-            toast(`${item.change.emoji} ${item.change.monitor.name}: ${item.change.summary}`, "success");
+            const text = item.monitorAlert
+              ? `⚠️ ${item.monitorAlert.monitor.name}: ${item.monitorAlert.title}`
+              : `${item.change?.emoji ?? "🔔"} ${item.change?.monitor.name ?? "Monitor"}: ${item.change?.summary ?? "A change was detected"}`;
+            toast(text, item.monitorAlert ? "error" : "success");
           }
         }
       } else {
@@ -100,6 +110,14 @@ export function NotificationDropdown() {
   const unreadCount = notifications.filter((n) => !readIds.has(n.id)).length;
 
   function handleNotificationClick(item: NotificationItem) {
+    if (item.monitorAlert) {
+      markNotificationsRead([item.id]);
+      syncReadIds();
+      setOpen(false);
+      router.push(`/dashboard/monitors/${item.monitorAlert.monitor.id}`);
+      return;
+    }
+    if (!item.change) return;
     markAlertOpened({
       notificationId: item.id,
       changeId: item.change.id,
@@ -168,19 +186,22 @@ export function NotificationDropdown() {
                     isUnread ? "bg-cyan-500/[0.04]" : ""
                   }`}
                 >
-                  <span className="text-lg">{item.change.emoji}</span>
+                  <span className="text-lg">{item.monitorAlert ? "⚠️" : item.change?.emoji}</span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <p className="truncate text-sm font-medium text-zinc-200">
-                        {item.change.monitor.name}
+                        {item.monitorAlert?.monitor.name ?? item.change?.monitor.name}
                       </p>
                       {isUnread && (
                         <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-400" />
                       )}
                     </div>
                     <p className="mt-0.5 line-clamp-2 text-xs text-zinc-500">
-                      {item.change.summary}
+                      {item.monitorAlert?.title ?? item.change?.summary}
                     </p>
+                    {item.monitorAlert?.resolvedAt && (
+                      <p className="mt-1 text-[10px] text-emerald-400/80">Resolved</p>
+                    )}
                     <p className="mt-1 text-[10px] text-zinc-600">
                       {item.channel === "IN_APP"
                         ? "On site"

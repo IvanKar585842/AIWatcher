@@ -36,11 +36,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { NOTIFICATION_LABELS, isIntervalAllowed } from "@/lib/constants";
 import {
-  getAllowedIntervals,
-  INTERVAL_LABELS,
-  NOTIFICATION_LABELS,
-} from "@/lib/constants";
+  IntervalSelectItems,
+  IntervalUpgradeHint,
+} from "@/components/dashboard/interval-select-items";
 import {
   AI_PROMPT_EXAMPLES,
   DEFAULT_MONITOR_CONFIG,
@@ -305,8 +305,6 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
     [form.url]
   );
 
-  const allowedIntervals = useMemo(() => getAllowedIntervals(plan), [plan]);
-
   function toggleSection(key: keyof typeof openSections) {
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
   }
@@ -558,19 +556,20 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
               <FieldLabel>Check Frequency</FieldLabel>
               <Select
                 value={form.interval}
-                onValueChange={(v) => setForm({ ...form, interval: v as MonitoringInterval })}
+                onValueChange={(v) => {
+                  const next = v as MonitoringInterval;
+                  if (!isIntervalAllowed(plan, next)) return;
+                  setForm({ ...form, interval: next });
+                }}
               >
                 <SelectTrigger className="border-white/[0.08] bg-black/40 text-zinc-100">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {allowedIntervals.map((interval) => (
-                    <SelectItem key={interval} value={interval}>
-                      {INTERVAL_LABELS[interval]}
-                    </SelectItem>
-                  ))}
+                  <IntervalSelectItems plan={plan} />
                 </SelectContent>
               </Select>
+              <IntervalUpgradeHint plan={plan} />
             </div>
             <div>
               <FieldLabel>Category</FieldLabel>
@@ -848,7 +847,7 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
                 value={form.config.waitStrategy ?? "stabilize"}
                 onValueChange={(v) => updateConfig({ waitStrategy: v as WaitStrategy })}
               >
-                <SelectTrigger>
+                <SelectTrigger className="border-white/[0.08] bg-black/40 text-zinc-100">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -925,66 +924,6 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
               <p className="mt-1.5 text-xs text-zinc-600">
                 Comma-separated CSS selectors removed before comparison.
               </p>
-            </div>
-            <div className="sm:col-span-2">
-              <FieldLabel>Session cookies (JSON)</FieldLabel>
-              <OsTextarea
-                value={form.config.sessionCookiesPlain ?? ""}
-                onChange={(e) => updateConfig({ sessionCookiesPlain: e.target.value })}
-                placeholder='[{"name":"session","value":"…","domain":"example.com","path":"/"}]'
-                rows={4}
-                className="font-mono text-xs"
-              />
-              <p className="mt-1.5 text-xs text-zinc-600">
-                Optional authenticated session for sites you already use. Stored encrypted per
-                account — never shared between users. Leave blank to keep the current session.
-                {form.config.hasSession ? (
-                  <span className="mt-1 block text-emerald-500/80">
-                    Session on file
-                    {form.config.sessionStatus === "expired" ? " (expired — reconnect)" : ""}.
-                  </span>
-                ) : null}
-              </p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <div className="min-w-[200px] flex-1">
-                  <FieldLabel>Session expires (optional)</FieldLabel>
-                  <OsInput
-                    type="datetime-local"
-                    value={
-                      form.config.sessionExpiresAt
-                        ? form.config.sessionExpiresAt.slice(0, 16)
-                        : ""
-                    }
-                    onChange={(e) =>
-                      updateConfig({
-                        sessionExpiresAt: e.target.value
-                          ? new Date(e.target.value).toISOString()
-                          : null,
-                      })
-                    }
-                  />
-                </div>
-                {form.config.hasSession ? (
-                  <div className="flex items-end">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        updateConfig({
-                          clearSession: true,
-                          sessionCookiesPlain: "",
-                          hasSession: false,
-                          sessionStatus: "none",
-                          sessionExpiresAt: null,
-                        })
-                      }
-                    >
-                      Clear session
-                    </Button>
-                  </div>
-                ) : null}
-              </div>
             </div>
             {(form.mode === "CSS_SELECTOR" || form.mode === "XPATH" || form.selector) && (
               <div className="sm:col-span-2">

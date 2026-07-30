@@ -26,10 +26,11 @@ import type { MonitoringMode } from "@prisma/client";
 
 interface NotificationItem {
   id: string;
+  type?: "change" | "monitor_error";
   channel: string;
   status: string;
   createdAt: string;
-  change: {
+  change?: {
     id: string;
     summary: string;
     emoji: string;
@@ -41,6 +42,17 @@ interface NotificationItem {
     recommendedAction?: string;
     createdAt: string;
     monitor: { name: string; url: string; mode?: string };
+  };
+  monitorAlert?: {
+    id: string;
+    kind: string;
+    title: string;
+    explanation: string;
+    possibleCause: string;
+    suggestedAction: string;
+    errorKind: string;
+    resolvedAt: string | null;
+    monitor: { id: string; name: string; url: string; mode?: string };
   };
 }
 
@@ -95,6 +107,12 @@ export default function NotificationsPage() {
   );
 
   function markRead(item: NotificationItem) {
+    if (item.monitorAlert) {
+      markNotificationsRead([item.id]);
+      setReadIds(getReadNotificationIds());
+      return;
+    }
+    if (!item.change) return;
     markAlertOpened({
       notificationId: item.id,
       changeId: item.change.id,
@@ -105,8 +123,11 @@ export default function NotificationsPage() {
   function markAllRead() {
     markNotificationsRead(items.map((i) => i.id));
     const highChangeIds = items
-      .filter((i) => i.change.importance === "HIGH" || i.change.importance === "CRITICAL")
-      .map((i) => i.change.id);
+      .filter(
+        (i) =>
+          i.change?.importance === "HIGH" || i.change?.importance === "CRITICAL"
+      )
+      .map((i) => i.change!.id);
     if (highChangeIds.length > 0) {
       markImportantChangesRead(highChangeIds);
     }
@@ -188,6 +209,73 @@ export default function NotificationsPage() {
 
         {items.map((item, i) => {
           const isUnread = !readIds.has(item.id);
+          if (item.monitorAlert) {
+            const alert = item.monitorAlert;
+            return (
+              <motion.article
+                key={item.id}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: Math.min(i * 0.04, 0.3) }}
+                className={`rounded-2xl border p-4 transition-colors ${
+                  isUnread
+                    ? "border-amber-400/25 bg-amber-500/[0.05]"
+                    : "border-white/[0.06] bg-white/[0.02]"
+                }`}
+              >
+                <div className="flex items-start gap-3 sm:gap-4">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-amber-400/20 bg-amber-500/[0.08] text-lg">
+                    ⚠️
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="font-medium text-zinc-100">{alert.title}</h3>
+                      {isUnread && <span className="h-1.5 w-1.5 rounded-full bg-amber-300" title="Unread" />}
+                      {alert.resolvedAt ? (
+                        <span className="rounded-full border border-emerald-400/20 bg-emerald-500/[0.08] px-2 py-0.5 text-[10px] font-medium text-emerald-300">Resolved</span>
+                      ) : (
+                        <span className="rounded-full border border-amber-400/20 bg-amber-500/[0.08] px-2 py-0.5 text-[10px] font-medium text-amber-200">Monitoring issue</span>
+                      )}
+                    </div>
+                    <p className="mt-1 text-xs text-zinc-500">
+                      {alert.monitor.name} · {formatRelativeTime(item.createdAt)} · In-app only
+                    </p>
+                    <p className="mt-3 text-sm leading-relaxed text-zinc-300">{alert.explanation}</p>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      <div className="rounded-lg border border-white/[0.06] bg-black/20 p-3">
+                        <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-600">Possible cause</p>
+                        <p className="mt-1 text-xs leading-relaxed text-zinc-400">{alert.possibleCause}</p>
+                      </div>
+                      <div className="rounded-lg border border-cyan-500/15 bg-cyan-500/[0.04] p-3">
+                        <p className="text-[10px] font-medium uppercase tracking-wider text-cyan-500/70">Suggested action</p>
+                        <p className="mt-1 text-xs leading-relaxed text-cyan-100/90">{alert.suggestedAction}</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <Link
+                        href={`/dashboard/monitors/${alert.monitor.id}`}
+                        onClick={() => markRead(item)}
+                        className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-cyan-400/25 bg-cyan-500/10 px-3 text-xs text-cyan-200 hover:bg-cyan-500/15"
+                      >
+                        Open monitor
+                        <ExternalLink className="h-3 w-3" />
+                      </Link>
+                      {isUnread && (
+                        <button
+                          type="button"
+                          onClick={() => markRead(item)}
+                          className="min-h-9 rounded-lg px-3 text-xs text-zinc-600 hover:text-zinc-300"
+                        >
+                          Mark read
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </motion.article>
+            );
+          }
+          if (!item.change) return null;
           const isExpanded = expandedId === item.id;
           const modeLabel = item.change.monitor.mode
             ? MODE_LABELS[item.change.monitor.mode as MonitoringMode] ??

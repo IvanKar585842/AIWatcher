@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
+import { MonitoringMode, Prisma } from "@prisma/client";
 import { requireUser } from "@/lib/auth";
-import { isIntervalAllowedForUser } from "@/lib/admin";
+import { getEffectivePlan, isIntervalAllowedForUser } from "@/lib/admin";
 import { prisma } from "@/lib/db";
 import { apiFailureFromError, apiErrorResponse } from "@/lib/api-response";
 import { ApiError, parseJsonBody } from "@/lib/errors";
-import { assertMonitorModeAllowed, assertNotificationAllowed } from "@/lib/plan-guards";
+import {
+  assertMonitorModeAllowed,
+  assertMonitorModeSelectable,
+  assertNotificationAllowed,
+  assertVisualMonitorQuota,
+} from "@/lib/plan-guards";
 import { withRateLimit } from "@/lib/rate-limit";
 import { resolveFaviconUrl } from "@/lib/favicon";
 import { getFaviconUrl } from "@/lib/utils";
@@ -16,6 +21,11 @@ import {
   sanitizeMonitorConfigForClient,
 } from "@/lib/monitoring/session-cookies";
 import { invalidateUserMonitoringContext } from "@/lib/ai/chat-user-context";
+
+function isVisualMode(mode: MonitoringMode): boolean {
+  return mode === MonitoringMode.VISUAL_CHANGES || mode === MonitoringMode.SCREENSHOT_DIFF;
+}
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -52,7 +62,7 @@ export async function GET(
             ...monitor,
             config: sanitizeMonitorConfigForClient(monitor.config),
           },
-          plan: user.subscription?.plan ?? "FREE",
+          plan: getEffectivePlan(user),
         });
       },
       user.id
@@ -102,6 +112,20 @@ export async function PATCH(
         }
         if (parsed.data.mode) {
           try {
+            if (parsed.data.mode !== existing.mode) {
+              assertMonitorModeSelectable(parsed.data.mode);
+              if (isVisualMode(parsed.data.mode) && !isVisualMode(existing.mode)) {
+                const visualMonitorCount = await prisma.monitor.count({
+                  where: {
+                    userId: user.id,
+                    mode: {
+                      in: [MonitoringMode.VISUAL_CHANGES, MonitoringMode.SCREENSHOT_DIFF],
+                    },
+                  },
+                });
+                assertVisualMonitorQuota(user, visualMonitorCount);
+              }
+            }
             assertMonitorModeAllowed(user, parsed.data.mode);
           } catch (err) {
             return apiFailureFromError(err);

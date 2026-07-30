@@ -12,7 +12,7 @@ import {
 export const PLAN_LIMITS = {
   FREE: {
     maxMonitors: 3,
-    minInterval: MonitoringInterval.TWENTY_FOUR_HOURS,
+    minInterval: MonitoringInterval.TWELVE_HOURS,
     historyDays: 7 as number | null,
     telegram: false,
     aiSummaries: false,
@@ -142,7 +142,7 @@ export const PRICING_PLANS = [
     description: "Try WatchFlowing and see how monitoring feels in practice.",
     features: [
       "Basic website monitoring (3 sites)",
-      "Checks every 24 hours",
+      "Checks every 12–24 hours",
       "7-day change history",
       "Email notifications",
       "Basic change detection",

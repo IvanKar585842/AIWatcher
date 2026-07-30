@@ -106,13 +106,6 @@ export function CommandCenter({
     };
   }, [mutate]);
 
-  // Clear stale empty state only after a hard failure with no cache
-  useEffect(() => {
-    if (error && !data) {
-      /* keep EMPTY_STATS via derived stats */
-    }
-  }, [error, data]);
-
   const unreadImportant = useMemo(() => {
     const list = stats.importantAlertChanges ?? [];
     return list.filter((c) => !readImportantIds.has(c.id));
@@ -198,7 +191,7 @@ export function CommandCenter({
             Command Center · Live
           </p>
           <h2 className="mt-1.5 text-lg font-semibold tracking-tight text-zinc-50 sm:text-xl">
-            WatchFlowing is watching your business
+            WatchFlowing watches what matters
           </h2>
           <p className="mt-1 max-w-xl text-xs leading-relaxed text-zinc-500 sm:text-sm">
             Loading monitors…
@@ -223,7 +216,7 @@ export function CommandCenter({
             </p>
           </div>
           <h2 className="mt-1.5 text-lg font-semibold tracking-tight text-zinc-50 sm:text-xl">
-            WatchFlowing is watching your business
+            WatchFlowing watches what matters
           </h2>
           <p className="mt-1 max-w-xl text-xs leading-relaxed text-zinc-500 sm:text-sm">
             {stats.activeMonitors} site{stats.activeMonitors === 1 ? "" : "s"} monitored
@@ -244,6 +237,24 @@ export function CommandCenter({
           />
         </div>
       </div>
+
+      {error && !data && (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-500/25 bg-red-500/[0.08] px-4 py-3"
+        >
+          <p className="text-sm text-red-200">
+            Dashboard data could not be loaded. Your monitors have not been changed.
+          </p>
+          <button
+            type="button"
+            onClick={() => void mutate()}
+            className="min-h-9 rounded-lg border border-red-400/25 px-3 text-xs font-medium text-red-100 transition-colors hover:bg-red-500/10"
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {unreadImportantCount > 0 && (
         <button

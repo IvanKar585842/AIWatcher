@@ -10,13 +10,13 @@ import {
 } from "../src/lib/constants";
 
 const EXPECTED_MIN: Record<Plan, MonitoringInterval> = {
-  FREE: MonitoringInterval.TWENTY_FOUR_HOURS,
+  FREE: MonitoringInterval.TWELVE_HOURS,
   PRO: MonitoringInterval.THIRTY_MIN,
   BUSINESS: MonitoringInterval.ONE_MIN,
 };
 
 const EXPECTED_MINUTES: Record<Plan, number> = {
-  FREE: 1440,
+  FREE: 720,
   PRO: 30,
   BUSINESS: 1,
 };
@@ -46,10 +46,19 @@ for (const plan of [Plan.FREE, Plan.PRO, Plan.BUSINESS] as const) {
   }
 }
 
-// Free must not allow 12h anymore
-if (getAllowedIntervals(Plan.FREE).includes(MonitoringInterval.TWELVE_HOURS)) {
+// Free (Basic) allows 12h and 24h only
+const freeAllowed = getAllowedIntervals(Plan.FREE);
+if (!freeAllowed.includes(MonitoringInterval.TWELVE_HOURS)) {
   failed++;
-  console.error("FAIL FREE still allows TWELVE_HOURS");
+  console.error("FAIL FREE must allow TWELVE_HOURS");
+}
+if (!freeAllowed.includes(MonitoringInterval.TWENTY_FOUR_HOURS)) {
+  failed++;
+  console.error("FAIL FREE must allow TWENTY_FOUR_HOURS");
+}
+if (freeAllowed.includes(MonitoringInterval.SIX_HOURS)) {
+  failed++;
+  console.error("FAIL FREE must not allow SIX_HOURS");
 }
 
 if (failed > 0) {

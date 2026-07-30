@@ -54,7 +54,7 @@ function feature(enabled: boolean, limit: number | null = null): PlanFeatureDef 
 export const PLAN_ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
   FREE: {
     maxMonitors: 3,
-    minInterval: MonitoringInterval.TWENTY_FOUR_HOURS,
+    minInterval: MonitoringInterval.TWELVE_HOURS,
     historyDays: 7,
     chatDailyMessages: 20,
     aiAnalysesPerMonth: 5,
@@ -269,9 +269,9 @@ export const FEATURE_COMPARISON_ROWS: Array<{
   {
     feature: "FASTER_INTERVALS",
     label: "Check frequency",
-    free: "Every 12h+",
-    pro: "From 5 min",
-    business: "From 5 min",
+    free: "12–24 hours",
+    pro: "From 30 min",
+    business: "From 1 min",
   },
   {
     feature: "VISUAL_MONITORING",

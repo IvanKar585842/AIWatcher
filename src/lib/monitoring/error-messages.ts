@@ -41,8 +41,8 @@ const KIND_COPY: Record<
       "The site refused this check (often HTTP 401/403). Public pages with strong access controls may not support automated monitoring.",
     suggestions: [
       "Try another public page on the same site",
-      "If you have an authenticated session, reconnect cookies in Advanced settings",
-      "Use API / RSS monitoring if the site provides it",
+      "Choose a page that loads without signing in",
+      "Use a public API or RSS feed if the site provides one",
     ],
     statusLabel: "Access denied",
     tone: "red",
@@ -256,6 +256,20 @@ export function classifyMonitoringError(raw: unknown): MonitoringErrorInfo {
     lower.includes("reconnect cookies")
   ) {
     return fromKind("SESSION_EXPIRED", message);
+  }
+
+  if (
+    lower.includes("anti-bot challenge") ||
+    lower.includes("captcha") ||
+    lower.includes("challenge-platform") ||
+    lower.includes("cf-browser-verification") ||
+    lower.includes("datadome")
+  ) {
+    return fromKind(
+      "BLOCKED",
+      message,
+      "This website presented an anti-bot challenge."
+    );
   }
 
   if (

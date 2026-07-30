@@ -34,12 +34,6 @@ export const monitorConfigSchema = z.object({
   scrollDepthPx: z.number().int().min(0).max(12000).optional(),
   waitForSelector: z.string().max(500).optional().nullable(),
   expandSelectors: z.string().max(2000).optional(),
-  /** Write-only JSON cookie array — encrypted server-side, never returned. */
-  sessionCookiesPlain: z.string().max(50000).optional(),
-  clearSession: z.boolean().optional(),
-  sessionExpiresAt: z.string().max(40).optional().nullable(),
-  sessionStatus: z.enum(["none", "active", "expired"]).optional(),
-  hasSession: z.boolean().optional(),
 });
 
 const monitorBaseSchema = z.object({

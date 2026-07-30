@@ -35,6 +35,29 @@ export const changeAnalysisSchema = z
     recommended_action: z.string().optional(),
     potentialImpact: z.string().optional().default(""),
     potential_impact: z.string().optional(),
+    where: z.string().optional().default(""),
+    whyItMatters: z.string().optional().default(""),
+    why_it_matters: z.string().optional(),
+    riskLevel: z.enum(["LOW", "MODERATE", "HIGH", "CRITICAL"]).optional(),
+    risk_level: z.enum(["LOW", "MODERATE", "HIGH", "CRITICAL"]).optional(),
+    possibleReason: z.string().optional().default(""),
+    possible_reason: z.string().optional(),
+    sectionsAdded: z.array(z.string()).optional().default([]),
+    sections_added: z.array(z.string()).optional(),
+    sectionsRemoved: z.array(z.string()).optional().default([]),
+    sections_removed: z.array(z.string()).optional(),
+    visualDifferences: z.array(z.string()).optional().default([]),
+    visual_differences: z.array(z.string()).optional(),
+    structureDifferences: z.array(z.string()).optional().default([]),
+    structure_differences: z.array(z.string()).optional(),
+    linksChanged: z.array(z.string()).optional().default([]),
+    links_changed: z.array(z.string()).optional(),
+    buttonsChanged: z.array(z.string()).optional().default([]),
+    buttons_changed: z.array(z.string()).optional(),
+    textChanged: z.array(z.string()).optional().default([]),
+    text_changed: z.array(z.string()).optional(),
+    metadataChanged: z.array(z.string()).optional().default([]),
+    metadata_changed: z.array(z.string()).optional(),
   })
   .transform((data) => {
     const changes = (data.changes.length > 0 ? data.changes : (data.bullet_points ?? []))
@@ -67,6 +90,22 @@ export const changeAnalysisSchema = z
       defaultRecommendedAction(data.importance, prismaCategory);
 
     const summary = data.summary.trim() || "A meaningful update was detected on this page.";
+    const list = (...values: Array<string[] | undefined>) =>
+      values
+        .flatMap((value) => value ?? [])
+        .map((value) => value.trim())
+        .filter(Boolean)
+        .slice(0, 8);
+    const riskLevel =
+      data.riskLevel ??
+      data.risk_level ??
+      (data.importance === "CRITICAL"
+        ? "CRITICAL"
+        : data.importance === "HIGH"
+          ? "HIGH"
+          : data.importance === "MEDIUM"
+            ? "MODERATE"
+            : "LOW");
 
     return {
       summary,
@@ -81,6 +120,19 @@ export const changeAnalysisSchema = z
       emoji: data.emoji || "🔔",
       recommendedAction,
       potentialImpact,
+      where: data.where.trim(),
+      whyItMatters:
+        (data.whyItMatters || data.why_it_matters || "").trim() || potentialImpact,
+      riskLevel,
+      possibleReason: (data.possibleReason || data.possible_reason || "").trim(),
+      sectionsAdded: list(data.sectionsAdded, data.sections_added),
+      sectionsRemoved: list(data.sectionsRemoved, data.sections_removed),
+      visualDifferences: list(data.visualDifferences, data.visual_differences),
+      structureDifferences: list(data.structureDifferences, data.structure_differences),
+      linksChanged: list(data.linksChanged, data.links_changed),
+      buttonsChanged: list(data.buttonsChanged, data.buttons_changed),
+      textChanged: list(data.textChanged, data.text_changed),
+      metadataChanged: list(data.metadataChanged, data.metadata_changed),
     };
   });
 
@@ -166,7 +218,7 @@ CHANGE PACKAGE:
 ADDITIONAL CONTEXT:
 {newHtml}
 
-Write a structured analysis users can act on immediately.
+Write a structured senior-analyst analysis that a non-technical reader can act on immediately.
 
 Summary rules:
 - 2–4 complete sentences
@@ -212,8 +264,7 @@ LOW (noise — almost never notify):
 - Whitespace, tiny styling, timestamps, counters, ads
 
 Also weigh Monitoring Mode:
-- PRICE_DETECTION / PRODUCT_AVAILABILITY → bias toward HIGH/CRITICAL for price/stock
-- JOB_LISTINGS → HIGH for real job changes; LOW for chrome noise
+- Legacy price, product-availability, or job modes → use the evidence; do not assume a price, stock, or hiring change is urgent
 - DOCUMENTATION_CHANGES → HIGH for API/docs substance; MEDIUM for typography
 - VISUAL_CHANGES / SCREENSHOT_DIFF → score by visual magnitude; tiny shifts ≤ LOW/MEDIUM
 - TEXT_CHANGES / HTML_DIFF → avoid HIGH unless substance is clear
@@ -229,6 +280,14 @@ Notification:
 
 recommendedAction: short next step for the user
 
+Required analyst fields:
+- where: identify the page area, section, or element that changed. Say "Not reliably identified" if the evidence cannot prove it.
+- whyItMatters: explain the practical consequence in plain language; do not overstate certainty.
+- riskLevel: LOW | MODERATE | HIGH | CRITICAL. This may differ from importance; risk is the downside if the change matters.
+- possibleReason: a clearly labeled, evidence-based hypothesis. Use "Not clear from the page change alone" if unknown.
+- sectionsAdded / sectionsRemoved: named page sections, only when evidence supports it.
+- visualDifferences / structureDifferences / linksChanged / buttonsChanged / textChanged / metadataChanged: short concrete findings. Use [] where no reliable evidence exists. Never invent a difference.
+
 Respond ONLY with valid JSON:
 {
   "summary": "2–4 sentence overview of the most important change",
@@ -241,7 +300,19 @@ Respond ONLY with valid JSON:
   "new_value": "string or null",
   "emoji": "string",
   "potentialImpact": "why this change may matter",
-  "recommendedAction": "short actionable recommendation"
+  "recommendedAction": "short actionable recommendation",
+  "where": "page area or section",
+  "whyItMatters": "plain-language consequence",
+  "riskLevel": "LOW|MODERATE|HIGH|CRITICAL",
+  "possibleReason": "evidence-based hypothesis or uncertainty",
+  "sectionsAdded": ["named added section"],
+  "sectionsRemoved": ["named removed section"],
+  "visualDifferences": ["concrete visual difference"],
+  "structureDifferences": ["concrete hierarchy or layout difference"],
+  "linksChanged": ["old link → new link"],
+  "buttonsChanged": ["concrete CTA difference"],
+  "textChanged": ["old text → new text"],
+  "metadataChanged": ["title, description, canonical, or other metadata difference"]
 }`;
 
 export function parseChangeAnalysis(raw: string): ChangeAnalysis {

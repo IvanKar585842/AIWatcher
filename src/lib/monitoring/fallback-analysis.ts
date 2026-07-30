@@ -71,6 +71,54 @@ function classifyFallbackCategory(
   return { category: "CONTENT", categoryLabel: "Content" };
 }
 
+function fallbackAnalystFields(input: {
+  importance: ChangeAnalysis["importance"];
+  potentialImpact: string;
+  where?: string;
+  possibleReason?: string;
+  sectionsAdded?: string[];
+  sectionsRemoved?: string[];
+  visualDifferences?: string[];
+  structureDifferences?: string[];
+  textChanged?: string[];
+}): Pick<
+  ChangeAnalysis,
+  | "where"
+  | "whyItMatters"
+  | "riskLevel"
+  | "possibleReason"
+  | "sectionsAdded"
+  | "sectionsRemoved"
+  | "visualDifferences"
+  | "structureDifferences"
+  | "linksChanged"
+  | "buttonsChanged"
+  | "textChanged"
+  | "metadataChanged"
+> {
+  return {
+    where: input.where ?? "Not reliably identified from the available page diff",
+    whyItMatters: input.potentialImpact,
+    riskLevel:
+      input.importance === "CRITICAL"
+        ? "CRITICAL"
+        : input.importance === "HIGH"
+          ? "HIGH"
+          : input.importance === "MEDIUM"
+            ? "MODERATE"
+            : "LOW",
+    possibleReason: input.possibleReason ?? "Not clear from the page change alone.",
+    sectionsAdded: input.sectionsAdded ?? [],
+    sectionsRemoved: input.sectionsRemoved ?? [],
+    visualDifferences: input.visualDifferences ?? [],
+    structureDifferences: input.structureDifferences ?? [],
+    linksChanged: [],
+    buttonsChanged: [],
+    textChanged: input.textChanged ?? [],
+    metadataChanged: [],
+  };
+}
+
 export function buildFallbackAnalysis(params: {
   monitorName: string;
   url: string;
@@ -114,6 +162,12 @@ export function buildFallbackAnalysis(params: {
       emoji: "👁️",
       recommendedAction: defaultRecommendedAction(importance, "OTHER"),
       potentialImpact: defaultPotentialImpact(importance, "OTHER", changes),
+      ...fallbackAnalystFields({
+        importance,
+        potentialImpact: defaultPotentialImpact(importance, "OTHER", changes),
+        where: "Visible page layout or media",
+        visualDifferences: changes,
+      }),
     };
   }
 
@@ -133,6 +187,11 @@ export function buildFallbackAnalysis(params: {
       emoji: "🔕",
       recommendedAction: "No action needed.",
       potentialImpact: defaultPotentialImpact("LOW", "OTHER", changes),
+      ...fallbackAnalystFields({
+        importance: "LOW",
+        potentialImpact: defaultPotentialImpact("LOW", "OTHER", changes),
+        possibleReason: "This resembles routine dynamic page content rather than a substantive update.",
+      }),
     };
   }
 
@@ -225,5 +284,14 @@ export function buildFallbackAnalysis(params: {
     emoji: category === "PRICE" ? "💰" : importance === "CRITICAL" ? "🚨" : "🔔",
     recommendedAction: defaultRecommendedAction(importance, category),
     potentialImpact: defaultPotentialImpact(importance, category, bullets),
+    ...fallbackAnalystFields({
+      importance,
+      potentialImpact: defaultPotentialImpact(importance, category, bullets),
+      where: structureHints[0] ?? "Main page content",
+      sectionsAdded: added.slice(0, 3),
+      sectionsRemoved: removed.slice(0, 3),
+      structureDifferences: structureHints,
+      textChanged: [...removed.slice(0, 2), ...added.slice(0, 3)],
+    }),
   };
 }

@@ -19,6 +19,7 @@ import {
   shouldEnforceRobotsTxt,
 } from "./robots";
 import { assertSafeFetchUrl, fetchWithSafeRedirects } from "@/lib/security/url";
+import { containsAntiBotChallenge } from "@/lib/monitoring/compatibility";
 import type { WaitStrategy } from "@/lib/monitor-config";
 import {
   cookiesFromBrowser,
@@ -498,6 +499,11 @@ async function fetchPageContentOnce(options: FetchOptions): Promise<FetchResult>
     context = await browser.newContext({
       userAgent:
         "WatchFlowing/1.0 (+https://watchflowing.com/bot; monitoring service)",
+      locale: "en-US",
+      extraHTTPHeaders: {
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.8",
+      },
       viewport: { width: VISUAL_VIEWPORT.width, height: VISUAL_VIEWPORT.height },
       deviceScaleFactor: 1,
       ignoreHTTPSErrors: true,
@@ -613,6 +619,16 @@ async function fetchPageContentOnce(options: FetchOptions): Promise<FetchResult>
       waitForSelector: effectiveWaitSelector,
       expandSelectors,
     });
+
+    // Detect challenge pages after client-side rendering. We report them clearly
+    // rather than attempting to bypass a site's access controls.
+    const pageTextForChallengeCheck = await page
+      .locator("body")
+      .innerText({ timeout: Math.min(timeout, 5_000) })
+      .catch(() => "");
+    if (containsAntiBotChallenge(pageTextForChallengeCheck)) {
+      throw new Error("Anti-bot challenge detected on this public page");
+    }
 
     // Hard adaptive wait for CSS selector modes — fail clearly if missing
     if (mode === MonitoringMode.CSS_SELECTOR && selector) {

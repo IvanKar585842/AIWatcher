@@ -160,3 +160,9 @@
   height: 0;
 }
 
+/* Native <select> options — match black / cyan OS system */
+select option {
+  background-color: #0c0c0c;
+  color: #e4e4e7;
+}
+

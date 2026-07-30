@@ -102,10 +102,10 @@ function buildPrefill(intent: OnboardingIntent): MonitorPrefill {
     case "price-changes":
       return {
         ...base,
-        name: "Public pricing page",
+        name: "Public plans page",
         category: "Competitor Intelligence",
-        description: "Watch a public company pricing or plans page",
-        mode: MonitoringMode.PRICE_DETECTION,
+        description: "Watch a public company plans page for general updates",
+        mode: MonitoringMode.ENTIRE_PAGE,
       };
     case "my-website":
     default:

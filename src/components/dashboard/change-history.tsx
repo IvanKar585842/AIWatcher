@@ -104,7 +104,7 @@ export function ChangeHistory() {
           />
         </div>
         <Select value={category} onValueChange={(v) => { setCategory(v); setPage(1); }}>
-          <SelectTrigger className="w-full sm:w-40">
+          <SelectTrigger className="w-full border-white/[0.08] bg-black/50 text-zinc-100 sm:w-40">
             <SelectValue placeholder="Category" />
           </SelectTrigger>
           <SelectContent>
@@ -119,7 +119,7 @@ export function ChangeHistory() {
           </SelectContent>
         </Select>
         <Select value={importance} onValueChange={(v) => { setImportance(v); setPage(1); }}>
-          <SelectTrigger className="w-full sm:w-36">
+          <SelectTrigger className="w-full border-white/[0.08] bg-black/50 text-zinc-100 sm:w-36">
             <SelectValue placeholder="Importance" />
           </SelectTrigger>
           <SelectContent>

@@ -8,6 +8,7 @@ import { analyzeIntelligenceScore } from "@/lib/growth/intelligence-score";
 import { trackEvent } from "@/lib/analytics";
 import { ApiError } from "@/lib/errors";
 import { apiErrorResponse } from "@/lib/api-response";
+import { validateMonitorUrl } from "@/lib/security/url";
 
 const bodySchema = z.object({
   url: z.string().min(3).max(2048),
@@ -24,36 +25,53 @@ export async function POST(request: NextRequest) {
     async () => {
       try {
         const parsed = bodySchema.parse(await request.json());
+        const candidate = /^https?:\/\//i.test(parsed.url.trim())
+          ? parsed.url.trim()
+          : `https://${parsed.url.trim()}`;
+        const validated = validateMonitorUrl(candidate);
+        if (!validated.ok) {
+          return NextResponse.json({ error: validated.error }, { status: 400 });
+        }
         const preview = await analyzeIntelligenceScore(parsed.url);
 
-        const { userId: clerkId } = await auth();
         let userId: string | null = null;
-        if (clerkId) {
-          const user = await prisma.user.findUnique({
-            where: { clerkId },
-            select: { id: true },
-          });
-          userId = user?.id ?? null;
+        try {
+          const { userId: clerkId } = await auth();
+          if (clerkId) {
+            const user = await prisma.user.findUnique({
+              where: { clerkId },
+              select: { id: true },
+            });
+            userId = user?.id ?? null;
+          }
+        } catch {
+          // The public analyzer remains available when auth is temporarily unavailable.
         }
 
         const shareToken = randomBytes(12).toString("hex");
-        const saved = await prisma.intelligenceScore.create({
-          data: {
-            url: preview.url,
-            hostname: preview.hostname,
-            overallScore: preview.overallScore,
-            payload: {
-              ...preview,
-              // Full detail only for signed-in users in response; store full anyway
-              previewOnly: !userId,
+        let saved: { id: string } | null = null;
+        try {
+          saved = await prisma.intelligenceScore.create({
+            data: {
+              url: preview.url,
+              hostname: preview.hostname,
+              overallScore: preview.overallScore,
+              payload: {
+                ...preview,
+                // Full detail only for signed-in users in response; store full anyway
+                previewOnly: !userId,
+              },
+              userId,
+              shareToken,
             },
-            userId,
-            shareToken,
-          },
-          select: { id: true, shareToken: true },
-        });
+            select: { id: true },
+          });
+        } catch {
+          // A score is useful even if its optional saved/shareable record cannot be created.
+          // Do not expose database details to anonymous visitors.
+        }
 
-        await trackEvent({
+        void trackEvent({
           type: "score_generated",
           userId: userId ?? undefined,
           metadata: {
@@ -86,9 +104,9 @@ export async function POST(request: NextRequest) {
               title: "Unlock the full Intelligence Report",
               description:
                 "Create a free WatchFlowing account to see all risks, SEO notes, and continuous monitoring.",
-              href: `/sign-up?from=score&score=${saved.id}`,
+              href: `/sign-up?from=score${saved ? `&score=${saved.id}` : ""}`,
             },
-            sharePath: `/score/${saved.shareToken}`,
+            ...(saved ? { sharePath: `/score/${shareToken}` } : {}),
           });
         }
 
@@ -96,13 +114,20 @@ export async function POST(request: NextRequest) {
           preview: false,
           ...preview,
           previewOnly: false,
-          id: saved.id,
-          sharePath: `/score/${saved.shareToken}`,
-          publicUrl: `${appUrl}/score/${saved.shareToken}`,
+          ...(saved
+            ? {
+                id: saved.id,
+                sharePath: `/score/${shareToken}`,
+                publicUrl: `${appUrl}/score/${shareToken}`,
+              }
+            : {}),
         });
       } catch (error) {
         if (error instanceof ApiError) return apiErrorResponse(error);
-        if (error instanceof Error && /blocked|unsafe|private/i.test(error.message)) {
+        if (
+          error instanceof Error &&
+          /blocked|unsafe|private|not allowed|invalid url|only http/i.test(error.message)
+        ) {
           return NextResponse.json({ error: error.message }, { status: 400 });
         }
         return apiErrorResponse(error);

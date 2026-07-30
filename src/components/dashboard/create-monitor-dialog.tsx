@@ -7,9 +7,21 @@ import {
   MonitoringInterval,
   MonitoringMode,
   NotificationMethod,
+  Plan,
   type Monitor,
 } from "@prisma/client";
-import { AlertTriangle, ArrowLeft, ArrowRight, HelpCircle, Loader2, Plus, Search, Sparkles } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  HelpCircle,
+  Loader2,
+  Plus,
+  Search,
+  ShieldAlert,
+  Sparkles,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -27,12 +39,18 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/os-toast";
-import { INTERVAL_LABELS, NOTIFICATION_LABELS } from "@/lib/constants";
+import {
+  IntervalSelectItems,
+  IntervalUpgradeHint,
+} from "@/components/dashboard/interval-select-items";
+import { SupportedSitesGuide } from "@/components/dashboard/supported-sites-guide";
+import { getAllowedIntervals, isIntervalAllowed, NOTIFICATION_LABELS } from "@/lib/constants";
 import { fetchApi } from "@/lib/fetch-api";
 import {
   CREATE_AI_PROMPT_EXAMPLES,
   MONITOR_CATEGORY_DEFS,
 } from "@/lib/monitor-config";
+import type { CompatibilityResult } from "@/lib/monitoring/compatibility";
 import {
   ACCENT_STYLES,
   getMonitorTypeById,
@@ -46,7 +64,6 @@ import {
 import { loadUserSettings } from "@/lib/user-settings";
 import { cn } from "@/lib/utils";
 import { PRODUCT_TOUR_EVENTS } from "@/lib/product-tour";
-import { SupportedSitesGuide } from "@/components/dashboard/supported-sites-guide";
 
 export interface MonitorPrefill {
   name: string;
@@ -116,6 +133,68 @@ function FieldLabel({
   );
 }
 
+function CompatibilityPanel({
+  result,
+  acknowledged,
+  onAcknowledge,
+}: {
+  result: CompatibilityResult;
+  acknowledged: boolean;
+  onAcknowledge: () => void;
+}) {
+  const tone =
+    result.verdict === "PUBLIC"
+      ? {
+          border: "border-emerald-500/30",
+          bg: "bg-emerald-500/[0.08]",
+          icon: <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />,
+          title: "text-emerald-100",
+        }
+      : result.verdict === "DYNAMIC"
+        ? {
+            border: "border-cyan-500/30",
+            bg: "bg-cyan-500/[0.08]",
+            icon: <HelpCircle className="mt-0.5 h-4 w-4 shrink-0 text-cyan-300" />,
+            title: "text-cyan-100",
+          }
+        : {
+            border: "border-amber-500/30",
+            bg: "bg-amber-500/[0.08]",
+            icon: <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />,
+            title: "text-amber-100",
+          };
+
+  return (
+    <div className={cn("rounded-xl border px-3.5 py-3", tone.border, tone.bg)}>
+      <div className="flex items-start gap-2.5">
+        {tone.icon}
+        <div className="min-w-0 flex-1">
+          <p className={cn("text-xs font-medium", tone.title)}>
+            Compatibility · {result.label}
+          </p>
+          <p className="mt-1 text-[11px] leading-relaxed text-zinc-400 sm:text-xs">
+            {result.explanation}
+          </p>
+          {result.risky && !acknowledged && (
+            <button
+              type="button"
+              onClick={onAcknowledge}
+              className="mt-2.5 inline-flex min-h-9 items-center rounded-full border border-white/[0.1] bg-black/40 px-3 text-[11px] font-medium text-zinc-200 transition-colors hover:border-cyan-400/30 hover:text-cyan-100"
+            >
+              I understand — continue
+            </button>
+          )}
+          {result.risky && acknowledged && (
+            <p className="mt-2 text-[11px] text-zinc-500">
+              Confirmed. You can create this monitor anyway.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function OsInput(props: React.ComponentProps<typeof Input>) {
   return (
     <Input
@@ -154,6 +233,11 @@ export function CreateMonitorDialog({
   const [typeFilter, setTypeFilter] = useState<MonitorTypeCategory | "All">("All");
   const [typeSearch, setTypeSearch] = useState("");
   const [showAdvancedTypes, setShowAdvancedTypes] = useState(false);
+  const [plan, setPlan] = useState<Plan>(Plan.FREE);
+  const [compatibility, setCompatibility] = useState<CompatibilityResult | null>(null);
+  const [compatCheckedUrl, setCompatCheckedUrl] = useState("");
+  const [checkingCompat, setCheckingCompat] = useState(false);
+  const [compatAcknowledged, setCompatAcknowledged] = useState(false);
 
   useEffect(() => {
     if (prefillRequest) {
@@ -202,24 +286,52 @@ export function CreateMonitorDialog({
       setTypeFilter("All");
       setSelectedTypeId("full-page");
       setShowAdvancedTypes(false);
+      setCompatibility(null);
+      setCompatCheckedUrl("");
+      setCheckingCompat(false);
+      setCompatAcknowledged(false);
       return;
     }
     // Apply Settings → Monitoring preferences when opening a fresh create flow
     if (!prefillRequest) {
       setForm(formDefaultsFromUserSettings());
     }
+    const controller = new AbortController();
+    void fetch("/api/user/context", { signal: controller.signal, credentials: "same-origin" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.plan && Object.values(Plan).includes(data.plan)) {
+          setPlan(data.plan as Plan);
+        }
+      })
+      .catch(() => {
+        /* keep FREE default */
+      });
+    return () => controller.abort();
   }, [open, prefillRequest]);
 
-  const intervals = useMemo(
-    () => allowedIntervals ?? (Object.keys(INTERVAL_LABELS) as MonitoringInterval[]),
-    [allowedIntervals]
+  const planAllowedIntervals = useMemo(
+    () => allowedIntervals ?? getAllowedIntervals(plan),
+    [allowedIntervals, plan]
   );
 
   useEffect(() => {
-    if (intervals.length > 0 && !intervals.includes(form.interval)) {
-      setForm((prev) => ({ ...prev, interval: intervals[0]! }));
+    if (
+      planAllowedIntervals.length > 0 &&
+      !planAllowedIntervals.includes(form.interval)
+    ) {
+      setForm((prev) => ({
+        ...prev,
+        interval: planAllowedIntervals[planAllowedIntervals.length - 1]!,
+      }));
     }
-  }, [intervals, form.interval]);
+  }, [planAllowedIntervals, form.interval]);
+
+  useEffect(() => {
+    setCompatibility(null);
+    setCompatCheckedUrl("");
+    setCompatAcknowledged(false);
+  }, [form.url]);
 
   const selectedType = useMemo(
     () => getMonitorTypeById(selectedTypeId) ?? MONITOR_TYPE_CATALOG[0],
@@ -326,6 +438,32 @@ export function CreateMonitorDialog({
     }));
   }
 
+  async function runCompatibilityCheck(url: string): Promise<CompatibilityResult | null> {
+    setCheckingCompat(true);
+    setError("");
+    try {
+      const result = await fetchApi<{ compatibility: CompatibilityResult }>(
+        "/api/monitors/compatibility-check",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: url.trim() }),
+        }
+      );
+      if (!result.success) {
+        setError(result.error);
+        toast(result.error, "error");
+        return null;
+      }
+      setCompatibility(result.data.compatibility);
+      setCompatCheckedUrl(url.trim());
+      setCompatAcknowledged(!result.data.compatibility.risky);
+      return result.data.compatibility;
+    } finally {
+      setCheckingCompat(false);
+    }
+  }
+
   async function handleCreate() {
     const step1Error = validateStep1();
     if (step1Error) {
@@ -339,6 +477,32 @@ export function CreateMonitorDialog({
       return;
     }
 
+    if (!isIntervalAllowed(plan, form.interval)) {
+      setError("That check frequency requires an upgrade. Choose 12 or 24 hours, or upgrade your plan.");
+      return;
+    }
+
+    const url = form.url.trim();
+    let compat = compatibility;
+    const needsFreshCheck = !compat || compatCheckedUrl !== url;
+
+    if (needsFreshCheck) {
+      compat = await runCompatibilityCheck(url);
+      if (!compat) return;
+      // Pause so the user always sees the compatibility explanation first
+      return;
+    }
+
+    if (!compat) {
+      setError("Compatibility check required before creating a monitor.");
+      return;
+    }
+
+    if (compat.risky && !compatAcknowledged) {
+      setError("Review the compatibility result, then confirm to create this monitor.");
+      return;
+    }
+
     setLoading(true);
     setError("");
 
@@ -347,7 +511,7 @@ export function CreateMonitorDialog({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: form.name.trim(),
-        url: form.url.trim(),
+        url,
         description: form.description.trim() || null,
         category: form.category || null,
         mode: form.mode,
@@ -808,19 +972,20 @@ export function CreateMonitorDialog({
                     <FieldLabel hint="How often we check the page.">Check frequency</FieldLabel>
                     <Select
                       value={form.interval}
-                      onValueChange={(v) => setForm({ ...form, interval: v as MonitoringInterval })}
+                      onValueChange={(v) => {
+                        const next = v as MonitoringInterval;
+                        if (!isIntervalAllowed(plan, next)) return;
+                        setForm({ ...form, interval: next });
+                      }}
                     >
                       <SelectTrigger className="min-h-11 border-white/[0.08] bg-black/50 text-zinc-100">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {intervals.map((interval) => (
-                          <SelectItem key={interval} value={interval}>
-                            {INTERVAL_LABELS[interval]}
-                          </SelectItem>
-                        ))}
+                        <IntervalSelectItems plan={plan} />
                       </SelectContent>
                     </Select>
+                    <IntervalUpgradeHint plan={plan} />
                   </div>
                   <div>
                     <FieldLabel hint="Where to send important alerts.">Alert method</FieldLabel>
@@ -843,6 +1008,17 @@ export function CreateMonitorDialog({
                     </Select>
                   </div>
                 </div>
+
+                {compatibility && (
+                  <CompatibilityPanel
+                    result={compatibility}
+                    acknowledged={compatAcknowledged}
+                    onAcknowledge={() => {
+                      setCompatAcknowledged(true);
+                      setError("");
+                    }}
+                  />
+                )}
 
                 <div className="flex items-center justify-between gap-3 rounded-lg border border-white/[0.06] bg-black/30 px-4 py-3">
                   <div className="min-w-0">
@@ -922,12 +1098,26 @@ export function CreateMonitorDialog({
             ) : (
               <Button
                 type="button"
-                onClick={handleCreate}
-                disabled={loading}
-                className="min-h-12 w-full bg-cyan-500 text-black hover:bg-cyan-400 sm:w-auto"
+                onClick={() => void handleCreate()}
+                disabled={
+                  loading ||
+                  checkingCompat ||
+                  Boolean(compatibility?.risky && !compatAcknowledged)
+                }
+                className="min-h-12 w-full bg-cyan-500 text-black hover:bg-cyan-400 disabled:opacity-50 sm:w-auto"
               >
-                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Create Monitor
+                {(loading || checkingCompat) && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                {checkingCompat
+                  ? "Checking compatibility…"
+                  : compatibility?.risky && !compatAcknowledged
+                    ? "Confirm compatibility"
+                    : compatibility?.risky
+                      ? "Create anyway"
+                      : compatibility
+                        ? "Create Monitor"
+                        : "Check & create"}
               </Button>
             )}
           </div>

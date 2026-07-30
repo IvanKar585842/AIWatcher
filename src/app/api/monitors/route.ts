@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { Prisma } from "@prisma/client";
+import { MonitoringMode, Prisma } from "@prisma/client";
 import { requireUser } from "@/lib/auth";
 import { trackEvent } from "@/lib/analytics";
 import { isIntervalAllowedForUser } from "@/lib/admin";
 import { prisma } from "@/lib/db";
-import { ApiError, parseJsonBody, UnauthorizedError } from "@/lib/errors";
+import { ApiError, parseJsonBody } from "@/lib/errors";
 import { apiFailureFromError } from "@/lib/api-response";
 import {
   assertMonitorModeAllowed,
+  assertMonitorModeSelectable,
   assertMonitorQuota,
   assertNotificationAllowed,
+  assertVisualMonitorQuota,
 } from "@/lib/plan-guards";
 import { withRateLimit } from "@/lib/rate-limit";
 import { createMonitorSchema } from "@/lib/validations";
@@ -23,6 +24,10 @@ import {
   sanitizeMonitorConfigForClient,
 } from "@/lib/monitoring/session-cookies";
 import { invalidateUserMonitoringContext } from "@/lib/ai/chat-user-context";
+
+function isVisualMode(mode: MonitoringMode): boolean {
+  return mode === MonitoringMode.VISUAL_CHANGES || mode === MonitoringMode.SCREENSHOT_DIFF;
+}
 
 function isSchemaMismatch(error: unknown): boolean {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -37,58 +42,10 @@ function isSchemaMismatch(error: unknown): boolean {
   );
 }
 
-/**
- * Resolve DB user id for the monitors list without failing the whole
- * request when optional User columns are missing (pending migrations).
- */
-async function resolveMonitorsUserId(): Promise<
-  { ok: true; userId: string } | { ok: false; unauthorized: true }
-> {
-  try {
-    const user = await requireUser();
-    return { ok: true, userId: user.id };
-  } catch (error) {
-    if (error instanceof UnauthorizedError) {
-      return { ok: false, unauthorized: true };
-    }
-
-    const { userId: clerkId } = await auth();
-    if (!clerkId) {
-      return { ok: false, unauthorized: true };
-    }
-
-    try {
-      const rows = await prisma.$queryRaw<Array<{ id: string }>>`
-        SELECT id FROM "User" WHERE "clerkId" = ${clerkId} LIMIT 1
-      `;
-      if (rows[0]?.id) {
-        return { ok: true, userId: rows[0].id };
-      }
-    } catch (rawError) {
-      console.error("Monitors list user lookup fallback failed:", rawError);
-    }
-
-    // Authenticated but user row not readable — empty list, not error UI
-    return { ok: true, userId: "" };
-  }
-}
-
 export async function GET() {
   try {
-    const resolved = await resolveMonitorsUserId();
-    if (!resolved.ok) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-
-    // No DB user yet (or unreadable) → successful empty onboarding payload
-    if (!resolved.userId) {
-      return NextResponse.json({ success: true, monitors: [] });
-    }
-
-    const userId = resolved.userId;
+    const user = await requireUser();
+    const userId = user.id;
 
     return withRateLimit(
       "monitors-list",
@@ -117,8 +74,13 @@ export async function GET() {
         } catch (error) {
           if (isSchemaMismatch(error)) {
             console.error("Database schema mismatch on GET /api/monitors:", error);
-            // Prefer empty onboarding over a false "failed to load" for zero-monitor UX
-            return NextResponse.json({ success: true, monitors: [] });
+            return NextResponse.json(
+              {
+                success: false,
+                error: "Database schema is out of sync. Run: npm run db:sync",
+              },
+              { status: 503 }
+            );
           }
           throw error;
         }
@@ -154,6 +116,16 @@ export async function POST(request: NextRequest) {
           });
 
           assertMonitorQuota(user, monitorCount);
+          assertMonitorModeSelectable(parsed.data.mode);
+          if (isVisualMode(parsed.data.mode)) {
+            const visualMonitorCount = await prisma.monitor.count({
+              where: {
+                userId: user.id,
+                mode: { in: [MonitoringMode.VISUAL_CHANGES, MonitoringMode.SCREENSHOT_DIFF] },
+              },
+            });
+            assertVisualMonitorQuota(user, visualMonitorCount);
+          }
 
           if (!isIntervalAllowedForUser(user, parsed.data.interval)) {
             return NextResponse.json(

@@ -16,7 +16,6 @@ import {
   Package,
   Search,
   Sparkles,
-  Target,
   Type,
 } from "lucide-react";
 
@@ -198,18 +197,6 @@ export const MONITOR_TYPE_CATALOG: MonitorTypeDefinition[] = [
   },
 
   // —— Competitor Intelligence ——
-  {
-    id: "competitor-pricing",
-    label: "Pricing Page",
-    description: "Monitor a company’s public pricing or plans page for wording updates.",
-    exampleUsage: "company.com/pricing (SaaS plans — not marketplaces)",
-    recommendedUsers: "Product, sales, and pricing teams",
-    tooltip: "For public plan pages. Amazon, eBay, and similar marketplaces are often blocked.",
-    icon: Target,
-    category: "Competitor Intelligence",
-    accent: "emerald",
-    mode: "PRICE_DETECTION",
-  },
   {
     id: "competitor-features",
     label: "Features Page",

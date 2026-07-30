@@ -12,6 +12,11 @@ import { UnauthorizedError } from "@/lib/errors";
  * Avoids previous: currentUser + upsert + findUniqueOrThrow on every request.
  */
 export async function getOrCreateUser() {
+  const clerkConfigured =
+    Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim()) &&
+    !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY!.includes("placeholder");
+  if (!clerkConfigured) return null;
+
   const { userId } = await auth();
   if (!userId) return null;
 

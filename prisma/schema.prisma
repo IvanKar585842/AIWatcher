@@ -95,6 +95,11 @@ enum NotificationStatus {
   FAILED
 }
 
+enum MonitorAlertKind {
+  CHECK_FAILED
+  MONITOR_ERROR
+}
+
 enum UserRole {
   USER
   ADMIN
@@ -147,6 +152,7 @@ model User {
   subscription        Subscription?
   monitors            Monitor[]
   notifications       Notification[]
+  monitorAlerts       MonitorAlert[]
   chatConversations   ChatConversation[]
   weeklyReports       WeeklyReport[]
   intelligenceScores  IntelligenceScore[]
@@ -211,6 +217,7 @@ model Monitor {
   updatedAt          DateTime           @updatedAt
   snapshots          Snapshot[]
   changes            Change[]
+  alerts             MonitorAlert[]
 
   @@index([userId])
   @@index([status])
@@ -278,6 +285,28 @@ model Notification {
   @@index([changeId])
   @@index([status])
   @@index([userId, createdAt])
+}
+
+/// In-app-only monitor health alerts. These intentionally do not reuse
+/// Notification: that model is a delivery receipt and requires a Change.
+model MonitorAlert {
+  id              String           @id @default(cuid())
+  userId          String
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  monitorId       String
+  monitor         Monitor          @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  kind            MonitorAlertKind
+  title           String
+  explanation     String           @db.Text
+  possibleCause   String           @db.Text
+  suggestedAction String           @db.Text
+  errorKind       String
+  resolvedAt      DateTime?
+  createdAt       DateTime         @default(now())
+
+  @@index([userId, createdAt])
+  @@index([monitorId, createdAt])
+  @@index([monitorId, kind, createdAt])
 }
 
 model MonitorQueue {

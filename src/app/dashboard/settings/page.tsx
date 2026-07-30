@@ -21,8 +21,12 @@ import {
   Unlink,
   User,
 } from "lucide-react";
-import { MonitoringInterval, MonitoringMode, NotificationMethod } from "@prisma/client";
+import { MonitoringInterval, MonitoringMode, NotificationMethod, Plan } from "@prisma/client";
 import { CommandPageHeader } from "@/components/dashboard/command/command-page-header";
+import {
+  IntervalSelectItems,
+  IntervalUpgradeHint,
+} from "@/components/dashboard/interval-select-items";
 import { OsExpandableSection, OsFieldLabel, OsInput } from "@/components/dashboard/os/os-primitives";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -34,8 +38,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { INTERVAL_LABELS, MODE_LABELS, NOTIFICATION_LABELS } from "@/lib/constants";
-import { CREATE_AI_PROMPT_EXAMPLES } from "@/lib/monitor-config";
+import { isIntervalAllowed, NOTIFICATION_LABELS } from "@/lib/constants";
+import { CREATE_AI_PROMPT_EXAMPLES, MONITORING_MODES } from "@/lib/monitor-config";
 import {
   AI_PROVIDER_OPTIONS,
   DEFAULT_USER_SETTINGS,
@@ -151,9 +155,25 @@ export default function SettingsPage() {
   } | null>(null);
   const [reportPrefsSaving, setReportPrefsSaving] = useState(false);
   const [agencySectionOpen, setAgencySectionOpen] = useState(false);
+  const [plan, setPlan] = useState<Plan>(Plan.FREE);
 
   useEffect(() => {
     setSettings(loadUserSettings());
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch("/api/user/context", { signal: controller.signal, credentials: "same-origin" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.plan && Object.values(Plan).includes(data.plan)) {
+          setPlan(data.plan as Plan);
+        }
+      })
+      .catch(() => {
+        /* keep FREE */
+      });
+    return () => controller.abort();
   }, []);
 
   useEffect(() => {
@@ -720,24 +740,23 @@ export default function SettingsPage() {
               <OsFieldLabel>Default interval</OsFieldLabel>
               <Select
                 value={settings.defaultInterval}
-                onValueChange={(v) =>
+                onValueChange={(v) => {
+                  const next = v as MonitoringInterval;
+                  if (!isIntervalAllowed(plan, next)) return;
                   updateSettings(
-                    { defaultInterval: v as MonitoringInterval },
+                    { defaultInterval: next },
                     { toastLabel: "Default interval saved" }
-                  )
-                }
+                  );
+                }}
               >
                 <OsSelectTrigger>
                   <SelectValue />
                 </OsSelectTrigger>
                 <SelectContent>
-                  {Object.entries(INTERVAL_LABELS).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>
-                      {label}
-                    </SelectItem>
-                  ))}
+                  <IntervalSelectItems plan={plan} />
                 </SelectContent>
               </Select>
+              <IntervalUpgradeHint plan={plan} />
             </div>
             <div>
               <OsFieldLabel>Default monitoring mode</OsFieldLabel>
@@ -754,14 +773,9 @@ export default function SettingsPage() {
                   <SelectValue />
                 </OsSelectTrigger>
                 <SelectContent>
-                  {Object.entries(MODE_LABELS)
-                    .filter(
-                      ([value]) =>
-                        value !== "PRODUCT_AVAILABILITY" && value !== "JOB_LISTINGS"
-                    )
-                    .map(([value, label]) => (
-                      <SelectItem key={value} value={value}>
-                        {label}
+                  {MONITORING_MODES.filter((mode) => mode.selectable !== false).map((mode) => (
+                      <SelectItem key={mode.mode} value={mode.mode}>
+                        {mode.label}
                       </SelectItem>
                     ))}
                 </SelectContent>

@@ -509,6 +509,18 @@ async function analyzeChangeRecord(change: ChangeWithMonitor): Promise<void> {
     old_value: analysis.old_value ?? null,
     new_value: analysis.new_value ?? null,
     emoji: analysis.emoji,
+    where: analysis.where,
+    whyItMatters: analysis.whyItMatters,
+    riskLevel: analysis.riskLevel,
+    possibleReason: analysis.possibleReason,
+    sectionsAdded: analysis.sectionsAdded,
+    sectionsRemoved: analysis.sectionsRemoved,
+    visualDifferences: analysis.visualDifferences,
+    structureDifferences: analysis.structureDifferences,
+    linksChanged: analysis.linksChanged,
+    buttonsChanged: analysis.buttonsChanged,
+    textChanged: analysis.textChanged,
+    metadataChanged: analysis.metadataChanged,
     ...(upgradePreview
       ? {
           upgradePreview: true,
@@ -647,11 +659,14 @@ async function sendNotifications(
     Boolean(monitor.user.email?.trim()) &&
     (monitor.notificationMethod === NotificationMethod.EMAIL ||
       monitor.notificationMethod === NotificationMethod.BOTH);
-  // If Telegram is connected + enabled, always send alerts (even when monitor defaults to EMAIL).
+  const telegramAllowed = getUserPlanEntitlements(monitor.user).telegram;
   const wantsTelegram =
+    telegramAllowed &&
     Boolean(monitor.user.telegramChatId) &&
     monitor.user.telegramConnected === true &&
-    monitor.user.telegramNotificationsEnabled !== false;
+    monitor.user.telegramNotificationsEnabled !== false &&
+    (monitor.notificationMethod === NotificationMethod.TELEGRAM ||
+      monitor.notificationMethod === NotificationMethod.BOTH);
 
   if (
     (monitor.notificationMethod === NotificationMethod.EMAIL ||

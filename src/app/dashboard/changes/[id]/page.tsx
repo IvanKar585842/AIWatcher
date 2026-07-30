@@ -33,6 +33,18 @@ interface ChangeDetail {
   categoryLabel?: string | null;
   potentialImpact?: string | null;
   recommendedAction?: string | null;
+  where?: string | null;
+  whyItMatters?: string | null;
+  riskLevel?: string | null;
+  possibleReason?: string | null;
+  sectionsAdded?: string[];
+  sectionsRemoved?: string[];
+  visualDifferences?: string[];
+  structureDifferences?: string[];
+  linksChanged?: string[];
+  buttonsChanged?: string[];
+  textChanged?: string[];
+  metadataChanged?: string[];
   oldValue: string | null;
   newValue: string | null;
   bulletPoints: string[];
@@ -212,6 +224,18 @@ export default function ChangeDetailPage({
             categoryLabel={categoryLabel}
             potentialImpact={change.potentialImpact}
             recommendedAction={change.recommendedAction}
+            where={change.where}
+            whyItMatters={change.whyItMatters}
+            riskLevel={change.riskLevel}
+            possibleReason={change.possibleReason}
+            sectionsAdded={change.sectionsAdded}
+            sectionsRemoved={change.sectionsRemoved}
+            visualDifferences={change.visualDifferences}
+            structureDifferences={change.structureDifferences}
+            linksChanged={change.linksChanged}
+            buttonsChanged={change.buttonsChanged}
+            textChanged={change.textChanged}
+            metadataChanged={change.metadataChanged}
             createdAt={change.createdAt}
             emoji={change.emoji}
           />

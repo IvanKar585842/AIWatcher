@@ -69,6 +69,22 @@ export async function GET(
               typeof meta.potentialImpact === "string" ? meta.potentialImpact : null,
             recommendedAction:
               typeof meta.recommendedAction === "string" ? meta.recommendedAction : null,
+            where: typeof meta.where === "string" ? meta.where : null,
+            whyItMatters:
+              typeof meta.whyItMatters === "string" ? meta.whyItMatters : null,
+            riskLevel: typeof meta.riskLevel === "string" ? meta.riskLevel : null,
+            possibleReason:
+              typeof meta.possibleReason === "string" ? meta.possibleReason : null,
+            sectionsAdded: Array.isArray(meta.sectionsAdded) ? meta.sectionsAdded : [],
+            sectionsRemoved: Array.isArray(meta.sectionsRemoved) ? meta.sectionsRemoved : [],
+            visualDifferences: Array.isArray(meta.visualDifferences) ? meta.visualDifferences : [],
+            structureDifferences: Array.isArray(meta.structureDifferences)
+              ? meta.structureDifferences
+              : [],
+            linksChanged: Array.isArray(meta.linksChanged) ? meta.linksChanged : [],
+            buttonsChanged: Array.isArray(meta.buttonsChanged) ? meta.buttonsChanged : [],
+            textChanged: Array.isArray(meta.textChanged) ? meta.textChanged : [],
+            metadataChanged: Array.isArray(meta.metadataChanged) ? meta.metadataChanged : [],
             upgradePreview: Boolean(meta.upgradePreview),
             upgradeTitle:
               typeof meta.upgradeTitle === "string" ? meta.upgradeTitle : null,

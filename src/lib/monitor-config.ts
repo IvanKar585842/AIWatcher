@@ -208,8 +208,8 @@ export interface ModeDefinition {
 
 /**
  * Engine modes available in product UX.
- * Marketplace / private-page oriented modes stay in the enum for existing monitors
- * but are not selectable for new setups.
+ * Modes that depend on private sessions or marketplace-style extraction stay in
+ * the enum only for legacy records; new monitors target public websites.
  */
 export const MONITORING_MODES: ModeDefinition[] = [
   {
@@ -248,11 +248,10 @@ export const MONITORING_MODES: ModeDefinition[] = [
   },
   {
     mode: "PRICE_DETECTION",
-    label: "Pricing Page Monitoring",
-    description: "Track price and plan wording on public company pricing pages.",
-    tooltip: "For SaaS / company plan pages — not Amazon, eBay, or other marketplaces.",
+    label: "Price Monitoring",
+    description: "Legacy price extraction mode.",
     icon: Target,
-    primary: true,
+    selectable: false,
   },
   {
     mode: "DOCUMENTATION_CHANGES",
@@ -342,6 +341,11 @@ export const PRIMARY_MONITORING_MODES = CREATE_MONITORING_MODES;
 export const ADVANCED_MONITORING_MODES = MONITORING_MODES.filter(
   (m) => !m.primary && m.selectable !== false
 );
+
+/** True only for modes WatchFlowing supports for new public-page monitors. */
+export function isModeSelectableForCreate(mode: MonitoringMode): boolean {
+  return MONITORING_MODES.some((definition) => definition.mode === mode && definition.selectable !== false);
+}
 
 /** Modes shown in settings pickers, plus current mode if legacy */
 export function getSelectableMonitoringModes(

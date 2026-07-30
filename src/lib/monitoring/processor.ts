@@ -10,7 +10,7 @@ import { INTERVAL_MINUTES, intervalToMs, resolveEffectiveInterval } from "@/lib/
 import { prisma } from "@/lib/db";
 import { parseMonitorConfig } from "@/lib/monitor-config";
 import { processPendingAnalyses, analyzeChangeById } from "./ai-processor";
-import { isAdminUser } from "@/lib/admin";
+import { getEffectivePlan, isAdminUser } from "@/lib/admin";
 import { getPlanEntitlements } from "@/lib/plan-features";
 import { compareSnapshots } from "./compare";
 import { generateTextDiff } from "./diff";
@@ -25,6 +25,10 @@ import {
 } from "./lock";
 import { classifyMonitoringError, serializeMonitorError } from "./error-messages";
 import { monitorLog, monitorLogError } from "./logger";
+import {
+  createMonitorErrorAlert,
+  resolveMonitorErrorAlerts,
+} from "@/lib/notifications/deliver";
 import { invalidateUserMonitoringContext } from "@/lib/ai/chat-user-context";
 import {
   claimDueMonitors,
@@ -83,6 +87,7 @@ async function updateMonitorChecked(
       ...extra,
     },
   });
+  await resolveMonitorErrorAlerts(monitorId);
   await syncMonitorQueue(monitorId, nextCheckAt);
 }
 
@@ -199,7 +204,7 @@ async function processMonitorInternal(monitorId: string): Promise<ProcessMonitor
     },
   });
 
-  const plan = monitor.user.subscription?.plan ?? Plan.FREE;
+  const plan = getEffectivePlan(monitor.user);
   const effectiveInterval = resolveEffectiveInterval(plan, monitor.interval);
   const config = parseMonitorConfig(monitor.config);
   const maxRetries = config.retryAttempts ?? DEFAULT_MAX_RETRIES;
@@ -548,6 +553,9 @@ async function processMonitorInternal(monitorId: string): Promise<ProcessMonitor
       classified.technical ??
       (error instanceof Error ? error.message : "Unknown error");
     const errorCount = monitor.errorCount + 1;
+    // This processor only runs active monitors, so reaching the threshold is
+    // the transition into ERROR.
+    const becameErrored = errorCount >= maxRetries;
     const isTemporary =
       classified.kind === "TEMPORARILY_UNAVAILABLE" ||
       classified.kind === "TIMEOUT" ||
@@ -593,6 +601,23 @@ async function processMonitorInternal(monitorId: string): Promise<ProcessMonitor
         ...sessionPatch,
       },
     });
+
+    if (errorCount === 1 || becameErrored) {
+      await createMonitorErrorAlert({
+        userId: monitor.userId,
+        monitorId: monitor.id,
+        error: classified,
+        errorCount,
+        becameErrored,
+      }).catch((alertError) => {
+        monitorLogError(
+          "error",
+          "Could not create in-app monitor error alert",
+          alertError,
+          { monitorId: monitor.id }
+        );
+      });
+    }
 
     await releaseMonitorQueue(monitor.id, retryAt, true);
 
@@ -687,8 +712,8 @@ export async function processDueMonitors(batchSize = 10): Promise<number> {
   });
 
   const sorted = dueMonitors.sort((a, b) => {
-    const aPriority = a.user.subscription?.plan === Plan.BUSINESS ? 0 : 1;
-    const bPriority = b.user.subscription?.plan === Plan.BUSINESS ? 0 : 1;
+    const aPriority = getEffectivePlan(a.user) === Plan.BUSINESS ? 0 : 1;
+    const bPriority = getEffectivePlan(b.user) === Plan.BUSINESS ? 0 : 1;
     if (aPriority !== bPriority) return aPriority - bPriority;
     return (a.nextCheckAt?.getTime() ?? 0) - (b.nextCheckAt?.getTime() ?? 0);
   });

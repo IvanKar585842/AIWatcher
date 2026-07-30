@@ -9,11 +9,11 @@ const FAQS = [
   },
   {
     q: "Can I monitor competitor websites?",
-    a: "Yes — public competitor pages such as documentation, careers, blogs, announcements, features, and company pricing pages. Marketplace product pages (Amazon, eBay, and similar) are not a reliable use case.",
+    a: "Yes — public competitor pages such as documentation, careers, blogs, announcements, features, and company plans pages. Marketplace product pages (Amazon, eBay, and similar) are not a reliable use case.",
   },
   {
     q: "What can this website monitoring tool watch?",
-    a: "Entire pages, text changes, CSS/XPath sections, documentation, job listings, keywords, tables, public pricing pages, and AI Smart Mode where you describe what matters in plain language.",
+    a: "Entire pages, text changes, CSS/XPath sections, documentation, keywords, tables, public APIs and feeds, plus AI Smart Mode where you describe what matters in plain language.",
   },
   {
     q: "How does noise filtering work?",
@@ -21,7 +21,7 @@ const FAQS = [
   },
   {
     q: "How fast can it check pages?",
-    a: "Free: every 24 hours. Pro: as often as every 30 minutes. Business: as often as every 1 minute — ideal for docs, news, and public announcements where timing matters.",
+    a: "Free: every 12 or 24 hours. Pro: as often as every 30 minutes. Business: as often as every 1 minute — ideal for docs, news, and public announcements where timing matters.",
   },
 ];
 

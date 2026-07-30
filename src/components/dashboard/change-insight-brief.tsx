@@ -17,6 +17,18 @@ export interface ChangeInsightData {
   categoryLabel?: string | null;
   potentialImpact?: string | null;
   recommendedAction?: string | null;
+  where?: string | null;
+  whyItMatters?: string | null;
+  riskLevel?: string | null;
+  possibleReason?: string | null;
+  sectionsAdded?: string[];
+  sectionsRemoved?: string[];
+  visualDifferences?: string[];
+  structureDifferences?: string[];
+  linksChanged?: string[];
+  buttonsChanged?: string[];
+  textChanged?: string[];
+  metadataChanged?: string[];
   createdAt: string;
   emoji?: string;
   compact?: boolean;
@@ -40,6 +52,18 @@ export function ChangeInsightBrief({
   categoryLabel,
   potentialImpact,
   recommendedAction,
+  where,
+  whyItMatters,
+  riskLevel,
+  possibleReason,
+  sectionsAdded = [],
+  sectionsRemoved = [],
+  visualDifferences = [],
+  structureDifferences = [],
+  linksChanged = [],
+  buttonsChanged = [],
+  textChanged = [],
+  metadataChanged = [],
   createdAt,
   emoji,
   compact = false,
@@ -123,6 +147,77 @@ export function ChangeInsightBrief({
           </div>
         )}
       </div>
+
+      {(where || whyItMatters || riskLevel || possibleReason) && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <SectionLabel>Where</SectionLabel>
+            <p className={cn("mt-2 leading-relaxed text-zinc-300", compact ? "text-xs" : "text-sm")}>
+              {where || "Not reliably identified"}
+            </p>
+          </div>
+          <div>
+            <SectionLabel>Risk level</SectionLabel>
+            <p className={cn("mt-2 font-medium", compact ? "text-xs" : "text-sm")}>
+              <span className={riskLevel === "CRITICAL" || riskLevel === "HIGH" ? "text-amber-300" : "text-zinc-200"}>
+                {riskLevel || "Not assessed"}
+              </span>
+            </p>
+          </div>
+          {whyItMatters && (
+            <div>
+              <SectionLabel>Why it matters</SectionLabel>
+              <p className={cn("mt-2 leading-relaxed text-zinc-300", compact ? "text-xs" : "text-sm")}>
+                {whyItMatters}
+              </p>
+            </div>
+          )}
+          {possibleReason && (
+            <div>
+              <SectionLabel>Possible reason</SectionLabel>
+              <p className={cn("mt-2 leading-relaxed text-zinc-400", compact ? "text-xs" : "text-sm")}>
+                {possibleReason}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {[
+        ["Sections added", sectionsAdded],
+        ["Sections removed", sectionsRemoved],
+        ["Visual differences", visualDifferences],
+        ["Structure differences", structureDifferences],
+        ["Links changed", linksChanged],
+        ["Buttons changed", buttonsChanged],
+        ["Text changed", textChanged],
+        ["Metadata changed", metadataChanged],
+      ].filter(([, items]) => items.length > 0).length > 0 && (
+        <div>
+          <SectionLabel>Detailed findings</SectionLabel>
+          <div className="mt-2.5 grid gap-3 sm:grid-cols-2">
+            {[
+              ["Sections added", sectionsAdded],
+              ["Sections removed", sectionsRemoved],
+              ["Visual differences", visualDifferences],
+              ["Structure differences", structureDifferences],
+              ["Links changed", linksChanged],
+              ["Buttons changed", buttonsChanged],
+              ["Text changed", textChanged],
+              ["Metadata changed", metadataChanged],
+            ].map(([label, items]) =>
+              (items as string[]).length > 0 ? (
+                <div key={label as string} className="rounded-lg border border-white/[0.06] bg-black/20 p-3">
+                  <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-500">{label as string}</p>
+                  <ul className="mt-1.5 space-y-1 text-xs leading-relaxed text-zinc-400">
+                    {(items as string[]).map((item) => <li key={item}>• {item}</li>)}
+                  </ul>
+                </div>
+              ) : null
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
