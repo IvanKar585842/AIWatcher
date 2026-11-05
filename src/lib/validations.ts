@@ -34,6 +34,23 @@ export const monitorConfigSchema = z.object({
   scrollDepthPx: z.number().int().min(0).max(12000).optional(),
   waitForSelector: z.string().max(500).optional().nullable(),
   expandSelectors: z.string().max(2000).optional(),
+  sourceType: z
+    .enum([
+      "product",
+      "marketplace_search",
+      "marketplace_category",
+      "news_feed",
+      "news_search",
+      "news_article",
+      "release",
+      "changelog",
+      "webpage",
+    ])
+    .optional(),
+  watchScope: z.enum(["page", "section", "keyword", "links", "structured", "images", "numbers", "tables", "files"]).optional(),
+  visualMonitoring: z.boolean().optional(),
+  compareAssetContent: z.boolean().optional(),
+  visualIgnore: z.enum(["none", "top", "bottom"]).optional(),
 });
 
 const monitorBaseSchema = z.object({

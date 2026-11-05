@@ -176,6 +176,11 @@ export function cleanHtml(html: string, options: CleanOptions = {}): string {
 
   cleaned = stripTrackingParamsFromUrls(cleaned);
 
+  cleaned = cleaned.replace(
+    /<[^>]*(?:id|class)=["'][^"']*(?:adsbygoogle|sponsored|recommendation|related-products)[^"']*["'][^>]*>[\s\S]{0,2500}?<\/[a-z0-9]+>/gi,
+    ""
+  );
+
   if (ignoreTimestamps || ignoreDynamicContent) {
     for (const pattern of DYNAMIC_PATTERNS) {
       cleaned = cleaned.replace(pattern, "[TIMESTAMP]");

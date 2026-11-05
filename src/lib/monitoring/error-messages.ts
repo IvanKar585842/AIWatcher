@@ -15,6 +15,10 @@ export type MonitoringErrorKind =
   | "SELECTOR_MISSING"
   | "ROBOTS_BLOCKED"
   | "SESSION_EXPIRED"
+  | "PARTIAL"
+  | "AUTH_REQUIRED"
+  | "QUOTA_EXCEEDED"
+  | "UNSUPPORTED"
   | "UNKNOWN";
 
 export type MonitoringErrorTone = "red" | "amber" | "zinc" | "emerald";
@@ -134,6 +138,50 @@ const KIND_COPY: Record<
     tone: "amber",
     icon: "clock",
   },
+  PARTIAL: {
+    title: "The check returned incomplete content.",
+    description:
+      "The page loaded, but the expected price, availability, selector, or body content was missing. The previous snapshot was kept.",
+    suggestions: [
+      "Confirm the page still shows the content you monitor",
+      "Update the selector if the layout changed",
+      "Retry after the site finishes loading",
+    ],
+    statusLabel: "Partial result",
+    tone: "amber",
+    icon: "alert",
+  },
+  AUTH_REQUIRED: {
+    title: "Marketplace API credentials are required.",
+    description:
+      "This marketplace is not opened in a browser. Add the official API credentials on the server to monitor it.",
+    suggestions: [
+      "Set the marketplace credentials in the server environment",
+      "Use a public page or RSS feed for sites without an API",
+      "Confirm the partner tag belongs to this marketplace",
+    ],
+    statusLabel: "Credentials required",
+    tone: "amber",
+    icon: "shield",
+  },
+  QUOTA_EXCEEDED: {
+    title: "The marketplace API quota was reached.",
+    description:
+      "The check stopped instead of retrying without a limit. The previous snapshot was kept.",
+    suggestions: ["Wait for the quota window to reset", "Reduce how many searches run at once"],
+    statusLabel: "Quota exceeded",
+    tone: "amber",
+    icon: "clock",
+  },
+  UNSUPPORTED: {
+    title: "This marketplace page is not supported.",
+    description:
+      "Use a product URL or a search URL that the official API can resolve. The page was not opened in a browser.",
+    suggestions: ["Paste a product URL with a stable id", "Paste a keyword search URL"],
+    statusLabel: "Unsupported",
+    tone: "amber",
+    icon: "alert",
+  },
   WARNING: {
     title: "Check completed with a warning",
     description: "The check finished, but something needs your attention.",
@@ -235,6 +283,26 @@ export function classifyMonitoringError(raw: unknown): MonitoringErrorInfo {
   const http = extractHttpStatus(message);
 
   if (
+    lower.includes("awaiting credentials") ||
+    lower.includes("authentication failed") ||
+    lower.includes("credentials are not configured")
+  ) {
+    return fromKind("AUTH_REQUIRED", message);
+  }
+
+  if (lower.includes("quota exceeded") || lower.includes("call budget")) {
+    return fromKind("QUOTA_EXCEEDED", message);
+  }
+
+  if (
+    lower.includes("not fetched with a browser") ||
+    lower.includes("not mapped") ||
+    lower.includes("not expanded")
+  ) {
+    return fromKind("UNSUPPORTED", message);
+  }
+
+  if (
     lower.includes("robots.txt") ||
     lower.includes("access denied by robots")
   ) {
@@ -248,6 +316,16 @@ export function classifyMonitoringError(raw: unknown): MonitoringErrorInfo {
     lower.includes("xpath is required")
   ) {
     return fromKind("SELECTOR_MISSING", message);
+  }
+
+  if (
+    lower.includes("partial extraction") ||
+    lower.includes("incomplete page") ||
+    lower.includes("price was not found") ||
+    lower.includes("availability was not found") ||
+    lower.includes("screenshot was not captured")
+  ) {
+    return fromKind("PARTIAL", message);
   }
 
   if (

@@ -3,7 +3,39 @@ import { Plan } from "@prisma/client";
 import { ensureAdminPrivileges, isAdminEmail } from "@/lib/admin";
 import { trackEvent } from "@/lib/analytics";
 import { prisma } from "@/lib/db";
+import { isClerkConfigured, isLocalDevSession } from "@/lib/clerk-config";
 import { UnauthorizedError } from "@/lib/errors";
+
+const LOCAL_DEV_CLERK_ID = "local-dev";
+const LOCAL_DEV_EMAIL = "local-dev@watchflowing.localhost";
+
+/** One operator row so the dashboard APIs work before Clerk keys exist. */
+async function getOrCreateLocalDevUser() {
+  const existing = await prisma.user.findUnique({
+    where: { clerkId: LOCAL_DEV_CLERK_ID },
+    include: { subscription: true },
+  });
+  if (existing) return existing;
+
+  try {
+    return await prisma.user.create({
+      data: {
+        clerkId: LOCAL_DEV_CLERK_ID,
+        email: LOCAL_DEV_EMAIL,
+        name: "Local operator",
+        onboardingCompleted: true,
+        productTourCompleted: true,
+        subscription: { create: { plan: Plan.FREE, status: "active" } },
+      },
+      include: { subscription: true },
+    });
+  } catch {
+    return prisma.user.findUniqueOrThrow({
+      where: { clerkId: LOCAL_DEV_CLERK_ID },
+      include: { subscription: true },
+    });
+  }
+}
 
 /**
  * Hot path for authenticated API/dashboard:
@@ -12,10 +44,10 @@ import { UnauthorizedError } from "@/lib/errors";
  * Avoids previous: currentUser + upsert + findUniqueOrThrow on every request.
  */
 export async function getOrCreateUser() {
-  const clerkConfigured =
-    Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim()) &&
-    !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY!.includes("placeholder");
-  if (!clerkConfigured) return null;
+  if (!isClerkConfigured()) {
+    if (!isLocalDevSession()) return null;
+    return getOrCreateLocalDevUser();
+  }
 
   const { userId } = await auth();
   if (!userId) return null;

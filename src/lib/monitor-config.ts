@@ -66,6 +66,28 @@ export interface MonitorConfig {
   sessionExpiresAt?: string | null;
   /** Write-only flag to wipe stored session cookies. */
   clearSession?: boolean;
+  /**
+   * auto: HTTP first, browser only when the page needs JavaScript.
+   * http / dynamic / advanced force a strategy.
+   */
+  fetchStrategy?: "auto" | "http" | "dynamic" | "advanced";
+  /** Comma-separated CSS selectors for links that should be fetched with the page. */
+  followLinkSelectors?: string;
+  /** How this URL should be interpreted. Ordinary pages stay on Scrapling. */
+  sourceType?:
+    | "product"
+    | "marketplace_search"
+    | "marketplace_category"
+    | "news_feed"
+    | "news_search"
+    | "news_article"
+    | "release"
+    | "changelog"
+    | "webpage";
+  watchScope?: "page" | "section" | "keyword" | "links" | "structured" | "images" | "numbers" | "tables" | "files";
+  visualMonitoring?: boolean;
+  compareAssetContent?: boolean;
+  visualIgnore?: "none" | "top" | "bottom";
 }
 
 export const DEFAULT_MONITOR_CONFIG: Required<
@@ -81,6 +103,13 @@ export const DEFAULT_MONITOR_CONFIG: Required<
     | "sessionStatus"
     | "sessionExpiresAt"
     | "clearSession"
+    | "fetchStrategy"
+    | "followLinkSelectors"
+    | "sourceType"
+    | "watchScope"
+    | "visualMonitoring"
+    | "compareAssetContent"
+    | "visualIgnore"
   >
 > & { ignoreSelectors: string; expandSelectors: string } = {
   retryAttempts: 3,

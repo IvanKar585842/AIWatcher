@@ -43,6 +43,13 @@ playwright-report/
 test-results/
 .playwright/
 
+# Scrapling runtime (created by npm run scrapling:install)
+python/.venv/
+.scrapling-storage/
+
+# Local embedded Postgres
+data/postgres/
+
 # TypeScript
 next-env.d.ts
 *.tsbuildinfo

@@ -22,7 +22,7 @@ AI-powered web monitoring SaaS. Monitor any webpage and get intelligent explanat
 | Auth | Clerk |
 | Payments | Stripe |
 | Email | Resend |
-| Monitoring | Playwright |
+| Monitoring | Scrapling (HTTP + Chromium) with Playwright fallback |
 | Scheduling | Trigger.dev |
 | AI | OpenAI / Claude / Gemini |
 
@@ -47,8 +47,16 @@ cp .env.example .env.local
 # Set up database
 npx prisma db push
 
-# Install Playwright browsers
+# Install Playwright's Chromium (serverless fallback) and Scrapling
 npx playwright install chromium
+npm run scrapling:install
+
+# Marketplace APIs are optional. Without them, Amazon, eBay, and Etsy checks fail
+# with a credentials error and are not opened in a browser.
+# Shopify stores use their public products.json catalog.
+# News feeds, Atom, and news sitemaps are monitored as feeds.
+# AliExpress, Temu, Walmart, Kaufland, Allegro, Otto, and MediaMarkt are not supported.
+# See .env.example for AMAZON_CREATORS_*, EBAY_*, and ETSY_API_KEY.
 
 # Start development server
 npm run dev

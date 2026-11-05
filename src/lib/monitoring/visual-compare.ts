@@ -12,6 +12,60 @@ export const VISUAL_CHANGE_THRESHOLD_PERCENT = 2.5;
 
 export type VisualFingerprint = number[]; // 0-255 averages, length = GRID_SIZE^2
 
+export interface VisualRegionDiff {
+  name: string;
+  percent: number;
+}
+
+/**
+ * Splits the global 48x48 fingerprint into a 3x4 grid.
+ * This locates a change on the screenshot. It does not identify DOM elements.
+ */
+export function compareVisualRegions(
+  previous: VisualFingerprint | null | undefined,
+  current: VisualFingerprint | null | undefined,
+  ignore: Array<"top" | "bottom"> = []
+): { percent: number; changed: boolean; regions: VisualRegionDiff[] } {
+  const overall = compareVisualFingerprints(previous, current);
+  if (!previous?.length || !current?.length || previous.length !== current.length) {
+    return { ...overall, regions: [] };
+  }
+  const cols = 3;
+  const rows = 4;
+  const cellW = VISUAL_GRID_SIZE / cols;
+  const cellH = VISUAL_GRID_SIZE / rows;
+  const names = ["top-left", "top-center", "top-right", "upper-left", "upper-center", "upper-right", "lower-left", "lower-center", "lower-right", "bottom-left", "bottom-center", "bottom-right"];
+  const regions: VisualRegionDiff[] = [];
+  let considered = 0;
+  let diffSum = 0;
+  for (let row = 0; row < rows; row++) {
+    if (ignore.includes("top") && row === 0) continue;
+    if (ignore.includes("bottom") && row === rows - 1) continue;
+    for (let col = 0; col < cols; col++) {
+      let local = 0;
+      let count = 0;
+      for (let y = row * cellH; y < (row + 1) * cellH; y++) {
+        for (let x = col * cellW; x < (col + 1) * cellW; x++) {
+          const index = y * VISUAL_GRID_SIZE + x;
+          local += Math.abs(previous[index] - current[index]);
+          count += 1;
+        }
+      }
+      const percent = (local / (count * 255)) * 100;
+      regions.push({ name: names[row * cols + col] ?? `region-${row}-${col}`, percent: Math.round(percent * 100) / 100 });
+      diffSum += local;
+      considered += count;
+    }
+  }
+  const percent = considered ? (diffSum / (considered * 255)) * 100 : overall.percent;
+  const hot = regions.filter((region) => region.percent >= 8);
+  return {
+    percent: Math.round(percent * 100) / 100,
+    changed: percent >= VISUAL_CHANGE_THRESHOLD_PERCENT && hot.length > 0,
+    regions: hot,
+  };
+}
+
 export function compareVisualFingerprints(
   previous: VisualFingerprint | null | undefined,
   current: VisualFingerprint | null | undefined

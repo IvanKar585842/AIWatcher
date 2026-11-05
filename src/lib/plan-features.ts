@@ -38,6 +38,10 @@ export type PlanEntitlements = {
   storageMb: number | null;
   maxVisualMonitors: number;
   teamMembers: number;
+  /** Official marketplace API calls allowed inside one monitor check. */
+  marketplaceApiCallsPerCheck: number;
+  /** Listings kept from one marketplace search. */
+  marketplaceSearchItems: number;
   /** Legacy boolean mirrors used across the app */
   telegram: boolean;
   aiSummaries: boolean;
@@ -62,6 +66,8 @@ export const PLAN_ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     storageMb: 50,
     maxVisualMonitors: 0,
     teamMembers: 1,
+    marketplaceApiCallsPerCheck: 3,
+    marketplaceSearchItems: 10,
     telegram: false,
     aiSummaries: false,
     teams: false,
@@ -96,6 +102,8 @@ export const PLAN_ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     storageMb: 5000,
     maxVisualMonitors: 25,
     teamMembers: 1,
+    marketplaceApiCallsPerCheck: 4,
+    marketplaceSearchItems: 20,
     telegram: true,
     aiSummaries: true,
     teams: false,
@@ -130,6 +138,8 @@ export const PLAN_ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     storageMb: null,
     maxVisualMonitors: Infinity,
     teamMembers: 25,
+    marketplaceApiCallsPerCheck: 6,
+    marketplaceSearchItems: 30,
     telegram: true,
     aiSummaries: true,
     teams: true,

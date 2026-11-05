@@ -1,7 +1,9 @@
 import { processDueMonitors, runMonitoringEngine } from "@/lib/monitoring/processor";
 import { monitorLog } from "@/lib/monitoring/logger";
+import { shouldContinueCron } from "@/lib/monitoring/scheduler";
 
 export async function runMonitoringCycle() {
+  const startedAt = Date.now();
   monitorLog({
     step: "scheduler_started",
     message: "Cron monitoring cycle started",
@@ -16,7 +18,14 @@ export async function runMonitoringCycle() {
     batchMonitors = result.monitorsProcessed;
     totalMonitors += result.monitorsProcessed;
     analysesProcessed += result.analysesProcessed;
-  } while (batchMonitors > 0 && totalMonitors < 100);
+  } while (
+    shouldContinueCron({
+      startedAt,
+      now: Date.now(),
+      processed: totalMonitors,
+      lastBatchSucceeded: batchMonitors,
+    })
+  );
 
   monitorLog({
     step: "scheduler_started",

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Menu } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
+import { isClerkConfigured } from "@/lib/clerk-config";
 import { DashboardUserButton } from "@/components/auth/clerk-wrappers";
 import { useGreeting } from "@/hooks/use-client-time";
 import { NotificationDropdown } from "./notification-dropdown";
@@ -33,11 +34,20 @@ function LiveClock() {
 }
 
 export function CommandTopbar() {
+  if (!isClerkConfigured()) return <CommandTopbarView firstName="Operator" />;
+  return <CommandTopbarClerk />;
+}
+
+function CommandTopbarClerk() {
   const { user } = useUser();
+  return <CommandTopbarView firstName={user?.firstName ?? user?.username ?? "Operator"} />;
+}
+
+function CommandTopbarView({ firstName }: { firstName: string }) {
   const { setMobileOpen } = useCommand();
   const greeting = useGreeting();
 
-  const name = user?.firstName ?? user?.username ?? "Operator";
+  const name = firstName;
 
   return (
     <header className="command-topbar sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-white/[0.06] bg-[#090909]/80 px-3 backdrop-blur-xl sm:h-16 sm:gap-4 sm:px-4 lg:px-6">

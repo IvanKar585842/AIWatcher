@@ -4,20 +4,40 @@ import { prisma } from "@/lib/db";
 const LOCK_STALE_MS = 5 * 60 * 1000;
 const WORKER_ID = `worker-${randomUUID().slice(0, 8)}`;
 
+/** Fields safe to write while another worker may hold the row. */
+export function queueReconcileData(scheduledAt: Date): { scheduledAt: Date } {
+  return { scheduledAt };
+}
+
 export async function syncMonitorQueue(monitorId: string, scheduledAt: Date): Promise<void> {
   try {
     await prisma.monitorQueue.upsert({
       where: { monitorId },
       create: { monitorId, scheduledAt },
-      update: {
-        scheduledAt,
-        attempts: 0,
-        lockedAt: null,
-        lockedBy: null,
-      },
+      update: queueReconcileData(scheduledAt),
     });
   } catch {
     // MonitorQueue table may not exist yet — fall back to nextCheckAt polling
+  }
+}
+
+/** Clear a lock without moving the schedule. Used for duplicates and paused rows. */
+export async function unlockMonitorQueue(monitorId: string): Promise<void> {
+  try {
+    await prisma.monitorQueue.updateMany({
+      where: { monitorId },
+      data: { lockedAt: null, lockedBy: null },
+    });
+  } catch {
+    // queue optional
+  }
+}
+
+export async function dropMonitorQueue(monitorId: string): Promise<void> {
+  try {
+    await prisma.monitorQueue.deleteMany({ where: { monitorId } });
+  } catch {
+    // queue optional
   }
 }
 

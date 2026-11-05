@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { UserProfile, useUser } from "@clerk/nextjs";
+import { isClerkConfigured } from "@/lib/clerk-config";
 import {
   Activity,
   Bell,
@@ -105,8 +106,24 @@ const AgencyBadgeSettings = dynamic(
  */
 const SHOW_UNWIRED_PREFERENCE_UI = false;
 
+type ClerkAccount = {
+  fullName?: string | null;
+  firstName?: string | null;
+  primaryEmailAddress?: { emailAddress?: string } | null;
+} | null;
+
 export default function SettingsPage() {
+  if (!isClerkConfigured()) return <SettingsScreen clerkUser={null} />;
+  return <SettingsScreenWithClerk />;
+}
+
+function SettingsScreenWithClerk() {
   const { user } = useUser();
+  return <SettingsScreen clerkUser={user ?? null} />;
+}
+
+function SettingsScreen({ clerkUser }: { clerkUser: ClerkAccount }) {
+  const user = clerkUser;
   const { toast } = useToast();
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_USER_SETTINGS);
   const [telegram, setTelegram] = useState<{
@@ -532,13 +549,13 @@ export default function SettingsPage() {
             <div>
               <OsFieldLabel>Display name</OsFieldLabel>
               <p className="rounded-lg border border-white/[0.06] bg-black/30 px-3 py-2 text-sm text-zinc-300">
-                {user?.fullName ?? user?.firstName ?? "—"}
+                {user?.fullName ?? user?.firstName ?? (isClerkConfigured() ? "—" : "Local operator")}
               </p>
             </div>
             <div>
               <OsFieldLabel>Email</OsFieldLabel>
               <p className="rounded-lg border border-white/[0.06] bg-black/30 px-3 py-2 text-sm text-zinc-300">
-                {user?.primaryEmailAddress?.emailAddress ?? "—"}
+                {user?.primaryEmailAddress?.emailAddress ?? telegram?.email ?? "—"}
               </p>
             </div>
             <p className="text-xs text-zinc-500">
@@ -1126,7 +1143,13 @@ export default function SettingsPage() {
             >
               {showAccountPanel ? "Hide account manager" : "Manage account"}
             </Button>
-            {showAccountPanel && (
+            {showAccountPanel && !isClerkConfigured() && (
+              <p className="text-sm text-zinc-500">
+                Account manager appears after Clerk keys are added. Monitoring still works in this
+                local session.
+              </p>
+            )}
+            {showAccountPanel && isClerkConfigured() && (
               <div className="mt-2 overflow-hidden rounded-xl border border-white/[0.06]">
                 <UserProfile
                   appearance={{

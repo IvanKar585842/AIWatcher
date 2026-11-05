@@ -150,6 +150,8 @@ export async function handleTelegramUpdate(update: TelegramUpdate) {
         return;
       }
       await prisma.monitor.delete({ where: { id: monitorId } });
+      const { dropMonitorQueue } = await import("@/lib/monitoring/queue");
+      await dropMonitorQueue(monitorId);
       await sendTelegramMessage(chatId, "🗑️ Monitor deleted.");
       break;
     }

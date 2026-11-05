@@ -12,6 +12,7 @@ import { parseMonitorConfig } from "@/lib/monitor-config";
 import { processPendingAnalyses, analyzeChangeById } from "./ai-processor";
 import { getEffectivePlan, isAdminUser } from "@/lib/admin";
 import { getPlanEntitlements } from "@/lib/plan-features";
+import { captureAssets, urlsForAssetCheck } from "./asset-content";
 import { compareSnapshots } from "./compare";
 import { generateTextDiff } from "./diff";
 import { closeBrowser, fetchPageContent } from "./fetcher";
@@ -32,10 +33,13 @@ import {
 import { invalidateUserMonitoringContext } from "@/lib/ai/chat-user-context";
 import {
   claimDueMonitors,
+  dropMonitorQueue,
   releaseMonitorQueue,
   syncAllDueMonitorsToQueue,
   syncMonitorQueue,
+  unlockMonitorQueue,
 } from "./queue";
+import { partitionMonitorsByUrl, rememberBrowserStrategy } from "./scheduler";
 import { prepareHtmlForStorage, readSnapshotHtml } from "./snapshot-store";
 
 const DEFAULT_MAX_RETRIES = 3;
@@ -210,8 +214,9 @@ async function processMonitorInternal(monitorId: string): Promise<ProcessMonitor
   const maxRetries = config.retryAttempts ?? DEFAULT_MAX_RETRIES;
   const now = new Date();
 
-  // Honor last successful check — never re-check earlier than the plan/interval allows
-  if (monitor.lastCheckedAt) {
+  // Honor the last successful check. Failed checks keep errorCount > 0 so a
+  // scheduled retry is not postponed for the full interval.
+  if (monitor.errorCount === 0 && monitor.lastCheckedAt) {
     const earliestNext = new Date(
       monitor.lastCheckedAt.getTime() + intervalToMs(effectiveInterval)
     );
@@ -238,6 +243,13 @@ async function processMonitorInternal(monitorId: string): Promise<ProcessMonitor
   }
 
   const nextCheckAt = computeNextCheckAt(effectiveInterval, now);
+  const priorSnapshot = monitor.snapshots[0];
+  const priorMeta =
+    priorSnapshot?.metadata &&
+    typeof priorSnapshot.metadata === "object" &&
+    !Array.isArray(priorSnapshot.metadata)
+      ? (priorSnapshot.metadata as Record<string, unknown>)
+      : null;
 
   try {
     const result = await fetchPageContent({
@@ -260,16 +272,40 @@ async function processMonitorInternal(monitorId: string): Promise<ProcessMonitor
       expandSelectors: config.expandSelectors,
       encryptedSession: config.encryptedSession,
       sessionExpiresAt: config.sessionExpiresAt,
+      fetchStrategy: config.fetchStrategy,
+      followLinkSelectors: config.followLinkSelectors,
+      marketplaceApiCallsPerCheck: getPlanEntitlements(plan).marketplaceApiCallsPerCheck,
+      marketplaceSearchItems: getPlanEntitlements(plan).marketplaceSearchItems,
+      sourceType: config.sourceType,
+      watchScope: config.watchScope,
+      visualMonitoring: Boolean(config.visualMonitoring) && getPlanEntitlements(plan).maxVisualMonitors > 0,
+      preferredStrategy:
+        priorMeta?.requiresBrowser === true &&
+        (priorMeta.fetchStrategy === "dynamic" || priorMeta.fetchStrategy === "advanced")
+          ? priorMeta.fetchStrategy
+          : null,
     });
 
-    if (result.refreshedEncryptedSession && result.refreshedEncryptedSession !== config.encryptedSession) {
+    const remembered = rememberBrowserStrategy(
+      config.fetchStrategy,
+      result.metadata.fetchStrategy
+    );
+    const sessionChanged = Boolean(
+      result.refreshedEncryptedSession && result.refreshedEncryptedSession !== config.encryptedSession
+    );
+    if (remembered || sessionChanged) {
       await prisma.monitor.update({
         where: { id: monitor.id },
         data: {
           config: {
             ...config,
-            encryptedSession: result.refreshedEncryptedSession,
-            sessionStatus: "active",
+            ...(sessionChanged
+              ? {
+                  encryptedSession: result.refreshedEncryptedSession,
+                  sessionStatus: "active",
+                }
+              : {}),
+            ...(remembered ? { fetchStrategy: remembered } : {}),
           } as Prisma.InputJsonValue,
         },
       });
@@ -286,6 +322,28 @@ async function processMonitorInternal(monitorId: string): Promise<ProcessMonitor
         captureType: result.metadata.captureType,
       },
     });
+
+    result.metadata.watchScope = config.watchScope ?? "page";
+    result.metadata.keywords = monitor.keywords;
+    result.metadata.visualIgnore = config.visualIgnore ?? "none";
+    if (config.watchScope === "images" || config.watchScope === "files" || config.compareAssetContent) {
+      const profile = result.metadata.pageProfile as { images?: string[]; links?: string[] } | undefined;
+      const urls = urlsForAssetCheck(profile, monitor.url, config.watchScope === "files");
+      const assets = await captureAssets(urls, { referer: monitor.url });
+      result.metadata.assets = assets;
+      const blocked = assets.find((asset) => asset.status !== "hashed");
+      if (blocked) {
+        throw new Error(
+          `Partial extraction: ${blocked.kind} at ${blocked.url} was ${blocked.status}. ${blocked.detail ?? "It was not treated as unchanged."}`
+        );
+      }
+    }
+
+    if (result.metadata.checkStatus && result.metadata.checkStatus !== "success") {
+      throw new Error(
+        `Partial extraction: check finished as ${String(result.metadata.checkStatus)}`
+      );
+    }
 
     const previousSnapshot = monitor.snapshots[0];
 
@@ -313,7 +371,16 @@ async function processMonitorInternal(monitorId: string): Promise<ProcessMonitor
       await trackEvent({
         type: "monitor.check",
         userId: monitor.userId,
-        metadata: { monitorId, baseline: true, snapshotId },
+        metadata: {
+          monitorId,
+          baseline: true,
+          snapshotId,
+          engine: result.metadata.engine ?? null,
+          fetchStrategy: result.metadata.fetchStrategy ?? null,
+          browserLaunches: result.metadata.browserLaunches ?? null,
+          marketplaceApiCalls: result.metadata.marketplaceApiCalls ?? null,
+          durationMs: result.metadata.durationMs ?? null,
+        },
       });
 
       return { status: "baseline" };
@@ -364,7 +431,16 @@ async function processMonitorInternal(monitorId: string): Promise<ProcessMonitor
       await trackEvent({
         type: "monitor.check",
         userId: monitor.userId,
-        metadata: { monitorId, changed: false, reason: comparison.reason },
+        metadata: {
+          monitorId,
+          changed: false,
+          reason: comparison.reason,
+          engine: result.metadata.engine ?? null,
+          fetchStrategy: result.metadata.fetchStrategy ?? null,
+          browserLaunches: result.metadata.browserLaunches ?? null,
+          marketplaceApiCalls: result.metadata.marketplaceApiCalls ?? null,
+          durationMs: result.metadata.durationMs ?? null,
+        },
       });
 
       return { status: "no_change", reason: comparison.reason };
@@ -384,7 +460,10 @@ async function processMonitorInternal(monitorId: string): Promise<ProcessMonitor
     });
 
     const visual = isVisualMode(monitor.mode);
-    const structureLines = comparison.structureDiff?.summaryLines ?? [];
+    const structureLines =
+      comparison.summaryLines && comparison.summaryLines.length > 0
+        ? comparison.summaryLines
+        : comparison.structureDiff?.summaryLines ?? [];
     const visualPct = comparison.visualDiffPercent;
 
     const diffHtml = visual
@@ -449,6 +528,8 @@ async function processMonitorInternal(monitorId: string): Promise<ProcessMonitor
           captureType: result.metadata.captureType ?? null,
           visualDiffPercent: visualPct ?? null,
           structureSummary: structureLines,
+          evidence: (comparison.evidence ?? []) as unknown as Prisma.InputJsonValue,
+          adapter: result.metadata.adapter ?? result.metadata.provider ?? result.metadata.engine ?? null,
           previousScreenshot: previousMeta?.screenshotPreview
             ? {
                 mime: previousMeta.screenshotMime ?? "image/jpeg",
@@ -522,7 +603,16 @@ async function processMonitorInternal(monitorId: string): Promise<ProcessMonitor
     await trackEvent({
       type: "monitor.check",
       userId: monitor.userId,
-      metadata: { monitorId, changed: true, changeId: change.id },
+        metadata: {
+          monitorId,
+          changed: true,
+          changeId: change.id,
+          engine: result.metadata.engine ?? null,
+          fetchStrategy: result.metadata.fetchStrategy ?? null,
+          browserLaunches: result.metadata.browserLaunches ?? null,
+          marketplaceApiCalls: result.metadata.marketplaceApiCalls ?? null,
+          durationMs: result.metadata.durationMs ?? null,
+        },
     });
 
     await trackEvent({
@@ -701,6 +791,23 @@ export async function processDueMonitors(batchSize = 10): Promise<number> {
           orderBy: [{ nextCheckAt: "asc" }],
         });
 
+  if (queuedIds.length > 0) {
+    const activeIds = new Set(dueMonitors.map((monitor) => monitor.id));
+    const leftover = queuedIds.filter((id) => !activeIds.has(id));
+    if (leftover.length > 0) {
+      const existing = await prisma.monitor.findMany({
+        where: { id: { in: leftover } },
+        select: { id: true },
+      });
+      const existingIds = new Set(existing.map((monitor) => monitor.id));
+      await Promise.all(
+        leftover.map((id) =>
+          existingIds.has(id) ? unlockMonitorQueue(id) : dropMonitorQueue(id)
+        )
+      );
+    }
+  }
+
   monitorLog({
     step: "scheduler_batch",
     message: "Due monitors loaded",
@@ -719,15 +826,8 @@ export async function processDueMonitors(batchSize = 10): Promise<number> {
   });
 
   const batch = sorted.slice(0, batchSize);
-  const seenUrls = new Set<string>();
-  const toProcess: string[] = [];
-
-  for (const monitor of batch) {
-    // Prevent duplicate URL checks in the same batch (shared landing pages, etc.)
-    if (seenUrls.has(monitor.url)) continue;
-    seenUrls.add(monitor.url);
-    toProcess.push(monitor.id);
-  }
+  const { process: selected, defer } = partitionMonitorsByUrl(batch);
+  const toProcess = selected.map((monitor) => monitor.id);
 
   // Process sequentially in small chunks to avoid launching too many browsers at once
   const chunkSize = Math.min(3, getCheckSlotStatus().max);
@@ -769,6 +869,10 @@ export async function processDueMonitors(batchSize = 10): Promise<number> {
     await closeBrowser();
   } catch (closeError) {
     monitorLogError("error", "Browser close after batch failed (non-fatal)", closeError);
+  }
+
+  if (defer.length > 0) {
+    await Promise.all(defer.map((monitor) => unlockMonitorQueue(monitor.id)));
   }
 
   return succeeded;

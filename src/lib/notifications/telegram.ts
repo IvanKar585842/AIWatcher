@@ -183,3 +183,16 @@ export async function getTelegramBotInfo() {
 export async function getTelegramWebhookInfo() {
   return telegramRequest("getWebhookInfo");
 }
+
+export async function deleteTelegramWebhook() {
+  return telegramRequest("deleteWebhook", { drop_pending_updates: false });
+}
+
+/** Long-poll Bot API. Used by the local worker when no public HTTPS webhook exists. */
+export async function getTelegramUpdates(offset?: number, timeoutSeconds = 20) {
+  return telegramRequest("getUpdates", {
+    timeout: timeoutSeconds,
+    allowed_updates: ["message"],
+    ...(offset != null ? { offset } : {}),
+  });
+}

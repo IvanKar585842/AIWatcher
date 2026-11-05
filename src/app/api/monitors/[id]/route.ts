@@ -236,6 +236,8 @@ export async function DELETE(
         // Ownership check — prevents deleting another user's monitor
         await assertMonitorOwnedBy(user.id, id);
         await prisma.monitor.delete({ where: { id } });
+        const { dropMonitorQueue } = await import("@/lib/monitoring/queue");
+        await dropMonitorQueue(id);
         invalidateUserMonitoringContext(user.id);
         return NextResponse.json({ success: true });
       },

@@ -63,6 +63,8 @@ import {
 } from "@/lib/monitor-types";
 import { loadUserSettings } from "@/lib/user-settings";
 import { cn } from "@/lib/utils";
+import { describeSource } from "@/lib/monitoring/sources/describe";
+import type { SourceKind } from "@/lib/monitoring/sources/types";
 import { PRODUCT_TOUR_EVENTS } from "@/lib/product-tour";
 
 export interface MonitorPrefill {
@@ -91,6 +93,18 @@ const DEFAULT_FORM = {
   interval: MonitoringInterval.TWENTY_FOUR_HOURS as MonitoringInterval,
   notificationMethod: NotificationMethod.EMAIL as NotificationMethod,
   respectRobots: true,
+  sourceType: "webpage" as SourceKind,
+  watchScope: "page" as
+    | "page"
+    | "section"
+    | "keyword"
+    | "links"
+    | "structured"
+    | "images"
+    | "numbers"
+    | "tables"
+    | "files",
+  visualMonitoring: false,
 };
 
 function formDefaultsFromUserSettings() {
@@ -520,7 +534,12 @@ export function CreateMonitorDialog({
           ? form.keywords.split(",").map((k) => k.trim()).filter(Boolean)
           : [],
         aiPrompt: form.aiPrompt.trim() || null,
-        config: { monitorTypeId: selectedTypeId },
+        config: {
+          monitorTypeId: selectedTypeId,
+          sourceType: form.sourceType,
+          watchScope: form.watchScope,
+          visualMonitoring: form.visualMonitoring,
+        },
         interval: form.interval,
         notificationMethod: form.notificationMethod,
         respectRobots: form.respectRobots,
@@ -626,6 +645,94 @@ export function CreateMonitorDialog({
                   )}
                   <SupportedSitesGuide className="mt-3" />
                 </div>
+                <div>
+                  <FieldLabel hint="Choose what kind of change matters. Ordinary pages stay on the general webpage check.">
+                    Monitoring type
+                  </FieldLabel>
+                  <Select
+                    value={form.sourceType}
+                    onValueChange={(value) => setForm({ ...form, sourceType: value as SourceKind })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="webpage">General webpage</SelectItem>
+                      <SelectItem value="product">Product</SelectItem>
+                      <SelectItem value="marketplace_search">Marketplace search</SelectItem>
+                      <SelectItem value="marketplace_category">Marketplace category</SelectItem>
+                      <SelectItem value="news_feed">News feed</SelectItem>
+                      <SelectItem value="news_search">News search</SelectItem>
+                      <SelectItem value="news_article">News article</SelectItem>
+                      <SelectItem value="release">Software release</SelectItem>
+                      <SelectItem value="changelog">Changelog</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {form.url.trim().startsWith("http") && (
+                    <p className="mt-2 text-xs leading-relaxed text-zinc-400">
+                      <span className="text-zinc-200">{describeSource(form.url.trim(), form.sourceType).label}.</span>{" "}
+                      {describeSource(form.url.trim(), form.sourceType).detail}
+                    </p>
+                  )}
+                </div>
+                  {(form.sourceType === "webpage" || form.sourceType === "changelog") && (
+                    <div>
+                      <FieldLabel hint="The whole page is the default. Narrower rules ignore unrelated parts of the page.">
+                        What to compare
+                      </FieldLabel>
+                      <Select
+                        value={form.watchScope}
+                        onValueChange={(value) =>
+                          setForm({
+                            ...form,
+                            watchScope: value as typeof form.watchScope,
+                            mode:
+                              value === "section"
+                                ? MonitoringMode.CSS_SELECTOR
+                                : value === "keyword"
+                                  ? MonitoringMode.KEYWORD_DETECTION
+                                  : form.mode,
+                          })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="page">Entire page</SelectItem>
+                          <SelectItem value="section">Selected section</SelectItem>
+                          <SelectItem value="keyword">Keyword text</SelectItem>
+                          <SelectItem value="links">Links</SelectItem>
+                          <SelectItem value="images">Images</SelectItem>
+                          <SelectItem value="numbers">Numbers and prices</SelectItem>
+                          <SelectItem value="tables">Tables and lists</SelectItem>
+                          <SelectItem value="files">Image and file contents</SelectItem>
+                          <SelectItem value="structured">Structured data</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <label className="mt-3 flex items-center justify-between gap-3 text-xs text-zinc-300">
+                        <span>Also compare a screenshot when the plan includes visual checks</span>
+                        <Switch
+                          checked={form.visualMonitoring}
+                          onCheckedChange={(checked) => setForm({ ...form, visualMonitoring: checked })}
+                        />
+                      </label>
+                    </div>
+                  )}
+                  {(form.sourceType === "news_search" ||
+                    form.sourceType === "marketplace_search" ||
+                    form.watchScope === "keyword") && (
+                    <div>
+                      <FieldLabel hint="Items must match at least one keyword. Separate keywords with commas.">
+                        Keywords
+                      </FieldLabel>
+                      <OsInput
+                        value={form.keywords}
+                        onChange={(e) => setForm({ ...form, keywords: e.target.value })}
+                        placeholder="samsung, galaxy"
+                      />
+                    </div>
+                  )}
                 <div>
                   <FieldLabel hint="A short name you’ll recognize in your dashboard.">
                     Monitor name
@@ -895,7 +1002,7 @@ export function CreateMonitorDialog({
                   </div>
                 </div>
 
-                {selectedType.requiresSelector && (
+                {(selectedType.requiresSelector || form.watchScope === "section") && (
                   <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}>
                     <FieldLabel
                       hint={
@@ -910,10 +1017,13 @@ export function CreateMonitorDialog({
                       value={form.selector}
                       onChange={(e) => setForm({ ...form, selector: e.target.value })}
                       placeholder={
-                        form.mode === "XPATH" ? "//div[@class='price']" : ".product-price"
+                        form.mode === "XPATH" ? "//div[@class='price']" : ".price, .stock"
                       }
                       className="font-mono text-sm"
                     />
+                    <p className="mt-2 text-xs leading-relaxed text-zinc-500">
+                      Separate multiple CSS selectors with commas. If a selector later disappears, the check fails and the last good snapshot stays.
+                    </p>
                   </motion.div>
                 )}
 

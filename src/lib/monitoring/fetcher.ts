@@ -21,6 +21,12 @@ import {
 import { assertSafeFetchUrl, fetchWithSafeRedirects } from "@/lib/security/url";
 import { containsAntiBotChallenge } from "@/lib/monitoring/compatibility";
 import type { WaitStrategy } from "@/lib/monitor-config";
+import { isMonitorCheckError } from "./check-error";
+import { tryOfficialSource } from "./official-apis";
+import { fetchViaScrapling, type FetchStrategyName } from "./scrapling-adapter";
+import { isScraplingRuntimeUnavailable } from "./scrapling-client";
+import { extractPageProfile, type PageProfile } from "./page-profile";
+import { extractStructuredFields } from "./structured-compare";
 import {
   cookiesFromBrowser,
   decryptSessionCookies,
@@ -107,9 +113,14 @@ function isRetryableFetchError(error: unknown): boolean {
   const lower = msg.toLowerCase();
   const http = extractHttpStatusCode(msg);
 
+  if (isMonitorCheckError(error) && error.terminal) return false;
+
   if (
     lower.includes("robots.txt") ||
     lower.includes("access denied by robots") ||
+    lower.includes("partial extraction") ||
+    lower.includes("anti-bot challenge") ||
+    lower.includes("not fetched with a browser") ||
     lower.includes("selector not found") ||
     lower.includes("xpath not found") ||
     lower.includes("css selector is required") ||
@@ -380,6 +391,28 @@ export interface FetchOptions {
   expandSelectors?: string;
   encryptedSession?: string;
   sessionExpiresAt?: string | null;
+  /** auto chooses the cheapest strategy that returns real content. */
+  fetchStrategy?: "auto" | FetchStrategyName;
+  /** Strategy that succeeded last time. Browser strategies are reused only when HTTP was not enough. */
+  preferredStrategy?: FetchStrategyName | null;
+  followLinkSelectors?: string | null;
+  sourceType?:
+    | "product"
+    | "marketplace_search"
+    | "marketplace_category"
+    | "news_feed"
+    | "news_search"
+    | "news_article"
+    | "release"
+    | "changelog"
+    | "webpage"
+    | null;
+  watchScope?: "page" | "section" | "keyword" | "links" | "structured" | "images" | "numbers" | "tables" | "files" | null;
+  visualMonitoring?: boolean;
+  /** Official marketplace calls allowed for this check. Comes from the plan. */
+  marketplaceApiCallsPerCheck?: number;
+  /** Search results kept for this check. Comes from the plan. */
+  marketplaceSearchItems?: number;
 }
 
 export async function fetchPageContent(options: FetchOptions): Promise<FetchResult> {
@@ -418,6 +451,61 @@ async function checkRobotsTxt(url: string, mode: MonitoringMode, respectRobots: 
   }
 }
 
+function finalizeFetchedContent(
+  mode: MonitoringMode,
+  rawHtml: string,
+  metadata: Record<string, unknown>,
+  cleanOptions?: CleanOptions,
+  refreshedEncryptedSession?: string
+): FetchResult {
+  const isVisual =
+    mode === MonitoringMode.VISUAL_CHANGES || mode === MonitoringMode.SCREENSHOT_DIFF;
+  const isPlainText =
+    mode === MonitoringMode.TEXT_CHANGES ||
+    mode === MonitoringMode.PRICE_DETECTION ||
+    mode === MonitoringMode.KEYWORD_DETECTION;
+
+  const cleanedHtml = isVisual
+    ? rawHtml
+    : isPlainText
+      ? cleanText(rawHtml, cleanOptions)
+      : cleanHtml(rawHtml, cleanOptions);
+
+  const extractedText = isPlainText
+    ? cleanedHtml
+    : isVisual
+      ? String(metadata.screenshotHash ?? "")
+      : extractTextFromHtml(cleanedHtml);
+
+  const structured =
+    metadata.structured && typeof metadata.structured === "object"
+      ? metadata.structured
+      : extractStructuredFields(rawHtml, extractedText);
+
+  const pageProfile: PageProfile | undefined = rawHtml.includes("<")
+    ? extractPageProfile(rawHtml, cleanedHtml)
+    : undefined;
+
+  const partial: FetchResult = {
+    rawHtml,
+    cleanedHtml,
+    extractedText,
+    contentHash: "",
+    metadata: {
+      ...metadata,
+      structured,
+      ...(pageProfile ? { pageProfile } : {}),
+      checkStatus: metadata.checkStatus ?? "success",
+    },
+  };
+
+  return {
+    ...partial,
+    contentHash: computeContentHash(mode, partial),
+    refreshedEncryptedSession,
+  };
+}
+
 async function fetchPageContentOnce(options: FetchOptions): Promise<FetchResult> {
   const {
     url,
@@ -438,6 +526,14 @@ async function fetchPageContentOnce(options: FetchOptions): Promise<FetchResult>
     expandSelectors,
     encryptedSession,
     sessionExpiresAt,
+    fetchStrategy = "auto",
+    preferredStrategy = null,
+    followLinkSelectors = null,
+    marketplaceApiCallsPerCheck,
+    marketplaceSearchItems,
+    sourceType,
+    watchScope,
+    visualMonitoring = false,
   } = options;
 
   // Re-validate at fetch time (SSRF / private IP / DNS) — never trust stored URLs alone
@@ -448,8 +544,8 @@ async function fetchPageContentOnce(options: FetchOptions): Promise<FetchResult>
     monitorId,
     url,
     mode,
-    message: "Opening website with Playwright",
-    data: { timeout, respectRobots, waitStrategy },
+    message: "Fetching website",
+    data: { timeout, respectRobots, waitStrategy, fetchStrategy },
   });
 
   if (mode === MonitoringMode.API_RESPONSE || mode === MonitoringMode.RSS_FEED) {
@@ -463,6 +559,35 @@ async function fetchPageContentOnce(options: FetchOptions): Promise<FetchResult>
       data: { hash: result.contentHash.slice(0, 16), textLength: result.extractedText.length },
     });
     return result;
+  }
+
+  try {
+    const official = await tryOfficialSource(url, timeout, {
+      limits: {
+        maxApiCalls: marketplaceApiCallsPerCheck ?? 4,
+        maxResults: marketplaceSearchItems ?? 10,
+      },
+      sourceType: sourceType ?? undefined,
+      keywords,
+    });
+    if (official) {
+      const result = finalizeFetchedContent(mode, official.rawHtml, official.metadata, cleanOptions);
+      monitorLog({
+        step: "fetch_success",
+        monitorId,
+        url,
+        mode,
+        message: "Official API content fetched",
+        data: {
+          provider: official.metadata.provider,
+          hash: result.contentHash.slice(0, 16),
+          browserLaunches: 0,
+        },
+      });
+      return result;
+    }
+  } catch (error) {
+    if (!isScraplingRuntimeUnavailable(error)) throw error;
   }
 
   if (respectRobots) {
@@ -488,12 +613,84 @@ async function fetchPageContentOnce(options: FetchOptions): Promise<FetchResult>
   }
 
   const isVisual =
-    mode === MonitoringMode.VISUAL_CHANGES || mode === MonitoringMode.SCREENSHOT_DIFF;
+    visualMonitoring ||
+    mode === MonitoringMode.VISUAL_CHANGES ||
+    mode === MonitoringMode.SCREENSHOT_DIFF;
+
+  const engine = (process.env.MONITOR_FETCH_ENGINE ?? "scrapling").toLowerCase();
+  if (engine !== "playwright") {
+    try {
+      let cookies;
+      if (encryptedSession && userId) {
+        cookies = decryptSessionCookies(encryptedSession, userId);
+      }
+      const page = await fetchViaScrapling({
+        url,
+        mode,
+        selector,
+        keywords,
+        timeoutMs: timeout,
+        waitStrategy,
+        stabilizeMs,
+        scrollForLazyLoad,
+        scrollDepthPx,
+        waitForSelector,
+        expandSelectors,
+        followLinkSelectors,
+        fetchStrategy,
+        preferredStrategy,
+        cookies,
+        captureScreenshot: isVisual,
+      });
+      let refreshedEncryptedSession: string | undefined;
+      if (encryptedSession && userId && page.refreshedCookies?.length) {
+        try {
+          refreshedEncryptedSession = encryptSessionCookies(page.refreshedCookies, userId);
+        } catch (persistError) {
+          monitorLogError(
+            "fetch_failed",
+            "Could not refresh encrypted session cookies (non-fatal)",
+            persistError,
+            { monitorId, url, mode }
+          );
+        }
+      }
+      const result = finalizeFetchedContent(
+        mode,
+        page.rawHtml,
+        page.metadata,
+        cleanOptions,
+        refreshedEncryptedSession
+      );
+      monitorLog({
+        step: "fetch_success",
+        monitorId,
+        url,
+        mode,
+        message: "Scrapling content ready for comparison",
+        data: {
+          strategy: page.metadata.fetchStrategy,
+          browserLaunches: page.metadata.browserLaunches,
+          hash: result.contentHash.slice(0, 16),
+          textLength: result.extractedText.length,
+        },
+      });
+      return result;
+    } catch (error) {
+      if (!isScraplingRuntimeUnavailable(error)) throw error;
+      monitorLog({
+        step: "fetch_start",
+        monitorId,
+        url,
+        mode,
+        message: "Scrapling runtime unavailable, falling back to Playwright",
+      });
+    }
+  }
 
   const browser = await acquireBrowser();
   let context: Awaited<ReturnType<Browser["newContext"]>> | null = null;
   let page: Page | null = null;
-  let refreshedEncryptedSession: string | undefined;
 
   try {
     context = await browser.newContext({
@@ -803,38 +1000,12 @@ async function fetchPageContentOnce(options: FetchOptions): Promise<FetchResult>
       case MonitoringMode.ENTIRE_PAGE:
       default: {
         rawHtml = await page.content();
-        metadata = { ...metadata, captureType: "entire_page_html" };
+        metadata = { ...metadata, captureType: "entire_page_html", browserEngine: "playwright-chromium" };
         break;
       }
     }
 
-    const isPlainText =
-      mode === MonitoringMode.TEXT_CHANGES ||
-      mode === MonitoringMode.PRICE_DETECTION ||
-      mode === MonitoringMode.KEYWORD_DETECTION;
-
-    const cleanedHtml = isVisual
-      ? rawHtml
-      : isPlainText
-        ? cleanText(rawHtml, cleanOptions)
-        : cleanHtml(rawHtml, cleanOptions);
-
-    const extractedText = isPlainText
-      ? cleanedHtml
-      : isVisual
-        ? String(metadata.screenshotHash ?? "")
-        : extractTextFromHtml(cleanedHtml);
-
-    const partial: FetchResult = {
-      rawHtml,
-      cleanedHtml,
-      extractedText,
-      contentHash: "",
-      metadata,
-    };
-
-    const contentHash = computeContentHash(mode, partial);
-
+    let refreshedEncryptedSession: string | undefined;
     if (encryptedSession && userId) {
       try {
         const jar = await context.cookies();
@@ -852,6 +1023,14 @@ async function fetchPageContentOnce(options: FetchOptions): Promise<FetchResult>
       }
     }
 
+    const finalized = finalizeFetchedContent(
+      mode,
+      rawHtml,
+      metadata,
+      cleanOptions,
+      refreshedEncryptedSession
+    );
+
     monitorLog({
       step: "fetch_success",
       monitorId,
@@ -860,17 +1039,13 @@ async function fetchPageContentOnce(options: FetchOptions): Promise<FetchResult>
       message: "Page content ready for comparison",
       data: {
         captureType: metadata.captureType,
-        hash: contentHash.slice(0, 16),
-        textLength: extractedText.length,
-        htmlLength: cleanedHtml.length,
+        hash: finalized.contentHash.slice(0, 16),
+        textLength: finalized.extractedText.length,
+        htmlLength: finalized.cleanedHtml.length,
       },
     });
 
-    return {
-      ...partial,
-      contentHash,
-      refreshedEncryptedSession,
-    };
+    return finalized;
   } catch (error) {
     monitorLogError("fetch_failed", "Failed to fetch website", error, {
       monitorId,

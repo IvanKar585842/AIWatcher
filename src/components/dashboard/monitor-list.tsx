@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
+import { isClerkConfigured } from "@/lib/clerk-config";
 import { motion } from "framer-motion";
 import { Radar } from "lucide-react";
 import { MonitorCard, type MonitorWithCount } from "@/components/dashboard/monitor-card";
@@ -36,21 +37,44 @@ function parseMonitorsPayload(body: unknown): MonitorWithCount[] | null {
   return null;
 }
 
-export function MonitorList({
-  embedded,
-  showHeaderCreate = true,
-  emptyStateShowCreate = true,
-  emptyVariant = "dashboard",
-  /** Defer first /api/monitors fetch so dashboard stats can win the critical path. */
-  deferInitialFetch = false,
-}: {
+type MonitorListProps = {
   embedded?: boolean;
   showHeaderCreate?: boolean;
   emptyStateShowCreate?: boolean;
   emptyVariant?: "dashboard" | "monitors";
+  /** Defer first /api/monitors fetch so dashboard stats can win the critical path. */
   deferInitialFetch?: boolean;
-}) {
+};
+
+export function MonitorList(props: MonitorListProps) {
+  if (!isClerkConfigured()) {
+    return (
+      <MonitorListView
+        {...props}
+        isLoaded
+        isSignedIn={process.env.NODE_ENV !== "production"}
+      />
+    );
+  }
+  return <MonitorListClerk {...props} />;
+}
+
+function MonitorListClerk(props: MonitorListProps) {
   const { isLoaded, isSignedIn } = useAuth();
+  return (
+    <MonitorListView {...props} isLoaded={isLoaded} isSignedIn={Boolean(isSignedIn)} />
+  );
+}
+
+function MonitorListView({
+  embedded,
+  showHeaderCreate = true,
+  emptyStateShowCreate = true,
+  emptyVariant = "dashboard",
+  deferInitialFetch = false,
+  isLoaded,
+  isSignedIn,
+}: MonitorListProps & { isLoaded: boolean; isSignedIn: boolean }) {
   const { toast } = useToast();
   const [monitors, setMonitors] = useState<MonitorWithCount[]>([]);
   const [loadState, setLoadState] = useState<LoadState>("loading");

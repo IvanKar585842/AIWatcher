@@ -3,16 +3,19 @@
 import Script from "next/script";
 import { ClerkThemeProvider } from "@/components/providers/clerk-provider";
 import { GrowthCapture } from "@/components/growth/growth-capture";
+import { isClerkConfigured } from "@/lib/clerk-config";
 
 const CLARITY_PROJECT_ID = "xrhyodo94i";
-const clerkConfigured =
-  Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim()) &&
-  !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY!.includes("placeholder");
+const clerkConfigured = isClerkConfigured();
 
 /**
  * App/auth shell providers — never mounted on marketing `/`.
  */
 export function AppProviders({ children }: { children: React.ReactNode }) {
+  if (!clerkConfigured && process.env.NODE_ENV !== "production") {
+    return <>{children}</>;
+  }
+
   if (!clerkConfigured) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#090909] p-6 text-center">
