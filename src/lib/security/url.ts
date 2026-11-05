@@ -1,7 +1,7 @@
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import { securityLog } from "@/lib/security/log";
-import { useSystemCa } from "@/lib/security/system-ca";
+import { installSystemCa } from "@/lib/security/system-ca";
 
 const BLOCKED_HOSTS = new Set([
   "localhost",
@@ -174,7 +174,7 @@ export async function fetchWithSafeRedirects(
 ): Promise<Response> {
   let current = (await assertSafeFetchUrl(urlString)).toString();
   const { redirect: _ignored, ...rest } = init ?? {};
-  useSystemCa();
+  installSystemCa();
 
   for (let hops = 0; hops <= maxRedirects; hops++) {
     const response = await fetch(current, { ...rest, redirect: "manual" });

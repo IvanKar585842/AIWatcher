@@ -5,13 +5,13 @@
  * Usage: npx tsx scripts/test-storefront-quality.ts
  */
 import { MonitoringMode } from "@prisma/client";
-import { useSystemCa } from "../src/lib/security/system-ca";
+import { installSystemCa } from "../src/lib/security/system-ca";
 import { tryOfficialSource } from "../src/lib/monitoring/official-apis";
 import { fetchViaScrapling } from "../src/lib/monitoring/scrapling-adapter";
 import { shutdownScrapling } from "../src/lib/monitoring/scrapling-client";
 import { extractStructuredFields } from "../src/lib/monitoring/structured-compare";
 
-useSystemCa();
+installSystemCa();
 
 const cases = [
   { name: "practice book page", url: "https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html", kind: "page" as const, passes: 2 },

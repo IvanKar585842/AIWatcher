@@ -2,7 +2,7 @@ import { MonitoringMode } from "@prisma/client";
 import { compareSnapshots } from "../src/lib/monitoring/compare";
 import { httpResponseNeedsBrowser } from "../src/lib/monitoring/render-need";
 import { rememberBrowserStrategy } from "../src/lib/monitoring/scheduler";
-import { useSystemCa } from "../src/lib/security/system-ca";
+import { installSystemCa } from "../src/lib/security/system-ca";
 import { resolveWorkerRunUrl } from "../src/lib/monitoring/worker-dispatch";
 
 function assert(name: string, condition: boolean) {
@@ -52,6 +52,6 @@ assert(
   "localhost worker URL points at /run",
   resolveWorkerRunUrl("http://127.0.0.1:8787") === "http://127.0.0.1:8787/run"
 );
-assert("system certificate store can be installed twice", useSystemCa() === true && useSystemCa() === true);
+assert("system certificate store can be installed twice", installSystemCa() === true && installSystemCa() === true);
 
 if (!process.exitCode) console.log("coverage guard checks passed");

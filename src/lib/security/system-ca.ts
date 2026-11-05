@@ -6,7 +6,7 @@ let installed = false;
  * Trust the OS certificate store in addition to Node's bundled roots.
  * Does not disable verification. Used when Windows has a root Node does not.
  */
-export function useSystemCa(): boolean {
+export function installSystemCa(): boolean {
   if (installed) return true;
   const api = tls as typeof tls & {
     getCACertificates?: (type: "default" | "system") => string[];

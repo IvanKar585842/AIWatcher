@@ -4,13 +4,13 @@
  *
  * Usage: npx tsx scripts/test-live-public.ts
  */
-import { useSystemCa } from "../src/lib/security/system-ca";
+import { installSystemCa } from "../src/lib/security/system-ca";
 import { MonitoringMode } from "@prisma/client";
 import { tryOfficialSource } from "../src/lib/monitoring/official-apis";
 import { fetchViaScrapling } from "../src/lib/monitoring/scrapling-adapter";
 import { shutdownScrapling } from "../src/lib/monitoring/scrapling-client";
 
-useSystemCa();
+installSystemCa();
 
 const cases = [
   { name: "example.com static", url: "https://example.com", kind: "page" as const },
