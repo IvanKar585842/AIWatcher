@@ -98,6 +98,18 @@ function loadClerkHandler(): Promise<ClerkHandler> {
         const isPublicRoute = createRouteMatcher(PUBLIC_PATH_MATCHERS);
 
         return clerkMiddleware(async (auth, request) => {
+          if (!isPublicRoute(request) && !hasRealClerkSession(request)) {
+            if (request.nextUrl.pathname.startsWith("/api/")) {
+              return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            }
+            const signIn = new URL("/sign-in", request.url);
+            signIn.searchParams.set(
+              "redirect_url",
+              `${request.nextUrl.pathname}${request.nextUrl.search}`
+            );
+            return NextResponse.redirect(signIn);
+          }
+
           if (!isPublicRoute(request)) {
             await auth.protect();
           }
