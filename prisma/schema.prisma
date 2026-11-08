@@ -87,6 +87,12 @@ enum NotificationChannel {
   TELEGRAM
   EMAIL
   IN_APP
+  WEBHOOK
+}
+
+enum TeamRole {
+  OWNER
+  MEMBER
 }
 
 enum NotificationStatus {
@@ -147,6 +153,8 @@ model User {
   agencyBrandName     String?
   agencyShowPoweredBy Boolean        @default(true)
   badgeEnabled        Boolean        @default(false)
+  webhookUrl          String?
+  webhookSecret       String?
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
   subscription        Subscription?
@@ -156,6 +164,9 @@ model User {
   chatConversations   ChatConversation[]
   weeklyReports       WeeklyReport[]
   intelligenceScores  IntelligenceScore[]
+  apiKeys             ApiKey[]
+  ownedTeam           Team?          @relation("TeamOwner")
+  teamMemberships     TeamMember[]
 
   @@index([clerkId])
   @@index([email])
@@ -213,6 +224,8 @@ model Monitor {
   errorMessage       String?
   errorCount         Int                @default(0)
   statusPageVisible  Boolean            @default(true)
+  teamId             String?
+  team               Team?              @relation(fields: [teamId], references: [id], onDelete: SetNull)
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
   snapshots          Snapshot[]
@@ -223,6 +236,7 @@ model Monitor {
   @@index([status])
   @@index([nextCheckAt])
   @@index([status, nextCheckAt])
+  @@index([teamId])
   @@unique([userId, url])
 }
 
@@ -322,6 +336,57 @@ model MonitorQueue {
   @@index([scheduledAt])
   @@index([lockedAt])
   @@index([scheduledAt, lockedAt])
+}
+
+model ApiKey {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  prefix     String
+  keyHash    String    @unique
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+
+  @@index([userId])
+}
+
+model Team {
+  id        String       @id @default(cuid())
+  name      String
+  ownerId   String       @unique
+  owner     User         @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt DateTime     @default(now())
+  members   TeamMember[]
+  invites   TeamInvite[]
+  monitors  Monitor[]
+}
+
+model TeamMember {
+  id        String   @id @default(cuid())
+  teamId    String
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      TeamRole @default(MEMBER)
+  createdAt DateTime @default(now())
+
+  @@unique([teamId, userId])
+  @@index([userId])
+}
+
+model TeamInvite {
+  id           String    @id @default(cuid())
+  teamId       String
+  team         Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  codeHash     String    @unique
+  expiresAt    DateTime
+  createdById  String
+  acceptedAt   DateTime?
+  acceptedById String?
+
+  @@index([teamId])
 }
 
 model AnalyticsEvent {

@@ -40,6 +40,8 @@ import {
   unlockMonitorQueue,
 } from "./queue";
 import { partitionMonitorsByUrl, rememberBrowserStrategy } from "./scheduler";
+import { snapshotKeepCount } from "./retention";
+import { shouldWaitForInterval, summarizeCapture, type CaptureSummary } from "./capture-summary";
 import { prepareHtmlForStorage, readSnapshotHtml } from "./snapshot-store";
 
 const DEFAULT_MAX_RETRIES = 3;
@@ -55,6 +57,7 @@ export interface ProcessMonitorResult {
   status: ProcessMonitorStatus;
   reason?: string;
   changeId?: string;
+  capture?: CaptureSummary;
 }
 
 function buildCleanOptions(config: ReturnType<typeof parseMonitorConfig>) {
@@ -124,7 +127,10 @@ async function saveSnapshot(
   return snapshot.id;
 }
 
-export async function processMonitor(monitorId: string): Promise<ProcessMonitorResult> {
+export async function processMonitor(
+  monitorId: string,
+  options?: { force?: boolean }
+): Promise<ProcessMonitorResult> {
   cleanupStaleLocks();
 
   if (!acquireMonitorLock(monitorId)) {
@@ -152,7 +158,7 @@ export async function processMonitor(monitorId: string): Promise<ProcessMonitorR
       monitorId,
       message: "Processing lock acquired",
     });
-    return await processMonitorInternal(monitorId);
+    return await processMonitorInternal(monitorId, options);
   } catch (error) {
     monitorLogError("error", "Monitor processing failed", error, { monitorId });
     // Fail safe: do not crash the batch — surface as error result when callers catch
@@ -163,7 +169,10 @@ export async function processMonitor(monitorId: string): Promise<ProcessMonitorR
   }
 }
 
-async function processMonitorInternal(monitorId: string): Promise<ProcessMonitorResult> {
+async function processMonitorInternal(
+  monitorId: string,
+  options?: { force?: boolean }
+): Promise<ProcessMonitorResult> {
   const monitor = await prisma.monitor.findUnique({
     where: { id: monitorId },
     include: {
@@ -216,30 +225,36 @@ async function processMonitorInternal(monitorId: string): Promise<ProcessMonitor
 
   // Honor the last successful check. Failed checks keep errorCount > 0 so a
   // scheduled retry is not postponed for the full interval.
-  if (monitor.errorCount === 0 && monitor.lastCheckedAt) {
-    const earliestNext = new Date(
-      monitor.lastCheckedAt.getTime() + intervalToMs(effectiveInterval)
-    );
-    if (now.getTime() + 2_000 < earliestNext.getTime()) {
-      await prisma.monitor.update({
-        where: { id: monitor.id },
-        data: { nextCheckAt: earliestNext },
-      });
-      await releaseMonitorQueue(monitor.id, earliestNext);
-      monitorLog({
-        step: "scheduler_batch",
-        monitorId,
-        message: "Skipped — interval not elapsed since last check",
-        data: {
-          plan,
-          storedInterval: monitor.interval,
-          effectiveInterval,
-          lastCheckedAt: monitor.lastCheckedAt.toISOString(),
-          nextCheckAt: earliestNext.toISOString(),
-        },
-      });
-      return { status: "skipped", reason: "interval_not_elapsed" };
-    }
+  const lastCheckedAt = monitor.lastCheckedAt;
+  if (
+    lastCheckedAt &&
+    shouldWaitForInterval({
+      force: options?.force,
+      errorCount: monitor.errorCount,
+      lastCheckedAt,
+      now,
+      intervalMs: intervalToMs(effectiveInterval),
+    })
+  ) {
+    const earliestNext = new Date(lastCheckedAt.getTime() + intervalToMs(effectiveInterval));
+    await prisma.monitor.update({
+      where: { id: monitor.id },
+      data: { nextCheckAt: earliestNext },
+    });
+    await releaseMonitorQueue(monitor.id, earliestNext);
+    monitorLog({
+      step: "scheduler_batch",
+      monitorId,
+      message: "Skipped — interval not elapsed since last check",
+      data: {
+        plan,
+        storedInterval: monitor.interval,
+        effectiveInterval,
+        lastCheckedAt: lastCheckedAt.toISOString(),
+        nextCheckAt: earliestNext.toISOString(),
+      },
+    });
+    return { status: "skipped", reason: "interval_not_elapsed" };
   }
 
   const nextCheckAt = computeNextCheckAt(effectiveInterval, now);
@@ -383,7 +398,7 @@ async function processMonitorInternal(monitorId: string): Promise<ProcessMonitor
         },
       });
 
-      return { status: "baseline" };
+      return { status: "baseline", capture: summarizeCapture(result.metadata, result.extractedText) };
     }
 
     const previous = await readSnapshotHtml(previousSnapshot);
@@ -443,7 +458,11 @@ async function processMonitorInternal(monitorId: string): Promise<ProcessMonitor
         },
       });
 
-      return { status: "no_change", reason: comparison.reason };
+      return {
+        status: "no_change",
+        reason: comparison.reason,
+        capture: summarizeCapture(result.metadata, result.extractedText),
+      };
     }
 
     monitorLog({
@@ -635,7 +654,11 @@ async function processMonitorInternal(monitorId: string): Promise<ProcessMonitor
     await cleanupOldHistory(monitor.id, plan, monitor.user);
     await releaseMonitorQueue(monitor.id, nextCheckAt);
 
-    return { status: "change_detected", changeId: change.id };
+    return {
+      status: "change_detected",
+      changeId: change.id,
+      capture: summarizeCapture(result.metadata, result.extractedText),
+    };
   } catch (error) {
     const classified = classifyMonitoringError(error);
     const errorMessage = serializeMonitorError(classified);
@@ -743,23 +766,40 @@ async function cleanupOldHistory(
   plan: Plan,
   user: { email: string; role?: string | null }
 ) {
-  if (isAdminUser(user)) return;
+  if (!isAdminUser(user)) {
+    const entitlements = getPlanEntitlements(plan);
+    const historyDays = entitlements.historyDays;
+    if (historyDays != null) {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - historyDays);
+      await prisma.change.deleteMany({
+        where: { monitorId, createdAt: { lt: cutoff } },
+      });
+    }
+  }
 
-  const entitlements = getPlanEntitlements(plan);
-  const historyDays = entitlements.historyDays;
-  if (historyDays == null) return;
+  const keep = await keepCountForMonitor(monitorId);
+  await trimSnapshots(monitorId, keep);
+}
 
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - historyDays);
-
-  await prisma.change.deleteMany({
-    where: { monitorId, createdAt: { lt: cutoff } },
+async function keepCountForMonitor(monitorId: string): Promise<number> {
+  const latest = await prisma.snapshot.findFirst({
+    where: { monitorId },
+    orderBy: { createdAt: "desc" },
+    select: { metadata: true },
   });
+  const captureType =
+    latest?.metadata && typeof latest.metadata === "object" && !Array.isArray(latest.metadata)
+      ? (latest.metadata as { captureType?: unknown }).captureType
+      : null;
+  return snapshotKeepCount(captureType);
+}
 
+async function trimSnapshots(monitorId: string, keep: number) {
   const snapshots = await prisma.snapshot.findMany({
     where: { monitorId },
     orderBy: { createdAt: "desc" },
-    skip: 10,
+    skip: keep,
     select: { id: true },
   });
 

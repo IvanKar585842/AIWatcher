@@ -1,0 +1,24 @@
+name: Monitoring tick
+
+on:
+  schedule:
+    # Fastest schedule GitHub allows. It can still start late.
+    # Vercel Hobby stays on the daily cron in vercel.json.
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ask production to process due monitors
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "CRON_SECRET is not set. Add it in GitHub repository secrets to run production checks."
+            exit 0
+          fi
+          curl --fail-with-body -sS --retry 3 --retry-delay 5 --max-time 110 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "https://watchflowing.com/api/cron/monitoring"

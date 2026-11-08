@@ -47,7 +47,8 @@ export function describeSource(rawUrl: string, sourceType?: SourceKind | null): 
       adapter: "amazon-creators",
       support: "credentials",
       label: "Amazon Creators API",
-      detail: "Product and search URLs use the official Creators API. A browser is not used. Credentials must be set on the server.",
+      detail:
+        "Product and search URLs use the official Creators API. A browser is not used. Credentials must be set on the server. Paid comparison use is not approved until Amazon confirms it.",
     };
   }
   if (/(^|\.)ebay\./i.test(url.hostname)) {
@@ -55,7 +56,8 @@ export function describeSource(rawUrl: string, sourceType?: SourceKind | null): 
       adapter: "ebay-browse",
       support: "credentials",
       label: "eBay Browse API",
-      detail: "Listings and searches use the official Browse API. A browser is not used. Credentials must be set on the server.",
+      detail:
+        "Listings and searches use the official Browse API. A browser is not used. Credentials must be set on the server. Paid comparison use is not approved until eBay confirms it.",
     };
   }
   if (isEtsyUrl(url)) {
@@ -63,7 +65,8 @@ export function describeSource(rawUrl: string, sourceType?: SourceKind | null): 
       adapter: "etsy",
       support: "credentials",
       label: "Etsy Open API",
-      detail: "Listing, shop, and search URLs use Etsy's Open API v3 when ETSY_API_KEY is set. A browser is not used.",
+      detail:
+        "Listing, shop, and search URLs use Etsy's Open API v3 when ETSY_API_KEY is set. A browser is not used. Paid comparison use is not approved until Etsy confirms it.",
     };
   }
   if (isShopifyUrl(url)) {

@@ -10,6 +10,8 @@ import { parseNewsSitemap } from "./news-sitemap";
 import { renderRecords } from "./records";
 import { fetchGitHubReleases, githubReleaseTarget } from "./releases";
 import { fetchShopify } from "./shopify";
+import { isContentIndexPath, isNewsIndex } from "./known-sites";
+import { lookupMarketplace } from "@/lib/monitoring/marketplace/catalog";
 import type { SourceCheckResult, SourceKind, SourceRecord, SourceRunOptions, FetchLike } from "./types";
 
 const DEFAULT_LIMIT = 10;
@@ -70,6 +72,18 @@ export async function runSourceCheck(url: string, options: SourceRunOptions = {}
       const record = await fetchArticle(url, fetchImpl);
       return finish("article", [record], [], true, Date.now() - started);
     }
+    if (isNewsIndex(parsed) || (isContentIndexPath(parsed) && !lookupMarketplace(parsed.hostname))) {
+      try {
+        const html = await readText(url, fetchImpl);
+        const alternate = feedAlternate(html, url);
+        if (alternate && sameSiteFeed(parsed, alternate)) {
+          const records = await loadFeed(alternate, "news_feed", options.keywords ?? [], limit, fetchImpl);
+          return finish("feed", records, [], false, Date.now() - started);
+        }
+      } catch (error) {
+        if (isNewsIndex(parsed)) throw error;
+      }
+    }
     return null;
   } catch (error) {
     recordFetchSample({
@@ -103,6 +117,18 @@ async function loadFeed(
     throw new MonitorCheckError(keywords.length > 0 ? "The feed has no items matching the keywords." : "The feed did not contain any items.", true);
   }
   return records;
+}
+
+function sameSiteFeed(page: URL, feedUrl: string): boolean {
+  try {
+    const feed = new URL(feedUrl);
+    if (feed.protocol !== "http:" && feed.protocol !== "https:") return false;
+    const pageHost = page.hostname.replace(/^www\./i, "").toLowerCase();
+    const feedHost = feed.hostname.replace(/^www\./i, "").toLowerCase();
+    return pageHost === feedHost || pageHost.endsWith(`.${feedHost}`) || feedHost.endsWith(`.${pageHost}`);
+  } catch {
+    return false;
+  }
 }
 
 async function readText(url: string, fetchImpl?: FetchLike): Promise<string> {

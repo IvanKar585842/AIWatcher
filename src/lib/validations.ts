@@ -7,13 +7,17 @@ import {
   NotificationMethod,
 } from "@prisma/client";
 import { validateMonitorUrl } from "@/lib/security/url";
+import { normalizeSubmittedUrl } from "@/lib/monitoring/link-url";
 
-const urlSchema = z
+const urlSchema = z.preprocess(
+  (value) => (typeof value === "string" ? normalizeSubmittedUrl(value) : value),
+  z
   .string()
   .url("Please enter a valid URL")
   .refine((url) => validateMonitorUrl(url).ok, {
     message: "This URL cannot be monitored (private or blocked address)",
-  });
+  })
+);
 
 export const monitorConfigSchema = z.object({
   retryAttempts: z.number().int().min(1).max(10).optional(),

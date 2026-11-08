@@ -37,6 +37,14 @@ export const KNOWN_SITES: KnownSite[] = [
   site("who", "WHO", "who.int", "news"),
   site("europa", "European Union", "europa.eu", "news"),
   site("govuk", "GOV.UK", "gov.uk", "news"),
+  site("aljazeera", "Al Jazeera", "aljazeera.com", "news"),
+  site("npr", "NPR", "npr.org", "news"),
+  site("ap", "AP", "apnews.com", "news"),
+  site("dw", "DW", "dw.com", "news"),
+  site("tagesschau", "tagesschau", "tagesschau.de", "news"),
+  site("france24", "France 24", "france24.com", "news"),
+  site("lemonde", "Le Monde", "lemonde.fr", "news"),
+  site("un", "United Nations", "un.org", "news"),
   site("github", "GitHub", "github.com", "code"),
   site("gitlab", "GitLab", "gitlab.com", "code"),
   site("codeberg", "Codeberg", "codeberg.org", "code"),
@@ -55,6 +63,22 @@ export function lookupKnownSite(hostname: string): KnownSite | null {
     }
   }
   return best;
+}
+
+export function isNewsIndex(url: URL): boolean {
+  if (lookupKnownSite(url.hostname)?.kind !== "news") return false;
+  const parts = url.pathname.split("/").filter(Boolean);
+  if (parts.length === 0) return true;
+  if (parts.length > 1) return false;
+  return /^(news|world|international|uk|us|sport|business|politics|technology|science|culture|latest|index\.rss|rss)$/i.test(parts[0]);
+}
+
+/** A short public section such as /blog or /company/news. Homepages stay page checks. */
+export function isContentIndexPath(url: URL): boolean {
+  const parts = url.pathname.split("/").filter(Boolean);
+  if (parts.length === 0 || parts.length > 2) return false;
+  const last = parts[parts.length - 1].replace(/\.(html|rss|xml)$/i, "");
+  return /^(news|blog|press|press-releases|latest|world|updates|changelog|articles|stories|feed|rss)$/i.test(last);
 }
 
 export function knownSiteDetail(kind: KnownSiteKind): string {

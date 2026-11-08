@@ -15,6 +15,10 @@ import { prisma } from "@/lib/db";
 import { getUpgradeCopy } from "@/lib/plan-features";
 import { parseMonitorConfig } from "@/lib/monitor-config";
 import { sendChangeEmail, classifyEmailSendError } from "@/lib/notifications/email";
+import {
+  buildChangeWebhookPayload,
+  deliverCustomerWebhook,
+} from "@/lib/notifications/customer-webhook";
 import { sendTelegramChangeNotification } from "@/lib/notifications/telegram";
 import {
   createInAppNotification,
@@ -83,6 +87,8 @@ type ChangeWithMonitor = {
       telegramConnected: boolean;
       telegramNotificationsEnabled: boolean;
       emailNotificationsEnabled: boolean;
+      webhookUrl?: string | null;
+      webhookSecret?: string | null;
       subscription?: { plan: import("@prisma/client").Plan } | null;
     };
   };
@@ -615,6 +621,9 @@ async function sendNotifications(
       telegramConnected: boolean;
       telegramNotificationsEnabled: boolean;
       emailNotificationsEnabled: boolean;
+      webhookUrl?: string | null;
+      webhookSecret?: string | null;
+      subscription?: { plan: import("@prisma/client").Plan } | null;
     };
   },
   changeId: string,
@@ -842,6 +851,42 @@ async function sendNotifications(
             metadata: { error: errMsg },
           });
         }
+      })()
+    );
+  }
+
+  const webhookUrl = monitor.user.webhookUrl?.trim();
+  const webhookSecret = monitor.user.webhookSecret;
+  const webhookAllowed = getUserPlanEntitlements(monitor.user).features.WEBHOOKS.enabled;
+  if (webhookAllowed && webhookUrl && webhookSecret) {
+    tasks.push(
+      (async () => {
+        await recordAlertDelivery(monitor.userId, changeId, NotificationChannel.WEBHOOK, "PENDING");
+        const result = await deliverCustomerWebhook({
+          url: webhookUrl,
+          secret: webhookSecret,
+          payload: buildChangeWebhookPayload({
+            changeId,
+            monitorId: monitor.id,
+            monitorName: monitor.name,
+            url: monitor.url,
+            summary: analysis.summary,
+            importance: analysis.importance,
+            category: analysis.category,
+            changes: analysis.changes,
+          }),
+        });
+        if (!result.ok) {
+          await recordAlertDelivery(
+            monitor.userId,
+            changeId,
+            NotificationChannel.WEBHOOK,
+            "FAILED",
+            result.error
+          );
+          return;
+        }
+        await recordAlertDelivery(monitor.userId, changeId, NotificationChannel.WEBHOOK, "SENT");
       })()
     );
   }

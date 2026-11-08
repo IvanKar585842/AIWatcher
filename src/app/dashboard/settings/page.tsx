@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { MonitoringInterval, MonitoringMode, NotificationMethod, Plan } from "@prisma/client";
 import { CommandPageHeader } from "@/components/dashboard/command/command-page-header";
+import { ProductAccessPanel } from "@/components/dashboard/product-access-panel";
 import {
   IntervalSelectItems,
   IntervalUpgradeHint,
@@ -146,6 +147,9 @@ function SettingsScreen({ clerkUser }: { clerkUser: ClerkAccount }) {
   const [telegramError, setTelegramError] = useState(false);
   const [unlinking, setUnlinking] = useState(false);
   const [showAccountPanel, setShowAccountPanel] = useState(false);
+  const [deletePhrase, setDeletePhrase] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
   const [newTemplate, setNewTemplate] = useState("");
 
   const [statusUsername, setStatusUsername] = useState("");
@@ -527,6 +531,49 @@ function SettingsScreen({ clerkUser }: { clerkUser: ClerkAccount }) {
     const full = `${window.location.origin}${publicUrl}`;
     void navigator.clipboard.writeText(full);
     toast("Status page URL copied", "success");
+  }
+
+  async function downloadAccountExport() {
+    setExportBusy(true);
+    try {
+      const response = await fetch("/api/user/export");
+      if (!response.ok) {
+        toast("Could not export account data", "error");
+        return;
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "watchflowing-account.json";
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast("Could not export account data", "error");
+    } finally {
+      setExportBusy(false);
+    }
+  }
+
+  async function deleteOwnAccount() {
+    setDeleteBusy(true);
+    try {
+      const response = await fetch("/api/user/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: deletePhrase }),
+      });
+      const body = (await response.json().catch(() => null)) as { error?: string } | null;
+      if (!response.ok) {
+        toast(body?.error ?? "Could not delete the account", "error");
+        return;
+      }
+      window.location.href = "/";
+    } catch {
+      toast("Could not delete the account", "error");
+    } finally {
+      setDeleteBusy(false);
+    }
   }
 
   return (
@@ -1188,6 +1235,8 @@ function SettingsScreen({ clerkUser }: { clerkUser: ClerkAccount }) {
           </div>
         </OsExpandableSection>
 
+        <ProductAccessPanel />
+
         <OsExpandableSection
           title="Danger Zone"
           subtitle="Irreversible account actions"
@@ -1195,16 +1244,35 @@ function SettingsScreen({ clerkUser }: { clerkUser: ClerkAccount }) {
           danger
         >
           <p className="mb-4 text-sm text-zinc-500">
-            Deleting your account permanently removes all monitors, history, and notifications.
+            Export downloads your profile, monitors, and recent change summaries. Deleting the
+            account removes those records. A Stripe subscription is canceled first.
           </p>
           <Button
+            type="button"
             variant="outline"
-            disabled
-            className="rounded-full border-red-500/30 bg-red-500/5 text-red-400 hover:bg-red-500/10"
+            disabled={exportBusy}
+            onClick={() => void downloadAccountExport()}
+            className="rounded-full border-white/[0.08] bg-white/[0.02] text-zinc-300"
           >
-            Delete account
+            {exportBusy ? "Preparing export..." : "Download my data"}
           </Button>
-          <p className="mt-2 text-xs text-zinc-600">Contact support to request account deletion.</p>
+          <div className="mt-4 space-y-3">
+            <OsInput
+              value={deletePhrase}
+              onChange={(event) => setDeletePhrase(event.target.value)}
+              placeholder="Type DELETE to confirm"
+              aria-label="Type DELETE to confirm account deletion"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              disabled={deleteBusy || deletePhrase !== "DELETE"}
+              onClick={() => void deleteOwnAccount()}
+              className="rounded-full border-red-500/30 bg-red-500/5 text-red-400 hover:bg-red-500/10"
+            >
+              {deleteBusy ? "Deleting..." : "Delete account"}
+            </Button>
+          </div>
         </OsExpandableSection>
       </div>
     </div>

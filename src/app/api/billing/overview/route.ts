@@ -11,6 +11,7 @@ import {
   isStripeCheckoutReady,
   isStripePaymentsEnabled,
 } from "@/lib/stripe-config";
+import { describeDeploymentSchedule } from "@/lib/monitoring/deployment-schedule";
 
 export async function GET() {
   try {
@@ -87,6 +88,7 @@ export async function GET() {
           notificationLimit: admin ? null : entitlements.notificationsPerMonth,
           activeFeatures,
           comparison: FEATURE_COMPARISON_ROWS,
+          schedule: describeDeploymentSchedule(),
         });
       },
       user.id

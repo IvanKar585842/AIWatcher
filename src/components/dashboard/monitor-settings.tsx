@@ -85,6 +85,7 @@ interface MonitorData {
   lastChangedAt: string | null;
   errorMessage: string | null;
   changes: MonitorChange[];
+  capture?: { headline: string; lines: string[] } | null;
   _count: { changes: number; snapshots: number };
 }
 
@@ -206,6 +207,8 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [checking, setChecking] = useState(false);
+  const [checkReport, setCheckReport] = useState<{ title: string; lines: string[] } | null>(null);
+  const baselineStarted = useRef(false);
   const [saved, setSaved] = useState(false);
   const [plan, setPlan] = useState<Plan>("FREE");
   const [monitor, setMonitor] = useState<MonitorData | null>(null);
@@ -358,13 +361,42 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
     setSaving(false);
   }
 
-  async function checkNow() {
+  const checkNow = useCallback(async () => {
     setChecking(true);
-    await fetch(`/api/monitors/${monitorId}/check`, { method: "POST" });
-    const m = await loadMonitor();
-    if (m) setMonitor(m);
-    setChecking(false);
-  }
+    try {
+      const res = await fetch(`/api/monitors/${monitorId}/check`, { method: "POST" });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.report?.title) {
+        setCheckReport({
+          title: data.report.title,
+          lines: Array.isArray(data.report.lines) ? data.report.lines : [],
+        });
+      } else if (data?.monitoringError?.title) {
+        setCheckReport({
+          title: data.monitoringError.title,
+          lines: Array.isArray(data.monitoringError.suggestions)
+            ? data.monitoringError.suggestions
+            : [],
+        });
+      } else {
+        setCheckReport({ title: "Check failed", lines: [] });
+      }
+      const m = await loadMonitor();
+      if (m) setMonitor(m);
+    } catch {
+      setCheckReport({ title: "Check failed", lines: ["The request did not finish."] });
+    } finally {
+      setChecking(false);
+    }
+  }, [loadMonitor, monitorId]);
+
+  useEffect(() => {
+    if (!monitor || baselineStarted.current) return;
+    if (monitor.status === "ACTIVE" && monitor._count.snapshots === 0 && !monitor.lastCheckedAt) {
+      baselineStarted.current = true;
+      void checkNow();
+    }
+  }, [monitor, checkNow]);
 
   async function resetHistory() {
     if (!confirm("Reset all change history and snapshots for this monitor?")) return;
@@ -470,7 +502,7 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
             className="border-white/[0.08] bg-black/30 text-zinc-300 hover:bg-white/[0.05] hover:text-cyan-300"
           >
             <RefreshCw className={`mr-2 h-4 w-4 ${checking ? "animate-spin" : ""}`} />
-            Check Now
+            {checking ? "Checking…" : "Check Now"}
           </Button>
           <a href={form.url} target="_blank" rel="noopener noreferrer">
             <Button
@@ -491,6 +523,19 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
           </Button>
         </div>
       </motion.div>
+
+      {(checkReport || monitor.capture) && (
+        <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/[0.06] px-4 py-3">
+          <p className="text-sm font-medium text-cyan-100">
+            {checkReport?.title ?? "Latest capture"}
+          </p>
+          <ul className="mt-2 space-y-1 text-sm text-zinc-300">
+            {(checkReport?.lines ?? monitor.capture?.lines ?? []).map((line, index) => (
+              <li key={`${index}-${line}`}>{line}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {monitor.errorMessage && (
         <MonitorErrorBanner

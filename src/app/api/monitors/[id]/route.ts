@@ -14,13 +14,14 @@ import {
 import { withRateLimit } from "@/lib/rate-limit";
 import { resolveFaviconUrl } from "@/lib/favicon";
 import { getFaviconUrl } from "@/lib/utils";
-import { assertMonitorOwnedBy } from "@/lib/security/ownership";
+import { assertMonitorOwnedBy, monitorReadFilter } from "@/lib/security/ownership";
 import { updateMonitorSchema } from "@/lib/validations";
 import {
   prepareMonitorConfigForStorage,
   sanitizeMonitorConfigForClient,
 } from "@/lib/monitoring/session-cookies";
 import { invalidateUserMonitoringContext } from "@/lib/ai/chat-user-context";
+import { summarizeCapture } from "@/lib/monitoring/capture-summary";
 
 function isVisualMode(mode: MonitoringMode): boolean {
   return mode === MonitoringMode.VISUAL_CHANGES || mode === MonitoringMode.SCREENSHOT_DIFF;
@@ -37,7 +38,7 @@ export async function GET(
       `monitor-get-${id}`,
       async () => {
         const monitor = await prisma.monitor.findFirst({
-          where: { id, userId: user.id },
+          where: { AND: [{ id }, await monitorReadFilter(user.id)] },
           include: {
             changes: {
               orderBy: { createdAt: "desc" },
@@ -52,15 +53,25 @@ export async function GET(
               },
             },
             _count: { select: { changes: true, snapshots: true } },
+            snapshots: {
+              orderBy: { createdAt: "desc" },
+              take: 1,
+              select: { metadata: true, extractedText: true },
+            },
           },
         });
         if (!monitor) {
           return NextResponse.json({ error: "Monitor not found" }, { status: 404 });
         }
+        const latest = monitor.snapshots[0];
         return NextResponse.json({
           monitor: {
             ...monitor,
+            snapshots: undefined,
             config: sanitizeMonitorConfigForClient(monitor.config),
+            capture: latest
+              ? summarizeCapture(latest.metadata, latest.extractedText)
+              : null,
           },
           plan: getEffectivePlan(user),
         });

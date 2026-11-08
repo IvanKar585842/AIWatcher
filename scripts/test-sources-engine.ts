@@ -7,7 +7,9 @@
 import { MonitoringMode } from "@prisma/client";
 import { compareSnapshots } from "../src/lib/monitoring/compare";
 import { describeSource } from "../src/lib/monitoring/sources/describe";
-import { parseFeed } from "../src/lib/monitoring/sources/feeds";
+import { feedAlternate, parseFeed } from "../src/lib/monitoring/sources/feeds";
+import { normalizeSubmittedUrl } from "../src/lib/monitoring/link-url";
+import { recommendMonitorSetup } from "../src/lib/monitoring/recommend";
 import type { SourceRecord } from "../src/lib/monitoring/sources/types";
 import { runSourceCheck } from "../src/lib/monitoring/sources/registry";
 
@@ -204,6 +206,76 @@ async function main() {
 
   const support = describeSource("https://www.otto.de/product/1");
   record("otto opens as a public storefront", support.support === "webpage" && support.label === "Otto", support.detail.slice(0, 80));
+
+  record(
+    "feed alternate accepts href before rel",
+    feedAlternate(`<link href="/rss.xml" type="application/rss+xml" rel="alternate">`, "https://www.theguardian.com/") ===
+      "https://www.theguardian.com/rss.xml",
+    "href before rel"
+  );
+  const calls: string[] = [];
+  const discovered = await runSourceCheck("https://www.theguardian.com/", {
+    fetchImpl: async (input) => {
+      const target = String(input);
+      calls.push(target);
+      if (target === "https://www.theguardian.com/") {
+        return xmlResponse(`<html><link href="/international/rss" rel="alternate" type="application/rss+xml"></html>`);
+      }
+      return xmlResponse(feed);
+    },
+  });
+  record(
+    "news homepage follows the same-site rss link",
+    discovered?.metadata.adapter === "feed" && calls.length === 2 && ((discovered.metadata.recordCount as number) ?? 0) === 2,
+    calls.join(" ")
+  );
+  const article = await runSourceCheck("https://www.theguardian.com/world/2026/nov/06/a-story", {
+    fetchImpl: async () => xmlResponse("<html>article</html>"),
+  });
+  record("a news article stays a page check", article === null, "page");
+  const offsite = await runSourceCheck("https://www.bbc.com/", {
+    fetchImpl: async () => xmlResponse(`<html><link rel="alternate" type="application/rss+xml" href="https://evil.example/rss.xml"></html>`),
+  });
+  record("an off-site feed link is ignored", offsite === null, "ignored");
+  const release = recommendMonitorSetup("https://github.com/nodejs/node/releases", "");
+  record("a releases URL is recommended as a release watch", release.sourceType === "release", release.label);
+  const catalog = recommendMonitorSetup(
+    "https://books.example/",
+    `<article class="product_pod"><a title="Alpha">Alpha</a><p>£10.00</p></article>
+     <article class="product_pod"><a title="Beta">Beta</a><p>£20.00</p></article>
+     <article class="product_pod"><a title="Gamma">Gamma</a><p>£30.00</p></article>`
+  );
+  record("a product grid is recommended as a catalog", catalog.label === "Product catalog", catalog.detail.slice(0, 60));
+  const home = recommendMonitorSetup(
+    "https://www.theguardian.com/",
+    `<link href="/international/rss" rel="alternate" type="application/rss+xml">`
+  );
+  record("a news home is recommended as a feed", home.sourceType === "news_feed", home.label);
+  record(
+    "a pasted link gains https and drops a campaign tag",
+    normalizeSubmittedUrl("example.com/docs?utm_source=newsletter&id=1") === "https://example.com/docs?id=1",
+    normalizeSubmittedUrl("example.com/docs?utm_source=newsletter&id=1")
+  );
+  const blogCalls: string[] = [];
+  const blog = await runSourceCheck("https://example.com/blog", {
+    fetchImpl: async (input) => {
+      const target = String(input);
+      blogCalls.push(target);
+      if (target === "https://example.com/blog") {
+        return xmlResponse(`<html><link rel="alternate" type="application/rss+xml" href="/blog/rss.xml"></html>`);
+      }
+      return xmlResponse(feed);
+    },
+  });
+  record(
+    "a blog index follows the same-site feed",
+    blog?.metadata.adapter === "feed" && blogCalls.length === 2,
+    blogCalls.join(" ")
+  );
+  const storeSection = await runSourceCheck("https://www.conrad.de/news", {
+    fetchImpl: async () => xmlResponse(`<html><link rel="alternate" type="application/rss+xml" href="/rss"></html>`),
+  });
+  record("a store section stays a page check", storeSection === null, "page");
 
   const passed = results.filter((item) => item.ok).length;
   console.log(`\n${passed}/${results.length} source assertions passed. No live marketplace calls were made.`);

@@ -1,5 +1,5 @@
 import { MonitoringMode } from "@prisma/client";
-import { MARKETPLACES, lookupMarketplace } from "../src/lib/monitoring/marketplace/catalog";
+import { MARKETPLACES, lookupMarketplace, marketplaceCommercialUse } from "../src/lib/monitoring/marketplace/catalog";
 import { amazonLocale } from "../src/lib/monitoring/marketplace/http";
 import { ebayMarketplaceIdForHost } from "../src/lib/monitoring/marketplace/ebay-browse";
 import { describeSource } from "../src/lib/monitoring/sources/describe";
@@ -20,7 +20,7 @@ async function main() {
   assert("catalog lists at least 150 marketplaces", MARKETPLACES.length >= 150, String(MARKETPLACES.length));
 assert("catalog domains are unique", domains.size === MARKETPLACES.length);
 
-const closed = ["zalando.de", "ozon.ru", "shopee.sg", "wildberries.ru", "coupang.com", "mercadolibre.com.ar"];
+const closed = ["zalando.de", "ozon.ru", "shopee.sg", "wildberries.ru", "coupang.com", "mercadolibre.com.ar", "conrad.de", "scan.co.uk", "macys.com", "bhphotovideo.com", "mediamarkt.pl", "e.leclerc"];
 for (const domain of closed) {
   const found = lookupMarketplace(domain);
   assert(`${domain} is recognized and opened as a public page`, found?.access === "public-page", found?.access);
@@ -29,6 +29,18 @@ for (const domain of closed) {
 assert("amazon.se uses the Swedish Creators locale", amazonLocale("www.amazon.se")?.currency === "SEK");
 assert("ebay.de selects EBAY_DE from the hostname", ebayMarketplaceIdForHost("www.ebay.de") === "EBAY_DE");
 assert("an unknown host is not forced to EBAY_US", ebayMarketplaceIdForHost("example.com") === null);
+assert(
+  "Amazon stays unapproved for paid comparison",
+  marketplaceCommercialUse(lookupMarketplace("amazon.de")!) === "requires_clarification"
+);
+assert(
+  "a public storefront is not described as an official API",
+  marketplaceCommercialUse(lookupMarketplace("zalando.de")!) === "public_page"
+);
+assert(
+  "Amazon copy says paid use is not approved",
+  describeSource("https://www.amazon.de/dp/B0TESTAS01").detail.includes("not approved")
+);
 
 const zalando = describeSource("https://www.zalando.de/product");
 assert("zalando is shown as a public storefront", zalando.support === "webpage" && zalando.label === "Zalando");

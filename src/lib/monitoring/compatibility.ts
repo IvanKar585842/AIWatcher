@@ -7,6 +7,7 @@ import {
   PROTECTED_SITE_WARNING,
 } from "@/lib/monitor-types";
 import { assertSafeFetchUrl, fetchWithSafeRedirects, validateMonitorUrl } from "@/lib/security/url";
+import { recommendMonitorSetup, type MonitorRecommendation } from "@/lib/monitoring/recommend";
 
 export type CompatibilityVerdict =
   | "PUBLIC"
@@ -23,6 +24,7 @@ export type CompatibilityResult = {
   risky: boolean;
   httpStatus: number | null;
   checkedUrl: string;
+  recommendation?: MonitorRecommendation;
 };
 
 const PROBE_TIMEOUT_MS = 10_000;
@@ -178,6 +180,18 @@ async function readBodyLimited(response: Response): Promise<string> {
   return new TextDecoder("utf-8", { fatal: false }).decode(merged);
 }
 
+function withRecommendation(
+  base: CompatibilityResult,
+  url: string,
+  html: string
+): CompatibilityResult {
+  const recommendation = recommendMonitorSetup(url, html);
+  if (recommendation.sourceType === "webpage" && recommendation.label === "General webpage") {
+    return base;
+  }
+  return { ...base, recommendation };
+}
+
 function result(
   verdict: CompatibilityVerdict,
   checkedUrl: string,
@@ -254,10 +268,10 @@ export async function checkMonitorCompatibility(
     }
 
     if (status === 401 || status === 403) {
-      return result(
-        status === 401 ? "REQUIRES_LOGIN" : "ANTI_BOT",
+      return withRecommendation(
+        result(status === 401 ? "REQUIRES_LOGIN" : "ANTI_BOT", finalUrl, status),
         finalUrl,
-        status
+        ""
       );
     }
 
@@ -280,14 +294,14 @@ export async function checkMonitorCompatibility(
     }
 
     if (headersSuggestAntiBot(response.headers)) {
-      return result("ANTI_BOT", finalUrl, status);
+      return withRecommendation(result("ANTI_BOT", finalUrl, status), finalUrl, "");
     }
 
     const contentType = (response.headers.get("content-type") || "").toLowerCase();
     const body = await readBodyLimited(response);
 
     if (containsAntiBotChallenge(body) || status === 429 || status === 503) {
-      return result("ANTI_BOT", finalUrl, status);
+      return withRecommendation(result("ANTI_BOT", finalUrl, status), finalUrl, body);
     }
 
     if (bodySuggestsLogin(body) || pathLooksPrivate(finalPath)) {
@@ -299,25 +313,28 @@ export async function checkMonitorCompatibility(
       contentType.includes("application/xhtml") ||
       body.trimStart().startsWith("<")
     ) {
+      const recommendation = recommendMonitorSetup(finalUrl, body);
       if (bodyLooksDynamicShell(body)) {
-        return result("DYNAMIC", finalUrl, status);
+        return { ...result("DYNAMIC", finalUrl, status), recommendation };
       }
-      return result("PUBLIC", finalUrl, status);
+      return { ...result("PUBLIC", finalUrl, status), recommendation };
     }
 
-    // Non-HTML (JSON API, feed, etc.) — still monitorable in some modes
     if (
       contentType.includes("json") ||
       contentType.includes("xml") ||
       contentType.includes("rss") ||
       contentType.includes("atom")
     ) {
-      return result(
-        "PUBLIC",
-        finalUrl,
-        status,
-        "This URL returns structured public data (JSON/XML/feed). Monitoring should work with the right monitor type."
-      );
+      return {
+        ...result(
+          "PUBLIC",
+          finalUrl,
+          status,
+          "This URL returns structured public data (JSON/XML/feed). Monitoring should work with the right monitor type."
+        ),
+        recommendation: recommendMonitorSetup(finalUrl, body),
+      };
     }
 
     return result(

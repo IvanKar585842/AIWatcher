@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { apiErrorResponse } from "@/lib/api-response";
 import { classifyMonitoringError } from "@/lib/monitoring/error-messages";
 import { closeBrowser } from "@/lib/monitoring/fetcher";
+import { describeCheck } from "@/lib/monitoring/capture-summary";
 import { processMonitor } from "@/lib/monitoring/processor";
 import { processPendingAnalyses } from "@/lib/monitoring/ai-processor";
 import { withRateLimit } from "@/lib/rate-limit";
@@ -25,13 +26,15 @@ export async function POST(
         await assertMonitorOwnedBy(user.id, id);
 
         try {
-          const result = await processMonitor(id);
+          const result = await processMonitor(id, { force: true });
           if (result.status === "change_detected") {
             await processPendingAnalyses(1);
           }
+          const report = describeCheck(result);
           return NextResponse.json({
             success: true,
-            message: "Check completed",
+            message: report.title,
+            report,
             result,
           });
         } catch (error) {

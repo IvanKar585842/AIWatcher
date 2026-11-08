@@ -100,10 +100,13 @@ function versionFrom(title: string | null): string | null {
 }
 
 export function feedAlternate(html: string, pageUrl: string): string | null {
-  const match = html.match(/<link[^>]*rel=["']alternate["'][^>]*>/i);
-  if (!match) return null;
-  const type = match[0].match(/type=["']([^"']+)["']/i)?.[1] ?? "";
-  if (!/rss|atom|xml/i.test(type)) return null;
-  const href = match[0].match(/href=["']([^"']+)["']/i)?.[1];
-  return href ? absolute(href, pageUrl) : null;
+  const tags = html.match(/<link\b[^>]*>/gi) ?? [];
+  for (const tag of tags) {
+    if (!/\brel=["'][^"']*\balternate\b/i.test(tag)) continue;
+    const type = tag.match(/\btype=["']([^"']+)["']/i)?.[1] ?? "";
+    if (!/rss|atom|xml/i.test(type)) continue;
+    const href = tag.match(/\bhref=["']([^"']+)["']/i)?.[1];
+    if (href) return absolute(href, pageUrl);
+  }
+  return null;
 }

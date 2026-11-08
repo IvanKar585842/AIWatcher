@@ -41,6 +41,7 @@ interface BillingOverview {
     cancelAtPeriodEnd: boolean;
     canManageBilling?: boolean;
   } | null;
+  schedule?: { minutes: number; label: string; detail: string };
   activeFeatures?: Array<{ name: string; label: string }>;
   comparison?: Array<{
     label: string;
@@ -230,6 +231,13 @@ export default function BillingPage() {
           Manage subscription
         </Button>
       </CommandPageHeader>
+
+      {overview?.schedule && (
+        <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/[0.06] px-4 py-3 text-sm text-cyan-50/90">
+          <p className="font-medium">Automatic checks: {overview.schedule.label}</p>
+          <p className="mt-1 text-zinc-300">{overview.schedule.detail}</p>
+        </div>
+      )}
 
       {overview && !paymentsReady && (
         <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100/90">

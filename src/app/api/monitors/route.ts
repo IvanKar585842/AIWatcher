@@ -24,6 +24,7 @@ import {
   sanitizeMonitorConfigForClient,
 } from "@/lib/monitoring/session-cookies";
 import { invalidateUserMonitoringContext } from "@/lib/ai/chat-user-context";
+import { monitorReadFilter } from "@/lib/security/ownership";
 
 function isVisualMode(mode: MonitoringMode): boolean {
   return mode === MonitoringMode.VISUAL_CHANGES || mode === MonitoringMode.SCREENSHOT_DIFF;
@@ -55,7 +56,7 @@ export async function GET() {
           void trackEvent({ type: "user.active", userId });
 
           const monitors = await prisma.monitor.findMany({
-            where: { userId },
+            where: await monitorReadFilter(userId),
             orderBy: { createdAt: "desc" },
             take: 250,
             include: {

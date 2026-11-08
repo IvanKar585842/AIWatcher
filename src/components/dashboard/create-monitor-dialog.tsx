@@ -63,6 +63,7 @@ import {
 } from "@/lib/monitor-types";
 import { loadUserSettings } from "@/lib/user-settings";
 import { cn } from "@/lib/utils";
+import { normalizeSubmittedUrl } from "@/lib/monitoring/link-url";
 import { describeSource } from "@/lib/monitoring/sources/describe";
 import type { SourceKind } from "@/lib/monitoring/sources/types";
 import { PRODUCT_TOUR_EVENTS } from "@/lib/product-tour";
@@ -189,6 +190,11 @@ function CompatibilityPanel({
           <p className="mt-1 text-[11px] leading-relaxed text-zinc-400 sm:text-xs">
             {result.explanation}
           </p>
+          {result.recommendation && (
+            <p className="mt-2 text-[11px] leading-relaxed text-zinc-300 sm:text-xs">
+              Suggested watch: {result.recommendation.label}. {result.recommendation.detail}
+            </p>
+          )}
           {result.risky && !acknowledged && (
             <button
               type="button"
@@ -249,6 +255,7 @@ export function CreateMonitorDialog({
   const [showAdvancedTypes, setShowAdvancedTypes] = useState(false);
   const [plan, setPlan] = useState<Plan>(Plan.FREE);
   const [compatibility, setCompatibility] = useState<CompatibilityResult | null>(null);
+  const [sourceTouched, setSourceTouched] = useState(false);
   const [compatCheckedUrl, setCompatCheckedUrl] = useState("");
   const [checkingCompat, setCheckingCompat] = useState(false);
   const [compatAcknowledged, setCompatAcknowledged] = useState(false);
@@ -403,9 +410,13 @@ export function CreateMonitorDialog({
   }, [advancedTypes, typeFilter, typeSearch]);
 
   function validateStep1(): string | null {
-    if (!form.url.trim()) return "Website URL is required";
+    const url = normalizeSubmittedUrl(form.url);
+    if (!url) return "Website URL is required";
     try {
-      new URL(form.url);
+      const parsed = new URL(url);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        return "Please enter a valid URL (include https://)";
+      }
     } catch {
       return "Please enter a valid URL (include https://)";
     }
@@ -472,6 +483,14 @@ export function CreateMonitorDialog({
       setCompatibility(result.data.compatibility);
       setCompatCheckedUrl(url.trim());
       setCompatAcknowledged(!result.data.compatibility.risky);
+      const suggestion = result.data.compatibility.recommendation;
+      if (!sourceTouched && suggestion) {
+        setForm((prev) => ({
+          ...prev,
+          sourceType: suggestion.sourceType,
+          watchScope: suggestion.watchScope,
+        }));
+      }
       return result.data.compatibility;
     } finally {
       setCheckingCompat(false);
@@ -496,7 +515,8 @@ export function CreateMonitorDialog({
       return;
     }
 
-    const url = form.url.trim();
+    const url = normalizeSubmittedUrl(form.url);
+    if (url !== form.url) setForm((prev) => ({ ...prev, url }));
     let compat = compatibility;
     const needsFreshCheck = !compat || compatCheckedUrl !== url;
 
@@ -634,7 +654,24 @@ export function CreateMonitorDialog({
                     type="url"
                     placeholder="https://docs.example.com/getting-started"
                     value={form.url}
-                    onChange={(e) => setForm({ ...form, url: e.target.value })}
+                    onChange={(e) => {
+                      setSourceTouched(false);
+                      setForm({ ...form, url: e.target.value });
+                    }}
+                    onPaste={(e) => {
+                      const next = normalizeSubmittedUrl(e.clipboardData.getData("text"));
+                      if (!next.startsWith("http")) return;
+                      e.preventDefault();
+                      setSourceTouched(false);
+                      setForm((prev) => ({ ...prev, url: next }));
+                    }}
+                    onBlur={() => {
+                      const next = normalizeSubmittedUrl(form.url);
+                      if (next && next !== form.url) {
+                        setSourceTouched(false);
+                        setForm((prev) => ({ ...prev, url: next }));
+                      }
+                    }}
                     autoFocus
                   />
                   {protectedWarning && (
@@ -651,7 +688,10 @@ export function CreateMonitorDialog({
                   </FieldLabel>
                   <Select
                     value={form.sourceType}
-                    onValueChange={(value) => setForm({ ...form, sourceType: value as SourceKind })}
+                    onValueChange={(value) => {
+                      setSourceTouched(true);
+                      setForm({ ...form, sourceType: value as SourceKind });
+                    }}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -668,10 +708,10 @@ export function CreateMonitorDialog({
                       <SelectItem value="changelog">Changelog</SelectItem>
                     </SelectContent>
                   </Select>
-                  {form.url.trim().startsWith("http") && (
+                  {normalizeSubmittedUrl(form.url).startsWith("http") && (
                     <p className="mt-2 text-xs leading-relaxed text-zinc-400">
-                      <span className="text-zinc-200">{describeSource(form.url.trim(), form.sourceType).label}.</span>{" "}
-                      {describeSource(form.url.trim(), form.sourceType).detail}
+                      <span className="text-zinc-200">{describeSource(normalizeSubmittedUrl(form.url), form.sourceType).label}.</span>{" "}
+                      {describeSource(normalizeSubmittedUrl(form.url), form.sourceType).detail}
                     </p>
                   )}
                 </div>

@@ -34,6 +34,7 @@ const PUBLIC_PATH_MATCHERS = [
   "/api/stripe/webhook",
   "/api/telegram/webhook",
   "/api/cron(.*)",
+  "/api/v1(.*)",
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/sitemap.xml",

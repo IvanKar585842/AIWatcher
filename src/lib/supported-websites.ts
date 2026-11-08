@@ -28,6 +28,7 @@ export const PARTIALLY_SUPPORTED_SITES = [
   "Shopify",
   "Notion public pages",
   "Google Sites",
+  "Recognized public storefronts such as Conrad, Scan, Macy's, B&H, MediaMarkt, LDLC, Thomann, and the other catalog stores",
 ] as const;
 
 export const UNSUPPORTED_OR_UNSTABLE_SITES = [
