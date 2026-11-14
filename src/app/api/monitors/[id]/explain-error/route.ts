@@ -31,7 +31,7 @@ async function generateExplanation(prompt: string): Promise<string> {
         {
           role: "system",
           content:
-            "You explain website monitoring failures to non-technical SaaS users. Be concise, calm, and practical. Never invent stack traces or internal details.",
+            "You explain why a check of the company's own website failed. Be concise, calm, and practical. Never invent stack traces or internal details.",
         },
         { role: "user", content: prompt },
       ],
@@ -103,7 +103,7 @@ export async function POST(
 
         // Minimal payload only — no HTML, snapshots, or stack traces
         const prompt = [
-          "Explain why this website monitoring check failed.",
+          "Explain why this check of the company's own site failed.",
           "Write 3 short sentences covering: what happened, why it likely happened, and what the user can do.",
           "Do not invent HTTP codes. Do not mention databases, browsers, or stack traces.",
           "",

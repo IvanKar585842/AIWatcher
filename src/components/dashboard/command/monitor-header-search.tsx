@@ -125,8 +125,8 @@ export function MonitorHeaderSearch({ className }: { className?: string }) {
         }}
         onFocus={onFocus}
         onKeyDown={onKeyDown}
-        placeholder="Search monitors…"
-        aria-label="Search monitors by name, domain, or URL"
+        placeholder="Search your sites…"
+        aria-label="Search your sites by name or address"
         aria-autocomplete="list"
         aria-controls={listId}
         aria-expanded={showPanel}

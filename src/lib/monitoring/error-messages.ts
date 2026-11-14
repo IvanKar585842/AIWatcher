@@ -42,12 +42,12 @@ const KIND_COPY: Record<
   BLOCKED: {
     title: "This website denied automated access.",
     description:
-      "The site refused this check (often HTTP 401/403). Public pages with strong access controls may not support automated monitoring.",
+      "The site refused this check (often HTTP 401/403). If this is your company's site, verify the domain or install the site script. WatchFlowing does not bypass protection.",
     suggestions: [
-      "Try another public page on the same site",
-      "Choose a page that loads without signing in",
-      "Use a public API or RSS feed if the site provides one",
-      "If you own the site, verify the domain or install the site script. That does not bypass the challenge",
+      "Add a page on your site that loads without a login",
+      "Verify the domain or install the site script",
+      "Use a feed your company publishes, if you have one",
+      "If you own the site, the script reports errors without bypassing the challenge",
     ],
     statusLabel: "Access denied",
     tone: "red",
@@ -80,12 +80,12 @@ const KIND_COPY: Record<
     icon: "clock",
   },
   INVALID_URL: {
-    title: "This URL cannot be monitored",
+    title: "This address cannot be checked",
     description:
       "The address is invalid or not allowed for security reasons (for example private/internal networks).",
     suggestions: [
       "Double-check the URL starts with https://",
-      "Use a public website address",
+      "Use the address of a page your company owns",
       "Remove login credentials from the URL",
     ],
     statusLabel: "Invalid URL",
@@ -158,7 +158,7 @@ const KIND_COPY: Record<
       "This marketplace is not opened in a browser. Add the official API credentials on the server to monitor it.",
     suggestions: [
       "Set the marketplace credentials in the server environment",
-      "Use a public page or RSS feed for sites without an API",
+      "Add a page your company owns, or a feed you publish",
       "Confirm the partner tag belongs to this marketplace",
     ],
     statusLabel: "Credentials required",

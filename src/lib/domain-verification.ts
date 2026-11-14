@@ -67,7 +67,7 @@ export function refusalGuidance(errorMessage: string | null | undefined, verifie
     return "The site's robots.txt disallows this check. Watchflowing keeps that refusal.";
   }
   if (verified) {
-    return "This domain is verified. The public page still refused the check. Verification does not bypass that protection.";
+    return "This domain is verified. The page still refused the check. Verification does not bypass that protection.";
   }
   return "Watchflowing does not bypass this refusal. If you own the site, verify the domain or install the site script.";
 }

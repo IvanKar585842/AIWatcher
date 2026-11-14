@@ -4,102 +4,74 @@
  */
 
 export const ANTIBOT_DISCLAIMER =
-  "Some websites use protection against automated requests. In those cases, monitoring may be limited or unavailable.";
+  "WatchFlowing does not bypass protection on a site. If your own site blocks an automated check, verify the domain or install the site script.";
 
 export const FULLY_SUPPORTED_SITES = [
-  "Most regular websites",
-  "WordPress",
-  "Webflow",
-  "Wix",
-  "Squarespace",
-  "GitHub",
-  "GitLab",
-  "Wikipedia",
-  "Government sites",
-  "University sites",
-  "News sites",
-  "Corporate sites",
-  "Documentation",
-  "Blogs",
-  "Public HTML pages",
+  "Your homepage",
+  "Your docs and help center",
+  "Your pricing page",
+  "Your blog and newsroom",
+  "Your careers page",
+  "Your changelog",
+  "WordPress, Webflow, Wix, Squarespace sites you own",
 ] as const;
 
 export const PARTIALLY_SUPPORTED_SITES = [
-  "Shopify",
-  "Notion public pages",
-  "Google Sites",
-  "Recognized public storefronts such as Conrad, Scan, Macy's, B&H, MediaMarkt, LDLC, Thomann, and the other catalog stores",
+  "A Shopify store you operate",
+  "A Notion page you published",
+  "A Google Site you own",
+  "A store you operate, when the page loads without a challenge",
 ] as const;
 
 export const UNSUPPORTED_OR_UNSTABLE_SITES = [
-  "Amazon",
-  "eBay",
-  "AliExpress",
-  "Temu",
-  "Most marketplaces",
-  "CAPTCHA-protected sites",
-  "Pages behind login",
-  "Cloudflare Bot Protection",
-  "DataDome",
-  "Akamai Bot Manager",
-  "Other strong anti-bot protections",
+  "A page on your site that asks for a login",
+  "A challenge or CAPTCHA on your own site",
+  "A page that stays empty until a bot check finishes",
 ] as const;
 
 /** Landing + help: realistic monitoring scenarios */
 export const REAL_USE_CASES = [
-  { id: "text", label: "Page text changes", description: "Detect wording updates on public pages." },
-  { id: "section", label: "HTML section or element", description: "Watch a CSS/XPath target area." },
-  { id: "docs", label: "Documentation", description: "Track docs, guides, and API references." },
-  { id: "news", label: "News & press", description: "Catch new articles and press updates." },
-  { id: "gov", label: "Government sites", description: "Monitor public agency announcements." },
-  { id: "uni", label: "University sites", description: "Follow aid, admissions, and campus updates." },
-  { id: "blog", label: "Blogs", description: "See new or edited posts." },
-  { id: "changelog", label: "Changelogs", description: "Watch product and release notes." },
-  { id: "github", label: "GitHub README & Releases", description: "Track public repo release pages." },
-  { id: "corp", label: "Corporate websites", description: "Homepage, about, and product pages." },
-  { id: "jobs", label: "Job listings", description: "New roles and career page updates." },
-  { id: "docs-public", label: "Public documents", description: "Policies, PDFs pages, and notices." },
-  { id: "pricing", label: "Public pricing pages", description: "SaaS / company plan pages — not marketplaces." },
-  { id: "tos", label: "Terms of use", description: "Legal page revisions." },
-  { id: "privacy", label: "Privacy policies", description: "Policy wording changes." },
-  { id: "schedule", label: "Schedules", description: "Timetables and calendar pages." },
-  { id: "results", label: "Results & announcements", description: "Public boards and result pages." },
-  { id: "ai", label: "AI change analysis", description: "Summaries of what changed and why it matters." },
+  { id: "text", label: "Your page text", description: "Wording changes on a page your company owns." },
+  { id: "section", label: "One section", description: "A header, price, or block you choose." },
+  { id: "docs", label: "Your docs", description: "Guides and API pages you publish." },
+  { id: "news", label: "Your newsroom", description: "Posts and press updates on your site." },
+  { id: "blog", label: "Your blog", description: "New or edited posts you published." },
+  { id: "changelog", label: "Your changelog", description: "Release notes on your own product site." },
+  { id: "corp", label: "Your homepage", description: "Home, about, and product pages you operate." },
+  { id: "jobs", label: "Your careers page", description: "Roles you add or remove." },
+  { id: "docs-public", label: "Your policies", description: "Terms, privacy, and notices you host." },
+  { id: "pricing", label: "Your pricing page", description: "Plans and prices on your own site." },
+  { id: "ai", label: "A plain explanation", description: "What changed on your site, and why it matters." },
 ] as const;
 
 export const CANNOT_MONITOR_REASONS = [
   {
-    label: "Marketplaces",
-    detail: "Amazon, eBay, AliExpress, Temu and similar often block automated checks.",
+    label: "A login on your site",
+    detail: "Add a page that loads without signing in. A private dashboard is not checked.",
   },
   {
-    label: "Strong anti-bot protection",
-    detail: "Cloudflare Bot Protection, DataDome, Akamai Bot Manager, and similar.",
+    label: "A challenge on your site",
+    detail: "If your site blocks the check, the last good snapshot stays. Verification and the site script do not bypass that.",
   },
   {
-    label: "Login & CAPTCHA pages",
-    detail: "Private dashboards and CAPTCHA walls are not supported.",
-  },
-  {
-    label: "Heavy client-only apps",
-    detail: "Pages that only appear after complex JavaScript may be unreliable.",
+    label: "A page that never finishes loading",
+    detail: "If the HTML stays empty until heavy scripts run, the check can be incomplete.",
   },
 ] as const;
 
 export const POPULAR_MONITORING_EXAMPLES = [
-  "Government updates",
-  "Documentation",
-  "Company news",
-  "GitHub projects",
-  "Public announcements",
-  "Job listings",
-  "University updates",
+  "Your homepage",
+  "Your docs",
+  "Your pricing page",
+  "Your changelog",
+  "Your blog",
+  "Your careers page",
+  "Your privacy policy",
 ] as const;
 
 export const BEST_SUPPORTED_SUMMARY = [
-  "Corporate & government sites",
-  "Docs, blogs & news",
-  "GitHub / GitLab / Wikipedia",
-  "WordPress, Webflow, Wix, Squarespace",
-  "University & public HTML pages",
+  "Pages your company owns",
+  "Your docs, blog, and changelog",
+  "Your pricing and careers pages",
+  "Sites you built on WordPress, Webflow, Wix, or Squarespace",
 ] as const;

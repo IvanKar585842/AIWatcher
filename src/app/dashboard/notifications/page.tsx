@@ -139,7 +139,7 @@ export default function NotificationsPage() {
       <CommandPageHeader
         label="Alerts"
         title="Notification Center"
-        description="AI-powered alerts with importance, summaries, and recommended actions."
+        description="Alerts about the sites your company owns."
       >
         {unreadCount > 0 && (
           <button
@@ -159,7 +159,7 @@ export default function NotificationsPage() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search monitors or summaries…"
+            placeholder="Search your sites or summaries…"
             className="h-11 w-full rounded-xl border border-white/[0.08] bg-black/40 pl-10 pr-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-cyan-400/30"
           />
         </div>

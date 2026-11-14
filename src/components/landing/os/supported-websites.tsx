@@ -25,14 +25,14 @@ import {
 } from "@/lib/supported-websites";
 
 const CATEGORY_ICONS = [
-  { icon: Globe2, label: "Public websites" },
-  { icon: Building2, label: "Corporate sites" },
-  { icon: BookOpen, label: "Documentation" },
-  { icon: Newspaper, label: "News & blogs" },
-  { icon: Github, label: "GitHub / GitLab" },
-  { icon: Landmark, label: "Government" },
-  { icon: GraduationCap, label: "Universities" },
-  { icon: FileText, label: "Policies & legal" },
+  { icon: Globe2, label: "Your homepage" },
+  { icon: Building2, label: "Your product pages" },
+  { icon: BookOpen, label: "Your docs" },
+  { icon: Newspaper, label: "Your blog" },
+  { icon: Github, label: "Your changelog" },
+  { icon: Landmark, label: "Your pricing" },
+  { icon: GraduationCap, label: "Your help center" },
+  { icon: FileText, label: "Your policies" },
 ] as const;
 
 export function OsSupportedWebsites() {
@@ -55,14 +55,14 @@ export function OsSupportedWebsites() {
           className="mb-14 max-w-2xl"
         >
           <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.35em] text-cyan-500/70">
-            Supported websites
+            Your sites
           </p>
           <h2 className="text-3xl font-light tracking-tight text-zinc-100 md:text-4xl">
-            What can WatchFlowing monitor?
+            Pages your company already runs
           </h2>
           <p className="mt-4 text-sm leading-relaxed text-zinc-500">
-            Built for public HTML pages — documentation, news, government notices,
-            university updates, corporate sites, and more. AI explains meaningful changes.
+            Add the homepage, docs, pricing, or another page you own. The assistant explains
+            important changes on those pages.
           </p>
         </motion.div>
 
@@ -112,7 +112,7 @@ export function OsSupportedWebsites() {
           >
             <div className="mb-4 flex items-center gap-2">
               <CheckCircle2 className="h-5 w-5 text-emerald-400" />
-              <h3 className="text-base font-medium text-emerald-100">Supported websites</h3>
+              <h3 className="text-base font-medium text-emerald-100">Pages that work well</h3>
             </div>
             <ul className="mb-4 grid gap-1.5 sm:grid-cols-2">
               {FULLY_SUPPORTED_SITES.map((item) => (
@@ -143,7 +143,7 @@ export function OsSupportedWebsites() {
           >
             <div className="mb-4 flex items-center gap-2">
               <Ban className="h-5 w-5 text-zinc-400" />
-              <h3 className="text-base font-medium text-zinc-100">What cannot be monitored</h3>
+              <h3 className="text-base font-medium text-zinc-100">When a check on your site stops</h3>
             </div>
             <div className="mb-5 space-y-3">
               {CANNOT_MONITOR_REASONS.map((row) => (
@@ -159,11 +159,10 @@ export function OsSupportedWebsites() {
               ))}
             </div>
             <p className="mb-2 text-xs font-medium uppercase tracking-wider text-zinc-500">
-              Often unstable
+              Also stops
             </p>
             <p className="text-sm leading-relaxed text-zinc-500">
-              {UNSUPPORTED_OR_UNSTABLE_SITES.slice(0, 8).join(" · ")}
-              {" · "}and similar protected sites.
+              {UNSUPPORTED_OR_UNSTABLE_SITES.join(" · ")}
             </p>
           </motion.div>
         </div>

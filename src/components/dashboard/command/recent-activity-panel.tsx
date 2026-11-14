@@ -94,9 +94,9 @@ export const RecentActivityPanel = memo(function RecentActivityPanel({
               <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-cyan-500/70">
                 Recent Activity
               </p>
-              <h3 className="mt-1 text-sm font-medium text-zinc-100">Intelligence Feed</h3>
+              <h3 className="mt-1 text-sm font-medium text-zinc-100">What changed</h3>
               <p className="mt-0.5 hidden text-[11px] text-zinc-500 sm:block">
-                Changes WatchFlowing understands — not just detects
+                Important changes on the sites you own
               </p>
             </div>
             <Sparkles className="h-4 w-4 shrink-0 text-cyan-500/40" />
@@ -152,8 +152,8 @@ export const RecentActivityPanel = memo(function RecentActivityPanel({
               {changes.length === 0 ? (
                 <EmptyState
                   icon={Brain}
-                  title="No intelligence insights yet"
-                  description="Once WatchFlowing detects important changes, AI insights will appear here."
+                  title="Nothing important yet"
+                  description="When a page you own changes, the explanation shows up here."
                 />
               ) : (
                 <div className="space-y-2">

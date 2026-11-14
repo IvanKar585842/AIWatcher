@@ -56,7 +56,7 @@ export function CommandSidebar() {
   const isAdmin = Boolean(data?.user?.isAdmin);
   const navItems: NavItem[] = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
-    { href: "/dashboard/monitors", label: "Monitors", icon: Radio },
+    { href: "/dashboard/monitors", label: "Sites", icon: Radio },
     { href: "/dashboard/assistant", label: "AI Assistant", icon: MessageSquare },
     { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
     {

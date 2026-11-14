@@ -19,10 +19,10 @@ export function OsFooter() {
       <div className="relative mx-auto max-w-7xl px-4 pb-16 pt-16">
         <div className="mb-16 text-center">
           <h2 className="text-2xl font-light text-zinc-200 md:text-3xl">
-            Start AI website monitoring today
+            Put an assistant on your own sites
           </h2>
           <p className="mt-3 text-sm text-zinc-600">
-            Deploy your first monitor in under 60 seconds — free plan included.
+            Add a page your company owns. The first account is free.
           </p>
           <div className="mt-6 flex justify-center">
             <Link
@@ -41,6 +41,7 @@ export function OsFooter() {
           <div className="flex flex-wrap justify-center gap-8">
             {[
               { label: "Features", href: "#os-features" },
+              { label: "Connect", href: "#connect" },
               { label: "Pricing", href: "#pricing" },
               { label: "FAQ", href: "#faq" },
               { label: "Score", href: "/score" },

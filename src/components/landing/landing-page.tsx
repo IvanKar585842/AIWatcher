@@ -47,24 +47,24 @@ export function LandingPage() {
           <div className="relative z-10 mx-auto max-w-7xl px-4">
             <div className="mb-10 flex flex-col items-center text-center">
               <p className="mb-4 font-mono text-[11px] uppercase tracking-[0.35em] text-cyan-400/70">
-                AI Website Monitoring · Online
+                Company website assistant
               </p>
               <h1 className="max-w-4xl text-4xl font-light tracking-tight text-zinc-100 sm:text-5xl md:text-6xl">
-                AI website monitoring
+                Watch the sites
                 <br />
-                <span className="font-normal text-cyan-300">that explains every change.</span>
+                <span className="font-normal text-cyan-300">your company owns.</span>
               </h1>
               <p className="mt-5 max-w-xl text-base leading-relaxed text-zinc-500">
-                WatchFlowing is an AI website tracker — detect important updates on public pages
-                (docs, news, government, corporate sites), analyze what changed, and get smart
-                alerts without the noise.
+                WatchFlowing is an assistant for your own websites. It explains important
+                changes, notices when a page fails, and tells your team what needs attention.
+                If a bot check blocks the outside look, paste one script tag into the site you own.
               </p>
               <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
                 <Link
                   href="/sign-up"
                   className="inline-flex min-h-11 items-center justify-center rounded-full border border-cyan-400/30 bg-cyan-500/10 px-8 py-3 text-sm font-medium text-cyan-50 transition-all duration-200 hover:border-cyan-300/50 hover:bg-cyan-500/15"
                 >
-                  Start free monitoring
+                  Watch your sites
                 </Link>
                 <a
                   href="#os-features"

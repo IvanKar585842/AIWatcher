@@ -582,7 +582,7 @@ function SettingsScreen({ clerkUser }: { clerkUser: ClerkAccount }) {
       <CommandPageHeader
         label="System"
         title="Settings"
-        description="Profile, notifications, monitoring defaults, AI, and account."
+        description="How your company is alerted about its own sites."
       />
 
       <div className="mx-auto max-w-3xl space-y-3">
@@ -664,7 +664,7 @@ function SettingsScreen({ clerkUser }: { clerkUser: ClerkAccount }) {
                 )}
                 <SettingRow
                   title="Telegram notifications"
-                  description="Instant alerts through Telegram when monitors detect changes"
+                  description="Alerts when a page your company owns changes"
                 >
                   <Switch
                     checked={settings.telegramNotifications}
@@ -728,7 +728,7 @@ function SettingsScreen({ clerkUser }: { clerkUser: ClerkAccount }) {
 
             <SettingRow
               title="Weekly AI report"
-              description="Monday intelligence digest via email / Telegram"
+              description="A Monday summary of your sites by email or Telegram"
             >
               <Switch
                 checked={reportPrefs?.weeklyReportEnabled ?? settings.weeklySummary}
@@ -755,7 +755,7 @@ function SettingsScreen({ clerkUser }: { clerkUser: ClerkAccount }) {
                     <option value="BUSINESS">Business</option>
                     <option value="DEVELOPER">Developer</option>
                     <option value="SEO">SEO</option>
-                    <option value="COMPETITOR">Competitor</option>
+                    <option value="COMPETITOR">Your pages</option>
                   </select>
                 </div>
                 <div>
@@ -793,13 +793,13 @@ function SettingsScreen({ clerkUser }: { clerkUser: ClerkAccount }) {
 
         {/* Monitoring preferences */}
         <OsExpandableSection
-          title="Monitoring preferences"
-          subtitle="Defaults applied when you create a new monitor"
+          title="Check defaults"
+          subtitle="Used the next time you add a page"
           icon={<Monitor className="h-5 w-5" />}
         >
           <div className="space-y-4">
             <p className="text-xs text-zinc-500">
-              Saved for this browser and applied the next time you open Create Monitor.
+              Saved in this browser and applied the next time you add a page.
             </p>
             <div>
               <OsFieldLabel>Default interval</OsFieldLabel>

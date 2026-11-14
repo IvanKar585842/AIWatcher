@@ -84,13 +84,16 @@ export async function buildDashboardStats(userId: string, options: DashboardStat
             },
           },
         }),
-    prisma.change.groupBy({
-      by: ["monitorId"],
-      where: { monitor: { userId } },
-      _count: { id: true },
-      orderBy: { _count: { id: "desc" } },
-      take: 1,
-    }),
+    // The home dashboard does not show the most-changed page, so skip grouping every change.
+    lean
+      ? Promise.resolve([] as Array<{ monitorId: string; _count: { id: number } }>)
+      : prisma.change.groupBy({
+          by: ["monitorId"],
+          where: { monitor: { userId } },
+          _count: { id: true },
+          orderBy: { _count: { id: "desc" } },
+          take: 1,
+        }),
     prisma.monitor.findMany({
       where: { userId },
       select: {

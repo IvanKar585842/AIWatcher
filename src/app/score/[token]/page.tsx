@@ -60,7 +60,7 @@ export default function SharedScorePage({
     <div className="min-h-screen bg-[#090909] px-4 py-12 text-zinc-200">
       <div className="mx-auto max-w-xl rounded-2xl border border-white/[0.08] bg-[#0c0c0c] p-6">
         <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-cyan-500/70">
-          Intelligence Score
+          Site check
         </p>
         <h1 className="mt-2 text-2xl font-semibold text-zinc-50">{data.hostname}</h1>
         <p className="mt-4 font-mono text-5xl text-cyan-200">{data.overallScore}</p>

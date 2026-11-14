@@ -72,7 +72,10 @@ export function SiteScriptPanel({ monitorId }: { monitorId: string }) {
       <p className="font-mono text-[10px] uppercase tracking-widest text-zinc-500">First-party script</p>
       <h2 className="text-lg font-medium text-zinc-100">Site script</h2>
       <p className="mt-1 text-sm text-zinc-400">
-        Install this on a site you own. It reports JavaScript errors and missing selectors. It does not read forms, cookies, or page text.
+        Paste this into the site you own, before the closing head or body tag. It still reports
+        when a bot check blocks the outside look, because it runs as part of your page. It
+        reports JavaScript errors and, if you add data-watch, whether those elements are still
+        there. It does not read forms, cookies, or page text, and it does not turn the bot check off.
       </p>
       {installation?.active && (
         <p className="mt-3 text-sm text-zinc-300">Active key {installation.prefix}…</p>

@@ -2,16 +2,16 @@ import type { Metadata } from "next";
 import { siteConfig } from "@/lib/seo";
 
 export const metadata: Metadata = {
-  title: "Website Intelligence Score",
+  title: "Check a site you own",
   description:
-    "Scan any website for health, SEO signals, performance hints, and risk factors — powered by WatchFlowing AI website monitoring.",
+    "Check your company's own site for changes, broken pages, and the elements you care about.",
   alternates: {
     canonical: `${siteConfig.url}/score`,
   },
   openGraph: {
-    title: "Website Intelligence Score | WatchFlowing",
+    title: "Check a site you own | WatchFlowing",
     description:
-      "Free website intelligence scan — SEO monitoring signals, risks, and recommendations.",
+      "A check of a site your company owns — what changed, what looks risky, and what to review.",
     url: `${siteConfig.url}/score`,
   },
 };

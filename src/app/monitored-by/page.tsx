@@ -6,14 +6,14 @@ import { siteConfig } from "@/lib/seo";
 export const metadata: Metadata = {
   title: "Monitored by WatchFlowing",
   description:
-    "Websites displaying the WatchFlowing badge use AI monitoring to detect meaningful changes and surface intelligent alerts.",
+    "A badge for a website the company owns and watches with WatchFlowing.",
   alternates: {
     canonical: `${siteConfig.url}/monitored-by`,
   },
   openGraph: {
     title: "Monitored by WatchFlowing",
     description:
-      "Trust signal for sites monitored by WatchFlowing AI website monitoring.",
+      "A badge for a website the company owns and watches with WatchFlowing.",
     url: `${siteConfig.url}/monitored-by`,
     siteName: siteConfig.name,
     images: [{ url: siteConfig.ogImage, width: 1200, height: 630 }],
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Monitored by WatchFlowing",
     description:
-      "Trust signal for sites monitored by WatchFlowing AI website monitoring.",
+      "A badge for a website the company owns and watches with WatchFlowing.",
     images: [siteConfig.ogImage],
   },
   robots: {
@@ -60,7 +60,7 @@ export default async function MonitoredByPage({
             <p className="mt-2 text-sm leading-relaxed text-zinc-500">
               {username
                 ? `This site is associated with @${username}'s WatchFlowing monitoring.`
-                : "Websites displaying this badge use WatchFlowing to detect meaningful changes and surface AI explanations."}
+                : "Companies use this badge when WatchFlowing watches a website they own."}
             </p>
           </div>
         </div>
@@ -71,8 +71,8 @@ export default async function MonitoredByPage({
             Continuous change detection
           </div>
           <p className="text-xs leading-relaxed text-zinc-500">
-            WatchFlowing checks pages on a schedule, filters noise, and explains important updates —
-            pricing, content, SEO signals, and more — so teams do not miss silent regressions.
+            WatchFlowing checks a site the company owns, filters noise, and explains important
+            updates so the team does not miss a silent change on its own pages.
           </p>
         </div>
 

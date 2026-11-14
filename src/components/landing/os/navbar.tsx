@@ -21,7 +21,8 @@ export function OsNavbar() {
         <nav className="hidden items-center gap-8 md:flex" aria-label="Primary">
           {[
             { label: "Features", href: "#features" },
-            { label: "Platform", href: "#showcase" },
+            { label: "Your sites", href: "#system" },
+            { label: "Connect", href: "#connect" },
             { label: "Pricing", href: "#pricing" },
             { label: "FAQ", href: "#faq" },
           ].map((item) => (

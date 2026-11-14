@@ -68,9 +68,9 @@ export default function ReportsPage() {
   return (
     <div className={os.page} data-tour="weekly-report">
       <CommandPageHeader
-        label="Intelligence"
-        title="Weekly AI Reports"
-        description="WatchFlowing works for you even when you are not looking — executive summaries of what changed and what needs attention."
+        label="Your sites"
+        title="Weekly reports"
+        description="A summary of what changed on the sites your company owns, even when nobody was looking."
       >
           <button
             type="button"

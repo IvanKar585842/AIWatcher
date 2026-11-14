@@ -16,7 +16,7 @@ function webpage(detail: string): MonitorRecommendation {
   return {
     sourceType: "webpage",
     watchScope: "page",
-    label: "General webpage",
+    label: "A page you own",
     detail,
   };
 }
@@ -27,15 +27,15 @@ export function recommendMonitorSetup(rawUrl: string, html: string): MonitorReco
   try {
     url = new URL(rawUrl);
   } catch {
-    return webpage("Enter a full public URL.");
+    return webpage("Enter the full address of a page your company owns.");
   }
 
   if (githubReleaseTarget(url)) {
     return {
       sourceType: "release",
       watchScope: "page",
-      label: "Software releases",
-      detail: "New versions come from the public releases API. Older tags leaving the latest page are not treated as deletions.",
+      label: "Releases you publish",
+      detail: "New versions come from the releases page. Older tags leaving the latest page are not treated as deletions.",
     };
   }
 
@@ -43,8 +43,8 @@ export function recommendMonitorSetup(rawUrl: string, html: string): MonitorReco
     return {
       sourceType: "news_feed",
       watchScope: "page",
-      label: "News feed",
-      detail: "New and updated items are compared by a stable id. A story falling off the latest page is not marked deleted.",
+      label: "A feed you publish",
+      detail: "New and updated items are compared. A story falling off the latest page is not marked deleted.",
     };
   }
 
@@ -53,8 +53,8 @@ export function recommendMonitorSetup(rawUrl: string, html: string): MonitorReco
     return {
       sourceType: "webpage",
       watchScope: "page",
-      label: "Product catalog",
-      detail: "Each product is compared by name and price. The first price on the page is not treated as the whole catalog.",
+      label: "A catalog you publish",
+      detail: "Each product on your page is compared by name and price.",
     };
   }
 
@@ -62,10 +62,10 @@ export function recommendMonitorSetup(rawUrl: string, html: string): MonitorReco
     return {
       sourceType: "webpage",
       watchScope: "structured",
-      label: "Product page",
-      detail: "The published product price and availability are compared. A challenge page does not replace the last good snapshot.",
+      label: "A product page you publish",
+      detail: "The price and availability you publish are compared. A challenge page does not replace the last good snapshot.",
     };
   }
 
-  return webpage("The main public text is compared. A browser runs only when the page is an empty script shell.");
+  return webpage("The text on your page is compared. A browser runs only when the page is an empty script shell.");
 }

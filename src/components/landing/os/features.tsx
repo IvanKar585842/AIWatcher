@@ -4,14 +4,14 @@ import { useRef } from "react";
 import { motion, useInView, useScroll, useTransform } from "framer-motion";
 
 const MODES = [
-  { id: "01", title: "Entire Page", desc: "Full-spectrum observation with noise stripped at the source." },
-  { id: "02", title: "CSS / XPath", desc: "Surgical targeting. One element or section. Zero distraction." },
-  { id: "03", title: "Public Pricing Pages", desc: "Plan and price wording on company pricing pages — not marketplaces." },
-  { id: "04", title: "Keyword Watch", desc: "Terms appear, disappear, or spike. You know first." },
-  { id: "05", title: "Documentation", desc: "Docs, changelogs, and API references tracked for meaningful edits." },
-  { id: "06", title: "Job Listings", desc: "New roles, removed postings, updated requirements." },
-  { id: "07", title: "AI Smart Mode", desc: "Describe what matters. The system decides what to surface." },
-  { id: "08", title: "Meaningful Diff", desc: "Ads, trackers, timestamps — filtered before analysis begins." },
+  { id: "01", title: "Your whole page", desc: "Watch a page you own, with ads and timestamps stripped before the comparison." },
+  { id: "02", title: "One section", desc: "Point at a header, price, or form on your site and ignore the rest." },
+  { id: "03", title: "Your pricing page", desc: "Notice when your own plans, prices, or offers change." },
+  { id: "04", title: "Words you care about", desc: "Know when a phrase you chose appears or disappears on your page." },
+  { id: "05", title: "Your docs", desc: "Docs, changelogs, and help articles you publish." },
+  { id: "06", title: "Your careers page", desc: "New roles and removed postings on the site you operate." },
+  { id: "07", title: "Say what matters", desc: "Describe the change your company cares about. The assistant surfaces that." },
+  { id: "08", title: "Less noise", desc: "Ads, trackers, and timestamps are filtered before anyone is alerted." },
 ];
 
 export function OsFeatures() {
@@ -37,16 +37,16 @@ export function OsFeatures() {
           className="mb-20 max-w-2xl"
         >
           <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.35em] text-cyan-500/70">
-            Website change detection
+            Sites your company owns
           </p>
           <h2 className="text-3xl font-light tracking-tight text-zinc-100 md:text-5xl">
-            Eight monitoring modes.
+            An assistant on the pages
             <br />
-            <span className="text-zinc-500">One AI intelligence layer.</span>
+            <span className="text-zinc-500">you already operate.</span>
           </h2>
           <p className="mt-4 max-w-xl text-sm leading-relaxed text-zinc-500">
-            From documentation and government notices to corporate sites and GitHub releases —
-            WatchFlowing tracks what matters and filters noise before you see an alert.
+            Homepage, docs, pricing, and the other pages your company owns. WatchFlowing
+            explains what changed and stays quiet when nothing important did.
           </p>
         </motion.div>
 

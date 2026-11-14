@@ -196,10 +196,10 @@ export function CommandCenter({
             Command Center · Live
           </p>
           <h2 className="mt-1.5 text-lg font-semibold tracking-tight text-zinc-50 sm:text-xl">
-            WatchFlowing watches what matters
+            Your sites, with an assistant
           </h2>
           <p className="mt-1 max-w-xl text-xs leading-relaxed text-zinc-500 sm:text-sm">
-            Loading monitors…
+            Loading the sites your company owns…
           </p>
         </div>
         <CommandCenterSkeleton />
@@ -221,17 +221,17 @@ export function CommandCenter({
             </p>
           </div>
           <h2 className="mt-1.5 text-lg font-semibold tracking-tight text-zinc-50 sm:text-xl">
-            WatchFlowing watches what matters
+            Your sites, with an assistant
           </h2>
           <p className="mt-1 max-w-xl text-xs leading-relaxed text-zinc-500 sm:text-sm">
-            {stats.activeMonitors} site{stats.activeMonitors === 1 ? "" : "s"} monitored
+            {stats.activeMonitors} of your site{stats.activeMonitors === 1 ? "" : "s"}
             {unreadImportantCount > 0
               ? ` · ${unreadImportantCount} need attention`
               : " · all clear"}
             {stats.changesToday > 0
               ? ` · ${stats.changesToday} change${stats.changesToday === 1 ? "" : "s"} today`
               : ""}
-            . AI explains what matters — not just what changed.
+            . The assistant explains what changed on the pages you own.
           </p>
         </div>
         <div className="hidden lg:block">

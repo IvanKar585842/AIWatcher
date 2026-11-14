@@ -73,10 +73,10 @@ export default function IntelligenceScorePage() {
               Free analyzer
             </p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight text-zinc-50 sm:text-3xl">
-              WatchFlowing Intelligence Score
+              Check a site you own
             </h1>
             <p className="mt-2 text-sm text-zinc-500">
-              Instant website health, SEO, performance, and risk signals — then monitor continuously.
+              A first look at a website your company owns. Then keep the assistant on that site.
             </p>
           </div>
         </div>
@@ -112,7 +112,7 @@ export default function IntelligenceScorePage() {
           <div className="mt-8 space-y-4">
             <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/[0.06] p-6 text-center">
               <p className="font-mono text-[10px] uppercase tracking-widest text-cyan-500/80">
-                Intelligence Score
+                Site check
               </p>
               <p className="mt-2 font-mono text-5xl font-semibold text-zinc-50">
                 {result.overallScore}

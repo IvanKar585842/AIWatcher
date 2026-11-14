@@ -201,7 +201,7 @@ export interface AIProvider {
   }): Promise<ChangeAnalysis>;
 }
 
-export const CHANGE_ANALYSIS_PROMPT = `You analyze website monitoring changes for WatchFlowing.
+export const CHANGE_ANALYSIS_PROMPT = `You analyze changes on a website the customer owns. WatchFlowing is their assistant for their own sites, not a tool for watching other companies.
 
 You receive a compact CHANGE PACKAGE (not full page HTML). Be specific — never write vague lines like "Content changed."
 

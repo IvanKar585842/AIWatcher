@@ -132,11 +132,11 @@ export const MONITOR_TYPE_CATALOG: MonitorTypeDefinition[] = [
   // —— Website Monitoring ——
   {
     id: "full-page",
-    label: "Full Page Monitoring",
-    description: "Watch the whole public page and surface meaningful changes automatically.",
-    exampleUsage: "https://example.com/docs or /news",
-    recommendedUsers: "Founders, marketers, site owners",
-    tooltip: "Best default. Works on most public pages without selectors — not marketplaces.",
+    label: "The whole page",
+    description: "Watch a whole page your company owns and explain the meaningful changes.",
+    exampleUsage: "yourcompany.com or yourcompany.com/docs",
+    recommendedUsers: "The team that owns the site",
+    tooltip: "Best default for a page on your own site that loads without a login.",
     icon: Globe,
     category: "Website Monitoring",
     accent: "cyan",
@@ -145,7 +145,7 @@ export const MONITOR_TYPE_CATALOG: MonitorTypeDefinition[] = [
   },
   {
     id: "specific-section",
-    label: "Specific Section Monitoring",
+    label: "One section",
     description: "Track one block or element with a CSS selector.",
     exampleUsage: "main .announcements or #release-notes",
     recommendedUsers: "Operators watching a single widget or module",
@@ -158,9 +158,9 @@ export const MONITOR_TYPE_CATALOG: MonitorTypeDefinition[] = [
   },
   {
     id: "text-changes",
-    label: "Text Change Monitoring",
+    label: "The words",
     description: "Focus on readable copy updates and ignore most HTML noise.",
-    exampleUsage: "Blog posts, help articles, policy pages",
+    exampleUsage: "Your blog, help articles, and policy pages",
     recommendedUsers: "Content and communications teams",
     tooltip: "Ideal when wording matters more than layout.",
     icon: Type,
@@ -170,7 +170,7 @@ export const MONITOR_TYPE_CATALOG: MonitorTypeDefinition[] = [
   },
   {
     id: "image-changes",
-    label: "Image Change Monitoring",
+    label: "The look",
     description: "Detect visual and image shifts such as banners, heroes, and media swaps.",
     exampleUsage: "Homepage hero, campaign banners, gallery pages",
     recommendedUsers: "Design and brand teams",
@@ -182,7 +182,7 @@ export const MONITOR_TYPE_CATALOG: MonitorTypeDefinition[] = [
   },
   {
     id: "link-changes",
-    label: "Link Change Monitoring",
+    label: "Your links",
     description: "Alert when important links, navigation, or destinations change.",
     exampleUsage: "Footer links, CTA destinations, download URLs",
     recommendedUsers: "SEO, growth, and web ops teams",
@@ -200,9 +200,9 @@ export const MONITOR_TYPE_CATALOG: MonitorTypeDefinition[] = [
   {
     id: "competitor-features",
     label: "Features Page",
-    description: "Watch feature lists and capability pages for competitive moves.",
-    exampleUsage: "competitor.com/features",
-    recommendedUsers: "Product managers and competitive intel",
+    description: "Watch the feature list on a page your company owns.",
+    exampleUsage: "yourcompany.com/features",
+    recommendedUsers: "Product managers",
     icon: Sparkles,
     category: "Competitor Intelligence",
     accent: "violet",
@@ -211,8 +211,8 @@ export const MONITOR_TYPE_CATALOG: MonitorTypeDefinition[] = [
   {
     id: "competitor-product",
     label: "Product Page",
-    description: "Track public product pages for positioning and messaging changes.",
-    exampleUsage: "company.com/product/… (public marketing pages)",
+    description: "Watch a product page your company publishes.",
+    exampleUsage: "yourcompany.com/product",
     recommendedUsers: "Product marketing and founders",
     icon: Package,
     category: "Competitor Intelligence",
@@ -222,8 +222,8 @@ export const MONITOR_TYPE_CATALOG: MonitorTypeDefinition[] = [
   {
     id: "competitor-landing",
     label: "Landing Page",
-    description: "Detect messaging and offer changes on competitor landing pages.",
-    exampleUsage: "competitor.com/ or campaign landers",
+    description: "Watch messaging and offers on a landing page you operate.",
+    exampleUsage: "yourcompany.com or a campaign page you own",
     recommendedUsers: "Growth and marketing teams",
     icon: Megaphone,
     category: "Competitor Intelligence",
@@ -233,9 +233,9 @@ export const MONITOR_TYPE_CATALOG: MonitorTypeDefinition[] = [
   {
     id: "competitor-announcements",
     label: "Announcements",
-    description: "Catch new competitor announcements, launches, and press updates.",
-    exampleUsage: "competitor.com/blog or /news",
-    recommendedUsers: "Strategy and competitive intel",
+    description: "Watch announcements, launches, and news on your own site.",
+    exampleUsage: "yourcompany.com/blog or /news",
+    recommendedUsers: "The team that publishes the site",
     icon: Newspaper,
     category: "Competitor Intelligence",
     accent: "rose",
@@ -246,8 +246,8 @@ export const MONITOR_TYPE_CATALOG: MonitorTypeDefinition[] = [
   {
     id: "github-releases",
     label: "GitHub Releases",
-    description: "Monitor release pages or feeds for new versions and notes.",
-    exampleUsage: "github.com/org/repo/releases",
+    description: "Watch release notes on a repository your company owns.",
+    exampleUsage: "github.com/your-org/your-repo/releases",
     recommendedUsers: "Engineers and DevRel teams",
     icon: GitBranch,
     category: "Developer Monitoring",
@@ -257,8 +257,8 @@ export const MONITOR_TYPE_CATALOG: MonitorTypeDefinition[] = [
   {
     id: "documentation-updates",
     label: "Documentation Updates",
-    description: "Track public docs, guides, and changelog pages.",
-    exampleUsage: "docs.example.com/getting-started",
+    description: "Watch docs, guides, and the changelog you publish.",
+    exampleUsage: "docs.yourcompany.com/getting-started",
     recommendedUsers: "Developers and technical writers",
     icon: BookOpen,
     category: "Developer Monitoring",
@@ -268,8 +268,8 @@ export const MONITOR_TYPE_CATALOG: MonitorTypeDefinition[] = [
   {
     id: "api-documentation",
     label: "API Documentation",
-    description: "Watch public API reference pages for endpoint or schema changes.",
-    exampleUsage: "docs.example.com/api or OpenAPI hubs",
+    description: "Watch the API reference your company publishes.",
+    exampleUsage: "docs.yourcompany.com/api",
     recommendedUsers: "API consumers and platform teams",
     icon: Code2,
     category: "Developer Monitoring",
@@ -336,8 +336,8 @@ export const MONITOR_TYPE_CATALOG: MonitorTypeDefinition[] = [
   {
     id: "business-news",
     label: "News Pages",
-    description: "Watch public news rooms and press pages for new stories.",
-    exampleUsage: "company.com/news or /press",
+    description: "Watch the newsroom or press page you publish.",
+    exampleUsage: "yourcompany.com/news",
     recommendedUsers: "PR, comms, and executives",
     icon: Newspaper,
     category: "Business Monitoring",
@@ -347,8 +347,8 @@ export const MONITOR_TYPE_CATALOG: MonitorTypeDefinition[] = [
   {
     id: "business-blog",
     label: "Blog Updates",
-    description: "Detect new or updated public blog posts.",
-    exampleUsage: "company.com/blog",
+    description: "Watch new or updated posts on your blog.",
+    exampleUsage: "yourcompany.com/blog",
     recommendedUsers: "Content marketers and analysts",
     icon: BookOpen,
     category: "Business Monitoring",
@@ -358,8 +358,8 @@ export const MONITOR_TYPE_CATALOG: MonitorTypeDefinition[] = [
   {
     id: "business-announcements",
     label: "Public Announcements",
-    description: "Track official announcement pages for company or product news.",
-    exampleUsage: "company.com/announcements",
+    description: "Watch announcement pages on your own site.",
+    exampleUsage: "yourcompany.com/announcements",
     recommendedUsers: "Business ops, founders, and partners",
     icon: Megaphone,
     category: "Business Monitoring",
@@ -417,7 +417,7 @@ const PRIVATE_PATH_HINT =
   /\/(login|signin|sign-in|signup|sign-up|account|dashboard|app|portal|auth|oauth|checkout|cart)(\/|$)/i;
 
 export const PROTECTED_SITE_WARNING =
-  "This website may use anti-bot protection. Monitoring can be limited or unavailable — WatchFlowing works best on public HTML pages (docs, news, government, corporate sites), not marketplaces.";
+  "This page may block an automated check. WatchFlowing does not bypass that protection. Add a page your company owns that loads without a login, or verify the domain and install the site script.";
 
 /**
  * Returns a user-facing warning when the URL looks like a protected /

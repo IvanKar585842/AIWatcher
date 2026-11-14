@@ -4,10 +4,10 @@ import { useRef, useState } from "react";
 import { AnimatePresence, motion, useInView } from "framer-motion";
 
 const TIMELINE = [
-  { time: "14:32:01", site: "docs.example.com", change: "API auth section rewritten", importance: "HIGH" },
-  { time: "14:28:44", site: "jobs.apple.com", change: "New role: Vision Pro Engineer", importance: "MEDIUM" },
-  { time: "14:15:12", site: "checkout.shop.com", change: "Login page returned 503", importance: "CRITICAL" },
-  { time: "13:58:33", site: "company.com", change: "Footer copyright year updated", importance: "LOW" },
+  { time: "14:32:01", site: "docs.yourcompany.com", change: "Getting started section rewritten", importance: "HIGH" },
+  { time: "14:28:44", site: "yourcompany.com/careers", change: "New role: Product engineer", importance: "MEDIUM" },
+  { time: "14:15:12", site: "yourcompany.com/checkout", change: "Checkout page returned 503", importance: "CRITICAL" },
+  { time: "13:58:33", site: "yourcompany.com", change: "Homepage headline updated", importance: "LOW" },
 ];
 
 const IMPORTANCE_PILL: Record<string, string> = {
@@ -35,14 +35,14 @@ export function OsDashboardShowcase() {
           className="mb-16 text-center"
         >
           <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.35em] text-cyan-500/70">
-            Website intelligence platform
+            Sites your company owns
           </p>
           <h2 className="text-3xl font-light text-zinc-100 md:text-4xl">
-            Your monitoring command center
+            One place for the pages you own
           </h2>
           <p className="mx-auto mt-3 max-w-xl text-sm text-zinc-500">
-            See detections, importance scores, and AI summaries in one place — built for teams that
-            need clarity, not just change logs.
+            See what changed on your sites, how important it is, and a short explanation —
+            so the team is not reading raw diffs.
           </p>
         </motion.div>
 
@@ -161,7 +161,7 @@ export function OsDashboardShowcase() {
               <div className="rounded-xl border border-white/[0.05] bg-[#111] p-4">
                 <p className="mb-3 font-mono text-[10px] text-zinc-600">AI SUMMARY</p>
                 <p className="text-sm leading-relaxed text-zinc-400">
-                  Stripe increased Pro pricing by 25%. Competitor positioning may shift within 48h.
+                  Your pricing page changed the Pro plan from $19 to $24. The assistant flagged it for the team.
                 </p>
               </div>
 

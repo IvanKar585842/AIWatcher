@@ -37,19 +37,19 @@ const VERDICT_COPY: Record<
   PUBLIC: {
     label: "Public page",
     explanation:
-      "This looks like a public HTML page. Monitoring should work reliably.",
+      "This looks like a page that loads without a login. A check of your company's site should work.",
     risky: false,
   },
   DYNAMIC: {
     label: "Dynamic page",
     explanation:
-      "This page appears heavily JavaScript-rendered. Monitoring can work, but results may vary — prefer a stable public HTML URL when possible.",
+      "This page is built mostly in the browser. A check can work, but a stable page on your own site is more reliable.",
     risky: true,
   },
   REQUIRES_LOGIN: {
     label: "Requires login",
     explanation:
-      "This URL looks private or behind authentication. WatchFlowing monitors public pages only — pick a page that loads without signing in.",
+      "This URL looks private or behind a login. Add a page on your company's site that loads without signing in. WatchFlowing does not bypass login.",
     risky: true,
   },
   ANTI_BOT: {
@@ -61,7 +61,7 @@ const VERDICT_COPY: Record<
   UNSUPPORTED: {
     label: "Unsupported",
     explanation:
-      "This site type is not a good fit for automated monitoring (marketplace, social network, or similar). Choose a public corporate, docs, news, or government page instead.",
+      "Marketplaces and social networks are not what this assistant is for. Add a page your company owns.",
     risky: true,
   },
 };
@@ -186,7 +186,7 @@ function withRecommendation(
   html: string
 ): CompatibilityResult {
   const recommendation = recommendMonitorSetup(url, html);
-  if (recommendation.sourceType === "webpage" && recommendation.label === "General webpage") {
+  if (recommendation.sourceType === "webpage" && recommendation.label === "A page you own") {
     return base;
   }
   return { ...base, recommendation };

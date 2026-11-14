@@ -33,7 +33,7 @@ import { useToast } from "@/components/ui/os-toast";
 import { loadUserSettings, saveUserSettings } from "@/lib/user-settings";
 import { cn } from "@/lib/utils";
 
-type OnboardingIntent = "my-website" | "competitor" | "important-page" | "price-changes";
+type OnboardingIntent = "homepage" | "docs" | "pricing" | "key-page";
 
 const INTENTS: Array<{
   id: OnboardingIntent;
@@ -43,30 +43,30 @@ const INTENTS: Array<{
   accent: string;
 }> = [
   {
-    id: "my-website",
-    label: "My website",
-    description: "Watch your own site for unexpected changes.",
+    id: "homepage",
+    label: "Our homepage",
+    description: "Watch the homepage your company owns.",
     icon: Globe,
     accent: "from-cyan-500/15 to-blue-500/5 border-cyan-500/30",
   },
   {
-    id: "competitor",
-    label: "Competitor website",
-    description: "Track competitor pages for strategic updates.",
+    id: "docs",
+    label: "Our docs",
+    description: "Watch help articles and guides you publish.",
     icon: Eye,
     accent: "from-violet-500/15 to-purple-500/5 border-violet-500/30",
   },
   {
-    id: "important-page",
-    label: "Important page",
-    description: "Monitor a critical article, docs, or landing page.",
+    id: "key-page",
+    label: "A key page",
+    description: "Watch one important page on your own site.",
     icon: Radio,
     accent: "from-emerald-500/15 to-teal-500/5 border-emerald-500/30",
   },
   {
-    id: "price-changes",
-    label: "Public pricing page",
-    description: "Watch a company’s public plans page (not marketplaces).",
+    id: "pricing",
+    label: "Our pricing",
+    description: "Watch the plans and prices on your site.",
     icon: Target,
     accent: "from-amber-500/15 to-orange-500/5 border-amber-500/30",
   },
@@ -83,37 +83,37 @@ function buildPrefill(intent: OnboardingIntent): MonitorPrefill {
   };
 
   switch (intent) {
-    case "competitor":
+    case "docs":
       return {
         ...base,
-        name: "Competitor website",
-        category: "Competitor Intelligence",
-        description: "Track competitor page changes",
-        mode: MonitoringMode.ENTIRE_PAGE,
-      };
-    case "important-page":
-      return {
-        ...base,
-        name: "Important page",
+        name: "Our docs",
         category: "Website Monitoring",
-        description: "Watch a critical page for updates",
+        description: "Watch our own help pages",
         mode: MonitoringMode.TEXT_CHANGES,
       };
-    case "price-changes":
+    case "key-page":
       return {
         ...base,
-        name: "Public plans page",
-        category: "Competitor Intelligence",
-        description: "Watch a public company plans page for general updates",
+        name: "Key page",
+        category: "Website Monitoring",
+        description: "Watch one page our company owns",
+        mode: MonitoringMode.TEXT_CHANGES,
+      };
+    case "pricing":
+      return {
+        ...base,
+        name: "Our pricing",
+        category: "Website Monitoring",
+        description: "Watch our own plans and prices",
         mode: MonitoringMode.ENTIRE_PAGE,
       };
-    case "my-website":
+    case "homepage":
     default:
       return {
         ...base,
-        name: "My website",
+        name: "Our homepage",
         category: "Website Monitoring",
-        description: "Monitor my website for important changes",
+        description: "Watch our company's homepage",
         mode: MonitoringMode.ENTIRE_PAGE,
       };
   }
@@ -223,32 +223,32 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                 className="space-y-5"
               >
                 <p className="text-sm leading-relaxed text-zinc-400">
-                  WatchFlowing watches websites you care about, detects meaningful changes,
-                  and explains them with AI — so you never miss an important update.
+                  WatchFlowing is an assistant for the websites your company owns. It explains
+                  important changes and tells you when one of your pages needs attention.
                 </p>
 
                 <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/[0.06] px-4 py-3 text-xs leading-relaxed text-cyan-100/80">
-                  <strong className="font-medium text-cyan-50">Your first win:</strong> create a
-                  monitor for your homepage or a competitor page. We take a baseline snapshot,
-                  then alert you when something important changes.
+                  <strong className="font-medium text-cyan-50">Your first win:</strong> add the
+                  homepage your company owns. We take a baseline snapshot, then tell you when something
+                  important changes.
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-3">
                   {[
                     {
                       icon: Globe,
-                      title: "Website monitoring",
-                      text: "We check pages on a schedule and compare them to the last snapshot.",
+                      title: "Your pages",
+                      text: "We check the pages you add and compare them with the last snapshot.",
                     },
                     {
                       icon: Eye,
-                      title: "Change detection",
-                      text: "Noise like ads and timestamps is filtered so you see real updates.",
+                      title: "What changed",
+                      text: "Ads and timestamps are filtered so you see real updates on your site.",
                     },
                     {
                       icon: Brain,
-                      title: "AI analysis",
-                      text: "AI summarizes what changed and whether it is worth alerting you.",
+                      title: "A plain explanation",
+                      text: "The assistant explains what changed on your page and whether the team should look.",
                     },
                   ].map((item) => {
                     const Icon = item.icon;

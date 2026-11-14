@@ -90,7 +90,7 @@ export function DomainVerificationPanel({
       </p>
       {verification?.guidance && <p className="mt-3 text-sm text-amber-200">{verification.guidance}</p>}
       {!verification?.guidance && errorMessage && verification?.verifiedAt && (
-        <p className="mt-3 text-sm text-zinc-400">Verification does not change how the public page is fetched.</p>
+        <p className="mt-3 text-sm text-zinc-400">Verification does not change how your page is checked, and it does not bypass a challenge.</p>
       )}
       {verification?.verifiedAt && (
         <p className="mt-3 text-sm text-emerald-200">Verified by {verification.method}.</p>

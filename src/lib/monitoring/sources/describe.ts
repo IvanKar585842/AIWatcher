@@ -46,56 +46,54 @@ export function describeSource(rawUrl: string, sourceType?: SourceKind | null): 
     return {
       adapter: "amazon-creators",
       support: "credentials",
-      label: "Amazon Creators API",
+      label: "Not a page you operate",
       detail:
-        "Product and search URLs use the official Creators API. A browser is not used. Credentials must be set on the server. Paid comparison use is not approved until Amazon confirms it.",
+        "Add a page on a site your company owns. Store listings are outside this assistant.",
     };
   }
   if (/(^|\.)ebay\./i.test(url.hostname)) {
     return {
       adapter: "ebay-browse",
       support: "credentials",
-      label: "eBay Browse API",
-      detail:
-        "Listings and searches use the official Browse API. A browser is not used. Credentials must be set on the server. Paid comparison use is not approved until eBay confirms it.",
+      label: "Not a page you operate",
+      detail: "Add a page on a site your company owns. Store listings are outside this assistant.",
     };
   }
   if (isEtsyUrl(url)) {
     return {
       adapter: "etsy",
       support: "credentials",
-      label: "Etsy Open API",
-      detail:
-        "Listing, shop, and search URLs use Etsy's Open API v3 when ETSY_API_KEY is set. A browser is not used. Paid comparison use is not approved until Etsy confirms it.",
+      label: "Not a page you operate",
+      detail: "Add a page on a site your company owns. Store listings are outside this assistant.",
     };
   }
   if (isShopifyUrl(url)) {
     return {
       adapter: "shopify",
       support: "supported",
-      label: "Shopify public catalog",
-      detail: "Uses the store's public products.json or product.js feed. Checkout and account pages are not monitored.",
+      label: "A store you operate",
+      detail: "If this store is yours, the catalog feed is compared. Checkout and account pages are not checked.",
     };
   }
   if (looksLikeNewsSitemap(url)) {
-    return { adapter: "news-sitemap", support: "supported", label: "News sitemap", detail: "New and updated sitemap entries are compared. Items that age out of the sitemap are not treated as deleted." };
+    return { adapter: "news-sitemap", support: "supported", label: "A feed you publish", detail: "New and updated entries on your site are compared. Items that age out are not treated as deleted." };
   }
   if (looksLikeFeed(url) || sourceType === "news_feed" || sourceType === "news_search") {
     return {
       adapter: "feed",
       support: sourceType === "news_search" ? "partial" : "supported",
-      label: sourceType === "news_search" ? "News search" : "RSS / Atom",
-      detail: "Feed items are compared by stable id. A keyword filter applies when keywords are set. Articles that drop off the latest page are not marked removed.",
+      label: "A feed you publish",
+      detail: "Items in a feed your company publishes are compared. A story falling off the latest page is not marked removed.",
     };
   }
   if (isGitHubReleaseUrl(url) || sourceType === "release") {
-    return { adapter: "github-releases", support: "supported", label: "GitHub releases", detail: "Uses the public GitHub releases API. New versions are reported. Older releases leaving the latest page are not marked deleted." };
+    return { adapter: "github-releases", support: "supported", label: "Releases you publish", detail: "New versions on a repository your company owns are reported. Older releases leaving the latest page are not marked deleted." };
   }
   if (sourceType === "news_article") {
-    return { adapter: "article", support: "partial", label: "Article page", detail: "Readable HTML is extracted. JavaScript-only articles should use the site's RSS feed instead." };
+    return { adapter: "article", support: "partial", label: "A post on your site", detail: "Readable text is compared. If the post only appears after scripts run, use the feed you publish." };
   }
   if (sourceType === "changelog") {
-    return { adapter: "changelog", support: "partial", label: "Changelog", detail: "Feeds and GitHub releases are precise. Other changelog URLs use the normal page check." };
+    return { adapter: "changelog", support: "partial", label: "Your changelog", detail: "A feed or releases page is precise. Other changelog addresses use the normal page check." };
   }
   const knownStore = lookupMarketplace(url.hostname);
   if (knownStore?.access === "public-page") {
@@ -118,7 +116,7 @@ export function describeSource(rawUrl: string, sourceType?: SourceKind | null): 
   return {
     adapter: "scrapling",
     support: "webpage",
-    label: "General webpage",
-    detail: "Public pages use Scrapling, HTTP first. A browser runs only when the page needs JavaScript.",
+    label: "A page you own",
+    detail: "The page is compared as published. A browser runs only when the page is an empty script shell.",
   };
 }

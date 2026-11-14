@@ -18,7 +18,7 @@ const MOBILE_NAV: Array<{
   exact?: boolean;
 }> = [
   { href: "/dashboard", label: "Home", icon: LayoutDashboard, exact: true },
-  { href: "/dashboard/monitors", label: "Monitors", icon: Radio },
+  { href: "/dashboard/monitors", label: "Sites", icon: Radio },
   { href: "/dashboard/assistant", label: "AI", icon: MessageSquare },
   { href: "/dashboard/notifications", label: "Alerts", icon: Bell },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },

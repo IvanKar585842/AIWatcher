@@ -3,7 +3,7 @@ import { siteConfig } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "Sign in",
-  description: "Sign in to WatchFlowing — your AI website monitoring dashboard.",
+  description: "Sign in to WatchFlowing — the assistant for websites your company owns.",
   robots: { index: false, follow: true },
   alternates: { canonical: `${siteConfig.url}/sign-in` },
 };

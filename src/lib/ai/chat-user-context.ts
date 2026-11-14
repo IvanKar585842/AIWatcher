@@ -433,7 +433,7 @@ async function buildAccountBriefingUncached(userId: string): Promise<AccountBrie
 
   if (totalMonitors === 0) {
     lines.push(
-      "Monitors: none. User has no monitors yet — say so clearly; do not invent any. Suggest Monitors → Create Monitor."
+      "Sites: none. The company has not added a page yet — say so clearly; do not invent any. Suggest Sites → Add a site."
     );
   } else {
     const listed = monitors.length;
@@ -450,7 +450,7 @@ async function buildAccountBriefingUncached(userId: string): Promise<AccountBrie
       );
     }
 
-    lines.push("", "Global Monitor Map (nodes around AI Core):");
+    lines.push("", "Sites the company added:");
     for (const m of monitors.slice(0, 30)) {
       lines.push(`- ${m.name} (${hostnameOf(m.url)}) · ${m.status}`);
     }
@@ -607,7 +607,7 @@ function deriveInsightsAndRecommendations(input: {
     });
     recommendations.push({
       id: "create-first",
-      text: "Create a monitor for a page you care about (homepage, pricing, docs, or a competitor).",
+      text: "Add a page your company owns — the homepage, docs, or pricing page.",
     });
     suggestedQuestions.push(
       "How do I create a monitor?",

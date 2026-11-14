@@ -1,27 +1,23 @@
 const FAQS = [
   {
-    q: "How is WatchFlowing different from basic website change detection tools?",
-    a: "Most website monitoring tools only tell you that something changed. WatchFlowing’s AI explains what changed, classifies it, and rates importance — like an analyst watching every page.",
+    q: "Who is WatchFlowing for?",
+    a: "Companies that want an assistant on the websites they own. Add your homepage, docs, pricing, or another page you operate. WatchFlowing explains what changed and when a page needs attention.",
   },
   {
-    q: "What sites work best with WatchFlowing?",
-    a: "Public HTML pages: corporate sites, documentation, blogs, news, government and university sites, GitHub/GitLab, Wikipedia, and common builders (WordPress, Webflow, Wix, Squarespace). Marketplaces and strong anti-bot sites are often unreliable.",
+    q: "How do we add a site?",
+    a: "Add the homepage, docs, pricing page, or another page your company operates. WatchFlowing stores a baseline, then explains the next important change.",
   },
   {
-    q: "Can I monitor competitor websites?",
-    a: "Yes — public competitor pages such as documentation, careers, blogs, announcements, features, and company plans pages. Marketplace product pages (Amazon, eBay, and similar) are not a reliable use case.",
+    q: "What if our site blocks automated checks?",
+    a: "The outside look stops, and the last good snapshot stays. Paste the site script into the HTML you control. It runs as part of your page, so the bot wall does not stop those reports. It tells you about JavaScript errors and whether the elements you name are still there. It does not read forms, cookies, or page text, and it does not turn the bot check off.",
   },
   {
-    q: "What can this website monitoring tool watch?",
-    a: "Entire pages, text changes, CSS/XPath sections, documentation, keywords, tables, public APIs and feeds, plus AI Smart Mode where you describe what matters in plain language.",
+    q: "What can the assistant watch on our site?",
+    a: "The whole page, a section, your docs, your pricing page, keywords you care about, and a plain-language description of what matters. Important changes are explained. Noise such as ads and timestamps is filtered first.",
   },
   {
-    q: "How does noise filtering work?",
-    a: "Before comparison, we strip ads, trackers, dynamic timestamps, cookies, and random IDs. Only meaningful content reaches the AI monitoring assistant.",
-  },
-  {
-    q: "How fast can it check pages?",
-    a: "Free: every 12 or 24 hours. Pro: as often as every 30 minutes. Business: as often as every 1 minute — ideal for docs, news, and public announcements where timing matters.",
+    q: "How often does it look?",
+    a: "Free checks run every 12 or 24 hours. Pro can check as often as every 30 minutes. Business can check as often as every minute. The schedule that actually runs is shown in billing.",
   },
 ];
 

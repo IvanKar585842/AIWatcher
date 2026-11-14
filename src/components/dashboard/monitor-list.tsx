@@ -252,11 +252,11 @@ function MonitorListView({
           </div>
           <div>
             <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-cyan-500/60">
-              Surveillance Grid
+              Your sites
             </p>
             <p className="text-sm text-zinc-400">
-              <span className="font-medium text-zinc-200">{monitors.length}</span> monitor
-              {monitors.length !== 1 ? "s" : ""} active
+              <span className="font-medium text-zinc-200">{monitors.length}</span>{" "}
+              {monitors.length === 1 ? "page" : "pages"} added
             </p>
           </div>
         </div>
@@ -266,7 +266,7 @@ function MonitorListView({
             variant="os"
             prefillRequest={duplicatePrefill}
             onPrefillConsumed={() => setDuplicatePrefill(null)}
-            triggerLabel="+ Create Monitor"
+            triggerLabel="+ Add a site"
             triggerClassName="h-11 px-6 text-sm font-medium shadow-[0_0_32px_-8px_rgba(34,211,238,0.55)]"
           />
         )}

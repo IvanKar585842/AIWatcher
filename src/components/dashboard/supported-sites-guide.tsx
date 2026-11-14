@@ -23,7 +23,7 @@ export function SupportedSitesGuide({ className }: { className?: string }) {
       <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/[0.06] px-3.5 py-3">
         <div className="mb-2 flex items-center gap-2">
           <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-cyan-300" />
-          <p className="text-xs font-medium text-cyan-100">Best supported websites</p>
+          <p className="text-xs font-medium text-cyan-100">Works best on pages you own</p>
         </div>
         <ul className="space-y-1">
           {BEST_SUPPORTED_SUMMARY.map((item) => (
@@ -45,7 +45,7 @@ export function SupportedSitesGuide({ className }: { className?: string }) {
         >
           <span className="flex min-w-0 items-center gap-2">
             <Globe2 className="h-3.5 w-3.5 shrink-0 text-cyan-400/80" />
-            <span className="text-xs font-medium text-zinc-300">Supported websites — full list</span>
+            <span className="text-xs font-medium text-zinc-300">Pages you can add</span>
           </span>
           <ChevronDown
             className={cn(

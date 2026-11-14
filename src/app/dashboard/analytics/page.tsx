@@ -41,25 +41,25 @@ export default function AnalyticsPage() {
   const metrics = data
     ? [
         {
-          label: "Total Coverage",
+          label: "Your sites",
           value: data.totalMonitors,
-          sub: "monitors tracked",
+          sub: "pages you added",
           icon: Globe,
         },
         {
-          label: "Daily Velocity",
+          label: "Changes today",
           value: data.changesToday,
           sub: "changes detected",
           icon: Zap,
         },
         {
-          label: "Critical Signals",
+          label: "Need attention",
           value: data.importantAlerts,
           sub: "high priority today",
           icon: TrendingUp,
         },
         {
-          label: "System Health",
+          label: "Site health",
           value: `${data.monitoringHealth}%`,
           sub: "uptime quality",
           icon: BarChart3,
@@ -70,9 +70,9 @@ export default function AnalyticsPage() {
   return (
     <div className="p-4 lg:p-6">
       <CommandPageHeader
-        label="Intelligence"
+        label="Your sites"
         title="Analytics"
-        description="Performance metrics across your monitoring network."
+        description="What changed on the sites your company owns."
       />
 
       {loading ? (
@@ -117,14 +117,14 @@ export default function AnalyticsPage() {
               className="mt-6 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6"
             >
               <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-cyan-500/70">
-                Top Signal
+                Most changed page
               </p>
               <h3 className="mt-2 text-lg font-medium text-zinc-100">
                 {data.mostActiveWebsite.name}
               </h3>
               <p className="mt-1 text-sm text-zinc-600">{data.mostActiveWebsite.url}</p>
               <p className="mt-4 font-mono text-sm text-cyan-300/80">
-                {data.mostActiveWebsite.changeCount} total changes detected
+                {data.mostActiveWebsite.changeCount} changes on this page
               </p>
             </motion.div>
           )}

@@ -15,11 +15,11 @@ export function OsPricing() {
             Access Tiers
           </p>
           <h2 className="text-3xl font-light text-zinc-100 md:text-4xl">
-            Pay for clarity, not just more monitors
+            A clear view of your own sites
           </h2>
           <p className="mx-auto mt-3 max-w-xl text-sm text-zinc-500">
-            Every plan unlocks smarter website change detection, faster checks, and better
-            alerts — so you know what changed and why it matters.
+            Every plan can look from outside, or from a script you paste into the site
+            you own. Plans differ by how many sites, how often, and who gets the alert.
           </p>
         </div>
 

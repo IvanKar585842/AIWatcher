@@ -7,7 +7,7 @@ export default function HistoryPage() {
       <CommandPageHeader
         label="Archive"
         title="Change History"
-        description="See what changed, when it happened, and why it matters."
+        description="What changed on the sites your company owns, and when."
       />
       <ChangeHistory />
     </div>

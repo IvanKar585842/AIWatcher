@@ -205,17 +205,17 @@ export default function BillingPage() {
 
   const planCopy =
     currentPlan === "FREE"
-      ? "You're exploring WatchFlowing. Upgrade when you want AI clarity, faster checks, and richer alerts."
+      ? "You are watching a few of your own sites. Upgrade when the team needs clearer alerts and more frequent checks."
       : currentPlan === "PRO"
-        ? "You have AI analysis, faster intervals, visual monitoring, and Telegram — built for serious monitoring."
-        : "Full team access with API, webhooks, priority processing, and unlimited AI.";
+        ? "Clearer alerts, faster checks, and Telegram for the sites your company owns."
+        : "The whole team can watch the company sites, with API, webhooks, and priority checks.";
 
   return (
     <div className="space-y-8 p-4 lg:p-6">
       <CommandPageHeader
         label="Subscription"
         title="Billing"
-        description="Pay for intelligence and automation — not just more monitors."
+        description="Plans for the sites your company owns."
       >
         <Button
           variant="outline"
@@ -273,12 +273,12 @@ export default function BillingPage() {
           ) : overview ? (
             <div className="space-y-5">
               <OsUsageBar
-                label="Monitors"
+                label="Your sites"
                 used={overview.usage.monitors}
                 limit={overview.limits.maxMonitors}
               />
               <OsUsageBar
-                label="Monitoring checks"
+                label="Checks"
                 used={overview.usage.monitoringChecks ?? 0}
                 limit={null}
               />

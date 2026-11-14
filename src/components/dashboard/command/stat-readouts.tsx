@@ -37,7 +37,7 @@ export const StatReadouts = memo(function StatReadouts({
 }) {
   const stats: StatItem[] = [
     {
-      label: "Active Monitors",
+      label: "Your sites",
       value: activeMonitors,
       icon: Radio,
       accent: "from-cyan-500/20 to-transparent",
@@ -62,7 +62,7 @@ export const StatReadouts = memo(function StatReadouts({
       accent: "from-violet-500/15 to-transparent",
     },
     {
-      label: "Monitoring Health",
+      label: "Site health",
       value: monitoringHealth,
       suffix: "%",
       icon: HeartPulse,

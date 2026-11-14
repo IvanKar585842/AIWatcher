@@ -15,7 +15,7 @@ export function PopularMonitoringExamples({ className }: { className?: string })
           <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-cyan-500/70">
             Help
           </p>
-          <h3 className="text-sm font-medium text-zinc-100">Popular monitoring examples</h3>
+          <h3 className="text-sm font-medium text-zinc-100">Pages companies add</h3>
         </div>
       </div>
       <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -28,10 +28,10 @@ export function PopularMonitoringExamples({ className }: { className?: string })
           </li>
         ))}
       </ul>
-      <p className="mt-3 text-[11px] leading-relaxed text-zinc-600">
-        Best on public HTML pages — docs, news, government, universities, corporate sites, and
-        GitHub. Marketplaces and strong anti-bot sites are often unreliable.
-      </p>
+        <p className="mt-3 text-[11px] leading-relaxed text-zinc-600">
+          Add a page your company owns. If the site blocks an automated check, verify the domain
+          or install the site script. WatchFlowing does not watch websites that belong to someone else.
+        </p>
     </div>
   );
 }

@@ -67,12 +67,12 @@ export async function sendWeeklyReportEmail(params: {
       <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#0c0c0c;border:1px solid #1f1f1f;border-radius:16px;overflow:hidden;">
         <tr><td style="padding:28px 28px 16px;border-bottom:1px solid #1f1f1f;">
           <div style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#22d3ee;">WatchFlowing</div>
-          <h1 style="margin:10px 0 0;font-size:22px;color:#fafafa;font-weight:600;">Weekly Intelligence Report</h1>
+          <h1 style="margin:10px 0 0;font-size:22px;color:#fafafa;font-weight:600;">What changed on your sites</h1>
           <p style="margin:8px 0 0;color:#71717a;font-size:13px;">${escapeHtml(params.periodLabel)}</p>
         </td></tr>
         <tr><td style="padding:24px 28px;">
           <p style="margin:0 0 12px;color:#d4d4d8;font-size:14px;">${greeting}</p>
-          <p style="margin:0;color:#a1a1aa;font-size:14px;line-height:1.6;">Your websites this week — WatchFlowing kept watching even while you were away.</p>
+          <p style="margin:0;color:#a1a1aa;font-size:14px;line-height:1.6;">A short account of the sites your company owns.</p>
           <div style="margin:20px 0;padding:16px;border-radius:12px;background:#111;border:1px solid #1f2937;">
             <p style="margin:0;color:#f4f4f5;font-size:15px;line-height:1.55;font-weight:500;">${escapeHtml(params.executiveSummary)}</p>
             <p style="margin:12px 0 0;font-size:12px;color:#71717a;">${params.totalChanges} changes · ${params.importantCount} need attention</p>
@@ -94,7 +94,7 @@ export async function sendWeeklyReportEmail(params: {
 </body></html>`;
 
   const text = [
-    "WatchFlowing Weekly Intelligence Report",
+    "What changed on your sites",
     params.periodLabel,
     "",
     params.executiveSummary,
@@ -108,7 +108,7 @@ export async function sendWeeklyReportEmail(params: {
     const result = await getResend().emails.send({
       from,
       to: params.to,
-      subject: "Your WatchFlowing Weekly Intelligence Report",
+      subject: "What changed on your sites",
       html,
       text,
     });

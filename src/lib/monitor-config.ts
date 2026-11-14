@@ -178,43 +178,43 @@ export interface CategoryDefinition {
 export const MONITOR_CATEGORY_DEFS: CategoryDefinition[] = [
   {
     id: "Website Monitoring",
-    label: "Website Monitoring",
-    description: "Public pages, sections, text, images, and links",
+    label: "Your site",
+    description: "Your homepage, a section, text, images, and links",
     icon: Globe,
     accent: "cyan",
   },
   {
     id: "Competitor Intelligence",
-    label: "Competitor Intelligence",
-    description: "Pricing, features, products, landers, announcements",
+    label: "Your pages",
+    description: "Your pricing, features, product, and landing pages",
     icon: Megaphone,
     accent: "amber",
   },
   {
     id: "Developer Monitoring",
-    label: "Developer Monitoring",
-    description: "Releases, docs, and API references",
+    label: "Your docs",
+    description: "Your releases, docs, and API reference",
     icon: Code,
     accent: "violet",
   },
   {
     id: "SEO Monitoring",
-    label: "SEO Monitoring",
-    description: "Titles, meta, headings, and content",
+    label: "Your search pages",
+    description: "Titles, meta, headings, and content on your site",
     icon: Sparkles,
     accent: "sky",
   },
   {
     id: "Business Monitoring",
-    label: "Business Monitoring",
-    description: "News, blogs, and public announcements",
+    label: "Your newsroom",
+    description: "Your newsroom, blog, and announcements",
     icon: Newspaper,
     accent: "rose",
   },
   {
     id: "Other",
     label: "Other",
-    description: "General-purpose monitoring",
+    description: "Another page your company owns",
     icon: BookOpen,
     accent: "blue",
   },
@@ -237,23 +237,23 @@ export interface ModeDefinition {
 
 /**
  * Engine modes available in product UX.
- * Modes that depend on private sessions or marketplace-style extraction stay in
- * the enum only for legacy records; new monitors target public websites.
+ * Modes that depend on private sessions stay in the enum for existing records.
+ * New checks are for a page the company owns.
  */
 export const MONITORING_MODES: ModeDefinition[] = [
   {
     mode: "ENTIRE_PAGE",
-    label: "Full Page Monitoring",
-    description: "Monitor the entire page and detect important changes automatically.",
-    tooltip: "Recommended for most users. Watches the whole page and filters noise.",
+    label: "The whole page",
+    description: "Watch a whole page your company owns and explain important changes.",
+    tooltip: "Best start. Watches the page you add and filters noise.",
     icon: Globe,
     recommended: true,
     primary: true,
   },
   {
     mode: "CSS_SELECTOR",
-    label: "Specific Section Monitoring",
-    description: "Watch one section or element using a CSS selector.",
+    label: "One section",
+    description: "Watch one section of your page with a CSS selector.",
     tooltip: "Requires a CSS selector for the exact element.",
     icon: Code,
     requiresSelector: true,
@@ -261,16 +261,16 @@ export const MONITORING_MODES: ModeDefinition[] = [
   },
   {
     mode: "TEXT_CHANGES",
-    label: "Text Change Monitoring",
-    description: "Focus on readable text updates and ignore most HTML noise.",
-    tooltip: "Ideal for articles, announcements, and copy changes.",
+    label: "The words",
+    description: "Watch readable text on your page and ignore most HTML noise.",
+    tooltip: "Use this when wording on your page matters more than layout.",
     icon: Type,
     primary: true,
   },
   {
     mode: "VISUAL_CHANGES",
-    label: "Image Change Monitoring",
-    description: "Detect layout, design, and visual / image shifts.",
+    label: "The look",
+    description: "Watch layout and images on your page.",
     tooltip: "Best when appearance or imagery matters more than text.",
     icon: Eye,
     primary: true,
@@ -284,16 +284,16 @@ export const MONITORING_MODES: ModeDefinition[] = [
   },
   {
     mode: "DOCUMENTATION_CHANGES",
-    label: "Documentation Monitoring",
-    description: "Track docs, changelogs, and API reference pages.",
-    tooltip: "Ideal for developer documentation.",
+    label: "Your docs",
+    description: "Watch docs, changelogs, and API pages you publish.",
+    tooltip: "For documentation your company publishes.",
     icon: FileText,
     primary: true,
   },
   {
     mode: "AI_SMART",
-    label: "AI Monitoring",
-    description: "Describe what matters in plain language and let AI decide.",
+    label: "Say what matters",
+    description: "Describe what matters on your page. The assistant decides what to surface.",
     tooltip: "Write natural-language instructions for the AI.",
     icon: Brain,
     requiresAiPrompt: true,
@@ -301,36 +301,36 @@ export const MONITORING_MODES: ModeDefinition[] = [
   },
   {
     mode: "KEYWORD_DETECTION",
-    label: "Keyword Monitoring",
-    description: "Alert when specific keywords appear or disappear.",
+    label: "Words you choose",
+    description: "Alert when words you choose appear or disappear on your page.",
     tooltip: "Enter the words you want to watch for.",
     icon: Hash,
     requiresKeywords: true,
   },
   {
     mode: "API_RESPONSE",
-    label: "API Monitoring",
-    description: "Monitor JSON or XML API endpoint responses.",
-    tooltip: "Point at a public API URL to detect response changes.",
+    label: "Your API",
+    description: "Watch a JSON or XML response your company publishes.",
+    tooltip: "Point at an API your company operates.",
     icon: Code,
   },
   {
     mode: "RSS_FEED",
-    label: "RSS Feed",
-    description: "Track new items in RSS/Atom feeds.",
+    label: "Your feed",
+    description: "Watch new items in a feed your company publishes.",
     icon: Rss,
   },
   {
     mode: "XPATH",
     label: "XPath Selector",
-    description: "Monitor a specific element by XPath.",
+    description: "Watch one element on your page by XPath.",
     icon: Search,
     requiresSelector: true,
   },
   {
     mode: "TABLE_DETECTION",
-    label: "Table Monitoring",
-    description: "Track changes in HTML tables.",
+    label: "A table",
+    description: "Watch a table on your page.",
     icon: Table,
   },
   {
@@ -371,7 +371,7 @@ export const ADVANCED_MONITORING_MODES = MONITORING_MODES.filter(
   (m) => !m.primary && m.selectable !== false
 );
 
-/** True only for modes WatchFlowing supports for new public-page monitors. */
+/** True only for modes offered when adding a page the company owns. */
 export function isModeSelectableForCreate(mode: MonitoringMode): boolean {
   return MONITORING_MODES.some((definition) => definition.mode === mode && definition.selectable !== false);
 }

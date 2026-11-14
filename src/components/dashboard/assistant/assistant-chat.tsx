@@ -267,7 +267,7 @@ export function AssistantChat() {
       <CommandPageHeader
         label="AI Assistant"
         title="WatchFlowing Assistant"
-        description="Context-aware help based on your monitors, alerts, and notifications."
+        description="Ask about the sites your company owns."
       />
 
       <div className="relative flex h-[calc(100dvh-13.5rem)] min-h-[360px] w-full min-w-0 overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] sm:h-[calc(100dvh-12rem)] sm:min-h-[480px] lg:h-[calc(100vh-11rem)] lg:min-h-[520px]">

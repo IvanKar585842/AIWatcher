@@ -47,6 +47,7 @@ import {
   WAIT_STRATEGY_OPTIONS,
   getSelectableMonitoringModes,
   MONITOR_CATEGORIES,
+  MONITOR_CATEGORY_DEFS,
   MONITORING_MODES,
   parseMonitorConfig,
   type MonitorConfig,
@@ -559,7 +560,7 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
         <SettingsSection
           id="general"
           title="General"
-          subtitle="Name, URL, monitoring type, frequency, and status"
+          subtitle="Name, address, how often we look, and whether the check is on"
           icon={<span className="text-lg">⚙</span>}
           open={openSections.general}
           onToggle={() => toggleSection("general")}
@@ -570,7 +571,7 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
               <OsInput value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             </div>
             <div className="sm:col-span-2">
-              <FieldLabel>Website URL</FieldLabel>
+              <FieldLabel>Page on your site</FieldLabel>
               <OsInput value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} />
               {protectedUrlWarning && (
                 <div className="mt-2 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/[0.08] px-3 py-2 text-xs leading-relaxed text-amber-100/90">
@@ -627,7 +628,7 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
                 <SelectContent>
                   {MONITOR_CATEGORIES.map((cat) => (
                     <SelectItem key={cat} value={cat}>
-                      {cat}
+                      {MONITOR_CATEGORY_DEFS.find((item) => item.id === cat)?.label ?? cat}
                     </SelectItem>
                   ))}
                   {form.category &&
@@ -668,8 +669,8 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
         {/* Monitoring Modes */}
         <SettingsSection
           id="modes"
-          title="Monitoring Modes"
-          subtitle="Choose how WatchFlowing detects changes"
+          title="What to watch"
+          subtitle="How the assistant looks at this page"
           icon={<span className="text-lg">◎</span>}
           open={openSections.modes}
           onToggle={() => toggleSection("modes")}

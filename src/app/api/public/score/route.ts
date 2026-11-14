@@ -101,9 +101,9 @@ export async function POST(request: NextRequest) {
             risksPreview: preview.risks.slice(0, 1),
             changeFrequencyHint: preview.changeFrequencyHint,
             cta: {
-              title: "Unlock the full Intelligence Report",
+              title: "Keep the assistant on this site",
               description:
-                "Create a free WatchFlowing account to see all risks, SEO notes, and continuous monitoring.",
+                "Create a free account and WatchFlowing will explain later changes on this site.",
               href: `/sign-up?from=score${saved ? `&score=${saved.id}` : ""}`,
             },
             ...(saved ? { sharePath: `/score/${shareToken}` } : {}),

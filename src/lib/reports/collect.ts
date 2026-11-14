@@ -153,7 +153,7 @@ export function toneForReportType(type: ReportType): string {
     case "SEO":
       return "Focus on SEO signals: titles, meta, robots, structure, indexability.";
     case "COMPETITOR":
-      return "Focus on competitive moves: pricing, offers, product messaging.";
+      return "Focus on pricing, offers, and messaging on the company's own sites.";
     case "BUSINESS":
     default:
       return "Focus on business impact, conversions, and what leadership should review.";

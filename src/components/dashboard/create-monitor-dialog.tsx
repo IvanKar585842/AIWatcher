@@ -236,7 +236,7 @@ export function CreateMonitorDialog({
   open: controlledOpen,
   onOpenChange: controlledOnOpenChange,
   hideTrigger = false,
-  triggerLabel = "New Monitor",
+  triggerLabel = "Add a site",
   triggerClassName,
   enableTourControl = false,
 }: CreateMonitorDialogProps) {
@@ -429,7 +429,7 @@ export function CreateMonitorDialog({
 
   function validateStep1(): string | null {
     const url = normalizeSubmittedUrl(form.url);
-    if (!url) return "Website URL is required";
+    if (!url) return "Add the address of a page your company owns";
     try {
       const parsed = new URL(url);
       if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
@@ -438,7 +438,7 @@ export function CreateMonitorDialog({
     } catch {
       return "Please enter a valid URL (include https://)";
     }
-    if (!form.name.trim()) return "Monitor name is required";
+    if (!form.name.trim()) return "Name this page";
     return null;
   }
 
@@ -455,7 +455,7 @@ export function CreateMonitorDialog({
       return "At least one keyword is required";
     }
     if (selectedType.requiresAiPrompt && !form.aiPrompt.trim()) {
-      return "Describe what the AI should monitor";
+      return "Describe what matters on this page";
     }
     return null;
   }
@@ -505,7 +505,11 @@ export function CreateMonitorDialog({
       if (!sourceTouched && suggestion) {
         setForm((prev) => ({
           ...prev,
-          sourceType: suggestion.sourceType,
+          sourceType: ["webpage", "product", "changelog", "release", "news_feed", "news_article"].includes(
+            suggestion.sourceType
+          )
+            ? suggestion.sourceType
+            : "webpage",
           watchScope: suggestion.watchScope,
         }));
       }
@@ -594,7 +598,7 @@ export function CreateMonitorDialog({
     }
 
     const monitorId = result.data.monitor.id;
-    toast("Monitor created successfully", "success");
+    toast("Site added", "success");
     setOpen(false);
     setForm(formDefaultsFromUserSettings());
     setClientId("");
@@ -631,11 +635,11 @@ export function CreateMonitorDialog({
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-cyan-500/70">
-                New monitor
+                Add a site
               </p>
-              <h2 className="mt-1 text-lg font-semibold text-zinc-50 sm:text-xl">Create AI Monitor</h2>
+              <h2 className="mt-1 text-lg font-semibold text-zinc-50 sm:text-xl">A page your company owns</h2>
               <p className="mt-1 text-sm text-zinc-500">
-                Step {step} of 2 — {step === 1 ? "Website details" : "How should we watch it?"}
+                Step {step} of 2 — {step === 1 ? "Your page" : "What should the assistant watch?"}
               </p>
             </div>
             <Sparkles className="hidden h-5 w-5 shrink-0 text-cyan-500/40 sm:block" />
@@ -667,8 +671,8 @@ export function CreateMonitorDialog({
                 className="space-y-4"
               >
                 <div>
-                  <FieldLabel hint="The public page you want WatchFlowing to check for changes.">
-                    Website URL
+                  <FieldLabel hint="A page on a website your company owns.">
+                    Page on your site
                   </FieldLabel>
                   <OsInput
                     type="url"
@@ -703,8 +707,8 @@ export function CreateMonitorDialog({
                   <SupportedSitesGuide className="mt-3" />
                 </div>
                 <div>
-                  <FieldLabel hint="Choose what kind of change matters. Ordinary pages stay on the general webpage check.">
-                    Monitoring type
+                  <FieldLabel hint="What kind of page this is on your site.">
+                    Page type
                   </FieldLabel>
                   <Select
                     value={form.sourceType}
@@ -717,15 +721,12 @@ export function CreateMonitorDialog({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="webpage">General webpage</SelectItem>
-                      <SelectItem value="product">Product</SelectItem>
-                      <SelectItem value="marketplace_search">Marketplace search</SelectItem>
-                      <SelectItem value="marketplace_category">Marketplace category</SelectItem>
-                      <SelectItem value="news_feed">News feed</SelectItem>
-                      <SelectItem value="news_search">News search</SelectItem>
-                      <SelectItem value="news_article">News article</SelectItem>
-                      <SelectItem value="release">Software release</SelectItem>
-                      <SelectItem value="changelog">Changelog</SelectItem>
+                      <SelectItem value="webpage">A page you own</SelectItem>
+                      <SelectItem value="product">A product page you publish</SelectItem>
+                      <SelectItem value="changelog">Your changelog</SelectItem>
+                      <SelectItem value="release">Your releases</SelectItem>
+                      <SelectItem value="news_feed">A feed you publish</SelectItem>
+                      <SelectItem value="news_article">A post on your site</SelectItem>
                     </SelectContent>
                   </Select>
                   {normalizeSubmittedUrl(form.url).startsWith("http") && (
@@ -789,16 +790,16 @@ export function CreateMonitorDialog({
                       <OsInput
                         value={form.keywords}
                         onChange={(e) => setForm({ ...form, keywords: e.target.value })}
-                        placeholder="samsung, galaxy"
+                        placeholder="pricing, launch"
                       />
                     </div>
                   )}
                 <div>
-                  <FieldLabel hint="A short name you’ll recognize in your dashboard.">
-                    Monitor name
+                  <FieldLabel hint="A short name for this page in the dashboard.">
+                    Name
                   </FieldLabel>
                   <OsInput
-                    placeholder="e.g. Competitor Pricing Page"
+                    placeholder="e.g. Our pricing page"
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
                   />
@@ -823,7 +824,7 @@ export function CreateMonitorDialog({
                   </div>
                 )}
                 <div>
-                  <FieldLabel hint="Optional — helps you organize monitors later.">Category</FieldLabel>
+                  <FieldLabel hint="Optional. Helps you group pages later.">Category</FieldLabel>
                   <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                     {MONITOR_CATEGORY_DEFS.map((cat) => {
                       const Icon = cat.icon;
@@ -869,7 +870,7 @@ export function CreateMonitorDialog({
                   <textarea
                     value={form.description}
                     onChange={(e) => setForm({ ...form, description: e.target.value })}
-                    placeholder="What should this monitor watch for?"
+                    placeholder="What matters on this page?"
                     rows={3}
                     className="flex w-full rounded-md border border-white/[0.08] bg-black/50 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/40"
                   />
@@ -886,7 +887,7 @@ export function CreateMonitorDialog({
               >
                 <div>
                   <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                    <FieldLabel hint="Not sure? Keep Full Page Monitoring — it works for most sites.">
+                    <FieldLabel hint="The whole page is the right start for a site you own.">
                       Monitoring type
                     </FieldLabel>
                     <p className="text-[11px] text-zinc-500 sm:mb-1.5">Start with Recommended</p>
@@ -1005,7 +1006,7 @@ export function CreateMonitorDialog({
                                     : "border-white/[0.06] text-zinc-500 hover:text-zinc-300"
                                 )}
                               >
-                                {cat}
+                                {MONITOR_CATEGORY_DEFS.find((item) => item.id === cat)?.label ?? cat}
                               </button>
                             ))}
                           </div>
@@ -1133,7 +1134,7 @@ export function CreateMonitorDialog({
                       <textarea
                         value={form.aiPrompt}
                         onChange={(e) => setForm({ ...form, aiPrompt: e.target.value })}
-                        placeholder="Describe exactly what should be monitored."
+                        placeholder="Describe what matters on this page."
                         rows={6}
                         className="min-h-[160px] w-full rounded-lg border border-white/[0.08] bg-black/40 px-3 py-3 text-sm leading-relaxed text-zinc-100 placeholder:text-zinc-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/40"
                       />
@@ -1218,10 +1219,10 @@ export function CreateMonitorDialog({
                       {(form.mode === MonitoringMode.VISUAL_CHANGES ||
                         form.mode === MonitoringMode.SCREENSHOT_DIFF)
                         ? "Usually leave this off for visual / image checks."
-                        : "Leave on unless the site blocks monitoring."}
+                        : "Leave this on unless your site blocks the check."}
                     </p>
                     <p className="mt-1 text-[11px] leading-snug text-zinc-600">
-                      Prefer public pages. Marketplaces and social networks often block automated monitoring.
+                      Add a page your company owns. If that site blocks automated checks, verify the domain or install the site script. WatchFlowing does not bypass protection.
                     </p>
                   </div>
                   <Switch
@@ -1305,7 +1306,7 @@ export function CreateMonitorDialog({
                     : compatibility?.risky
                       ? "Create anyway"
                       : compatibility
-                        ? "Create Monitor"
+                        ? "Add this site"
                         : "Check & create"}
               </Button>
             )}

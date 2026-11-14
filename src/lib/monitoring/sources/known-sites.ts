@@ -83,10 +83,10 @@ export function isContentIndexPath(url: URL): boolean {
 
 export function knownSiteDetail(kind: KnownSiteKind): string {
   if (kind === "docs") {
-    return "Public documentation. The main article text is compared. A browser runs only when the page is an empty script shell.";
+    return "Documentation your company publishes. The main article text is compared. A browser runs only when the page is an empty script shell.";
   }
   if (kind === "news") {
-    return "Public news page. An RSS or Atom link on the same site is more precise. The page itself is still fetched when you monitor it directly.";
+    return "A news or blog page on your site. An RSS or Atom link on the same site is more precise. The page itself is still checked when you add it directly.";
   }
-  return "Public code host. A /releases URL uses the releases API. Other public pages use the normal page check.";
+  return "A code host your company uses. A /releases URL uses the releases API. Other pages use the normal page check.";
 }

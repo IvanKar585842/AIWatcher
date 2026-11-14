@@ -6,14 +6,14 @@ export default function MonitorsPage() {
   return (
     <div className="p-4 lg:p-6">
       <CommandPageHeader
-        label="Network"
-        title="Monitors"
-        description="Manage every website under active surveillance."
+        label="Your sites"
+        title="Sites"
+        description="Pages your company owns. The assistant explains what changes."
       >
         <CreateMonitorDialog
           variant="os"
           enableTourControl
-          triggerLabel="+ Create Monitor"
+          triggerLabel="+ Add a site"
           triggerClassName="h-11 px-6 text-sm font-medium shadow-[0_0_32px_-8px_rgba(34,211,238,0.55)]"
         />
       </CommandPageHeader>

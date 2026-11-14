@@ -65,13 +65,13 @@ export function IntelligenceCenter({
   }[] = [
     {
       id: "feed",
-      label: "Intelligence Feed",
+      label: "What changed",
       mobileLabel: "Feed",
       emoji: "🧠",
     },
     {
       id: "assistant",
-      label: "Detection Assistant",
+      label: "Ask the assistant",
       mobileLabel: "Assistant",
       emoji: "🤖",
     },
@@ -85,7 +85,7 @@ export function IntelligenceCenter({
       <div className="shrink-0 border-b border-white/[0.06] px-3 pt-3 sm:px-5 sm:pt-5">
         <div className="mb-3 min-w-0 sm:mb-4">
           <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-cyan-500/70">
-            WatchFlowing Intelligence Center
+            Your sites
           </p>
           <h3 className="mt-1 text-base font-medium text-zinc-100 sm:text-lg">
             Ask AI · Read insights
@@ -97,7 +97,7 @@ export function IntelligenceCenter({
 
         <div
           role="tablist"
-          aria-label="Intelligence Center tabs"
+          aria-label="Site assistant tabs"
           className="mb-3 grid grid-cols-2 gap-1.5 rounded-2xl border border-white/[0.06] bg-black/40 p-1.5 sm:mb-4"
         >
           {tabs.map((t) => {

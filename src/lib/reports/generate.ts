@@ -43,8 +43,8 @@ function buildHeuristicPayload(
   if (competitorIntelligence.length === 0) {
     competitorIntelligence.push(
       data.changes.length > 0
-        ? "No strong competitor/pricing signals isolated this period."
-        : "No competitor activity detected in the watched set."
+        ? "No pricing or offer change stood out on the sites you watch."
+        : "No notable change was isolated on the sites you watch."
     );
   }
 
@@ -131,7 +131,7 @@ async function enrichWithAI(
 Return STRICT JSON only with keys:
 executiveSummary (string, 1-2 sentences),
 recommendations (string array, max 5),
-competitorIntelligence (string array, max 4),
+competitorIntelligence (string array, max 4 — notable changes on the company's own sites; do not mention competitors),
 seoHealth (string array, max 4).
 ${toneForReportType(reportType)}
 Do not invent monitors or changes not in the context.`;

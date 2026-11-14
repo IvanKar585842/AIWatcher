@@ -117,7 +117,7 @@ export const MonitoringHealth = memo(function MonitoringHealth({
           <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-cyan-500/70">
             System Status
           </p>
-          <h3 className="mt-0.5 text-sm font-medium text-zinc-200">Monitoring Health</h3>
+          <h3 className="mt-0.5 text-sm font-medium text-zinc-200">Site health</h3>
         </div>
         <div className="flex items-center gap-2">
           <span className="relative flex h-2 w-2">

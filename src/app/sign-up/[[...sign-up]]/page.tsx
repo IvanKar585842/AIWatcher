@@ -32,7 +32,7 @@ export default function SignUpPage() {
         Create your account
       </h1>
       <p className="mb-8 max-w-sm text-center text-sm text-zinc-500">
-        Start free AI website monitoring in under a minute.
+        Add a website your company owns. The first account is free.
       </p>
       <ClerkSignUpWidget />
     </div>

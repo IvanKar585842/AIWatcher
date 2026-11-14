@@ -148,7 +148,7 @@ export async function sendChangeEmail(params: ChangeEmailParams) {
   const modeLabel =
     params.monitorMode && MODE_LABELS[params.monitorMode as MonitoringMode]
       ? MODE_LABELS[params.monitorMode as MonitoringMode]
-      : params.category?.replace(/_/g, " ") || "Website monitoring";
+      : params.category?.replace(/_/g, " ") || "Your site";
   const recommendation =
     params.recommendedAction?.trim() ||
     (params.importance === "HIGH" || params.importance === "CRITICAL"
@@ -316,7 +316,7 @@ export async function sendChangeEmail(params: ChangeEmailParams) {
                 <a href="${safe.notificationsUrl}" style="color:#67e8f9;text-decoration:none;">Manage alerts</a>
               </p>
               <p style="margin:12px 0 0;font-size:11px;color:#3f3f46;">
-                WatchFlowing · Intelligent website monitoring
+                WatchFlowing · Assistant for your company's sites
               </p>
             </td>
           </tr>
@@ -377,14 +377,14 @@ export async function sendWelcomeEmail(to: string, name: string) {
     const result = await getResend().emails.send({
       from,
       to,
-      subject: "Welcome to WatchFlowing — create your first monitor",
+      subject: "Welcome to WatchFlowing — add your first site",
       html: `
       <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:560px;margin:0 auto;padding:40px 20px;background:#090909;color:#d4d4d8;">
         <p style="margin:0 0 8px;font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:rgba(56,189,248,0.75);">WatchFlowing</p>
         <h1 style="color:#fafafa;margin:0 0 12px;">Welcome, ${safeName}</h1>
-        <p style="line-height:1.6;color:#a1a1aa;">Your monitoring workspace is ready. Here’s the fastest path to value:</p>
+        <p style="line-height:1.6;color:#a1a1aa;">Your account is ready. Add a page your company owns:</p>
         <ol style="line-height:1.7;color:#a1a1aa;padding-left:18px;">
-          <li>Create a monitor for your homepage or a competitor URL</li>
+          <li>Add your company's homepage, docs, or pricing page</li>
           <li>We store a baseline snapshot automatically</li>
           <li>AI explains the next meaningful change and alerts you</li>
         </ol>

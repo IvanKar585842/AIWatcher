@@ -10,7 +10,16 @@ import { z } from "zod";
 const completeSchema = z.object({
   completed: z.literal(true),
   intent: z
-    .enum(["my-website", "competitor", "important-page", "price-changes"])
+    .enum([
+      "homepage",
+      "docs",
+      "key-page",
+      "pricing",
+      "my-website",
+      "competitor",
+      "important-page",
+      "price-changes",
+    ])
     .optional(),
 });
 

@@ -26,18 +26,17 @@ const STATIC_FAQ: FaqEntry[] = [
       /как создать монитор/i,
       /как добавить монитор/i,
     ],
-    answer: `To create a monitor in WatchFlowing:
+    answer: `To add a site in WatchFlowing:
 
-1. Go to **Monitors** in the sidebar (or use the dashboard empty state).
-2. Click **Create Monitor**.
-3. Enter a **name** and the **URL** you want to watch.
-4. Choose a **monitoring mode** (e.g. Entire Website, Visual Changes, Price Tracking).
-5. Set the **check interval** (Free plan: minimum 12 hours; Pro/Business: down to 5 minutes).
-6. Pick **notifications**: Email, Telegram, or Both.
-7. Optionally add an AI prompt, keywords, or a CSS/XPath selector.
-8. Click **Save**.
+1. Open **Sites** in the sidebar.
+2. Click **Add a site**.
+3. Name the page and paste an address your company owns.
+4. Choose what the assistant should watch: the whole page, the words, one section, or a plain description.
+5. Set how often to look. Free is every 12 or 24 hours. Pro can be as often as every 30 minutes. Business can be as often as every minute.
+6. Choose email, Telegram, or both.
+7. Save.
 
-The first check stores a baseline snapshot. Later checks compare against it and alert you when something meaningful changes.`,
+The first check stores a baseline. Later checks explain what changed on that page.`,
   },
   {
     patterns: [
@@ -49,11 +48,11 @@ The first check stores a baseline snapshot. Later checks compare against it and 
     ],
     answer: `WatchFlowing has three plans:
 
-**Free** — 3 monitors, 12-hour minimum interval, 7-day history, email notifications.
+**Free** — 3 of your company's sites, checks every 12 or 24 hours, 7-day history, email.
 
-**Pro** — 100 monitors, 5-minute intervals, unlimited history, Telegram, AI summaries.
+**Pro** — up to 100 of your sites, checks as often as every 30 minutes, unlimited history, Telegram, explanations.
 
-**Business** — unlimited monitors, priority queue, API access, team features.
+**Business** — unlimited sites, priority checks, API access, and a team.
 
 Open **Dashboard → Billing** to see your current plan, usage limits, and upgrade options. Payments are handled securely via Stripe.`,
   },
@@ -65,13 +64,13 @@ Open **Dashboard → Billing** to see your current plan, usage limits, and upgra
       /как работает ai/i,
       /ии мониторинг/i,
     ],
-    answer: `AI monitoring in WatchFlowing works in two ways:
+    answer: `The assistant explains changes on a site your company owns.
 
-**AI Smart mode** — When creating a monitor, choose AI Smart to focus on the main content area instead of noisy page chrome.
+**Say what matters** — when you add a page, describe the change you care about. The assistant looks for that.
 
-**Change analysis** — After any detected change, WatchFlowing sends old vs. new content to AI (OpenAI or Gemini) with your optional custom prompt. The AI writes a human-readable summary and decides if the change is important enough to notify you.
+**After a change** — WatchFlowing compares the page with the last snapshot and writes a short explanation. Noise such as timestamps and ads is filtered first.
 
-If no AI API key is configured, a built-in fallback still produces a useful text summary. Noise like timestamps and ads is typically filtered out.`,
+If no AI key is configured, a built-in summary is still written.`,
   },
   {
     patterns: [
@@ -84,9 +83,9 @@ If no AI API key is configured, a built-in fallback still produces a useful text
 
 1. **Was a change actually detected?** Open **History** — if nothing is listed, the page may not have changed meaningfully.
 2. **AI filtered it as noise** — Minor formatting or timestamps may set shouldNotify=false (no email/Telegram, but in-app bell may still show it).
-3. **Monitor paused or in ERROR** — Check the monitor card status on the Monitors page.
-4. **Email** — Check spam; server needs Resend configured; monitor must use Email or Both.
-5. **Telegram** — Link your account in Settings (Pro+ required); monitor must use Telegram or Both.
+3. **The page is paused or failing** — Open **Sites** and check that page.
+4. **Email** — Check spam. The page must send email alerts.
+5. **Telegram** — Link the account in Settings. The page must send Telegram alerts.
 6. **Wrong notification method** — Edit the monitor and confirm Email/Telegram settings.`,
   },
   {
@@ -95,17 +94,17 @@ If no AI API key is configured, a built-in fallback still produces a useful text
       /which mode should/i,
       /какой режим/i,
     ],
-    answer: `Choose a monitoring mode based on your goal:
+    answer: `On a page your company owns:
 
-- **General website changes** → Entire Website or Text Changes
-- **Layout/design shifts** → Visual Changes or Screenshot Diff
-- **Price drops** → Price Tracking
-- **Specific words appearing** → Keyword Tracking
-- **One element on the page** → CSS Selector or XPath
-- **API endpoint** → API Response
-- **Main article/content focus** → AI Smart
+- **The whole page** — ordinary changes
+- **The words** — wording only
+- **The look** — layout and images
+- **One section** — a header, price, or block you choose
+- **Words you choose** — a phrase that should appear or disappear
+- **Your API or feed** — a response or feed you publish
+- **Say what matters** — describe the change in plain language
 
-For public marketing, docs, and competitor pages, start with **Full Page Monitoring**. Avoid marketplaces and social networks — they often block automation.`,
+Start with **The whole page**. If your site blocks the check, verify the domain or install the site script.`,
   },
   {
     patterns: [
@@ -114,15 +113,14 @@ For public marketing, docs, and competitor pages, start with **Full Page Monitor
       /price change/i,
       /отслеживать цену/i,
     ],
-    answer: `To monitor price changes:
+    answer: `To watch a price on a page your company owns:
 
-1. Go to **Monitors → Create Monitor**.
-2. Enter the product page URL.
-3. Select **Price Tracking** as the monitoring mode.
-4. Set your preferred check interval and notifications.
-5. Save the monitor.
+1. Open **Sites** and click **Add a site**.
+2. Paste the product page you publish.
+3. Choose **One section** and point at the price, or choose **The whole page**.
+4. Save.
 
-WatchFlowing extracts price-like content from the page and alerts you when it changes. For a single price element, you can also use **CSS Selector** mode with a selector pointing to the price element.`,
+The assistant tells you when that price changes.`,
   },
 ];
 

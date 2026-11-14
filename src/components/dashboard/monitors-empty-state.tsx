@@ -5,10 +5,10 @@ import { Activity, Bot, LineChart, Search } from "lucide-react";
 import { CreateMonitorDialog } from "@/components/dashboard/create-monitor-dialog";
 
 const EXAMPLES = [
-  { icon: Activity, label: "Website Health" },
-  { icon: Search, label: "Competitor Monitoring" },
-  { icon: LineChart, label: "SEO Monitoring" },
-  { icon: Bot, label: "AI Smart Monitoring" },
+  { icon: Activity, label: "Your homepage" },
+  { icon: Search, label: "Your docs" },
+  { icon: LineChart, label: "Your pricing page" },
+  { icon: Bot, label: "A plain explanation" },
 ] as const;
 
 export function MonitorsEmptyState({
@@ -20,12 +20,12 @@ export function MonitorsEmptyState({
   showCreateButton?: boolean;
   variant?: "dashboard" | "monitors";
 }) {
-  const title = variant === "monitors" ? "No monitors created yet" : "No monitors yet";
+  const title = variant === "monitors" ? "No sites added yet" : "No sites yet";
   const description =
     variant === "monitors"
-      ? "Create your first monitor and let WatchFlowing protect what matters on your site."
-      : "Create your first monitor to start tracking important changes with WatchFlowing AI.";
-  const buttonLabel = variant === "monitors" ? "+ Create Monitor" : "Create Monitor";
+      ? "Add a page your company owns. WatchFlowing explains what changes."
+      : "Add a page your company owns so the assistant can explain important changes.";
+  const buttonLabel = variant === "monitors" ? "+ Add a site" : "Add a site";
 
   return (
     <motion.div
@@ -66,7 +66,7 @@ export function MonitorsEmptyState({
 
       <div className="relative mx-auto mt-10 max-w-lg">
         <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-600">
-          Popular monitoring types
+          Popular pages to add
         </p>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {EXAMPLES.map(({ icon: Icon, label }) => (

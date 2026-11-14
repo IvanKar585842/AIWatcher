@@ -187,7 +187,7 @@ export default function PublicReportPage({
                 }
               }}
             >
-              Start free monitoring
+              Watch the sites your company owns
             </Link>
           </div>
 

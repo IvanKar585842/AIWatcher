@@ -1,4 +1,5 @@
 import { LandingDeferredGate } from "@/components/landing/landing-deferred-gate";
+import { OsConnect } from "@/components/landing/os/connect";
 import { OsFaq } from "@/components/landing/os/faq";
 import { OsFooter } from "@/components/landing/os/footer";
 import { OsPricing } from "@/components/landing/os/pricing";
@@ -11,6 +12,7 @@ export function LandingBelowFold() {
   return (
     <>
       <LandingDeferredGate />
+      <OsConnect />
       <OsPricing />
       <OsFaq />
       <OsFooter />

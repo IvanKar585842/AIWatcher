@@ -10,10 +10,10 @@ import { ParticleField } from "@/components/landing/os/particle-field";
 import { cn } from "@/lib/utils";
 
 type EventType =
-  | "Website updated"
+  | "Homepage updated"
   | "Docs updated"
-  | "New job detected"
-  | "Scholarship added"
+  | "Careers page changed"
+  | "Pricing updated"
   | "Policy changed";
 
 interface MonitorSite {
@@ -33,27 +33,27 @@ interface LiveEvent {
 }
 
 const SITES: MonitorSite[] = [
-  { id: "stripe", name: "Stripe Pricing", domain: "stripe.com/pricing", x: 12, y: 18, color: "#38bdf8" },
-  { id: "mit", name: "MIT Careers", domain: "careers.mit.edu", x: 78, y: 14, color: "#22d3ee" },
-  { id: "docs", name: "Product Docs", domain: "docs.example.com", x: 86, y: 52, color: "#67e8f9" },
-  { id: "gov", name: "EU Policy", domain: "europa.eu/policy", x: 72, y: 82, color: "#7dd3fc" },
-  { id: "uni", name: "Harvard Aid", domain: "harvard.edu/finaid", x: 10, y: 72, color: "#06b6d4" },
-  { id: "github", name: "GitHub Releases", domain: "github.com/org/repo", x: 42, y: 8, color: "#0ea5e9" },
+  { id: "pricing", name: "Our pricing", domain: "yourcompany.com/pricing", x: 12, y: 18, color: "#38bdf8" },
+  { id: "careers", name: "Our careers", domain: "yourcompany.com/careers", x: 78, y: 14, color: "#22d3ee" },
+  { id: "docs", name: "Our docs", domain: "docs.yourcompany.com", x: 86, y: 52, color: "#67e8f9" },
+  { id: "policy", name: "Our privacy policy", domain: "yourcompany.com/privacy", x: 72, y: 82, color: "#7dd3fc" },
+  { id: "home", name: "Our homepage", domain: "yourcompany.com", x: 10, y: 72, color: "#06b6d4" },
+  { id: "changelog", name: "Our changelog", domain: "yourcompany.com/changelog", x: 42, y: 8, color: "#0ea5e9" },
 ];
 
 const EVENTS: { message: EventType; emoji: string }[] = [
-  { message: "Website updated", emoji: "◆" },
+  { message: "Homepage updated", emoji: "◆" },
   { message: "Docs updated", emoji: "◈" },
-  { message: "New job detected", emoji: "◎" },
-  { message: "Scholarship added", emoji: "✦" },
+  { message: "Careers page changed", emoji: "◎" },
+  { message: "Pricing updated", emoji: "✦" },
   { message: "Policy changed", emoji: "⚡" },
 ];
 
 const FEED = [
-  { time: "now", text: "Documentation section updated on docs hub", type: "docs" },
-  { time: "2m", text: "New job: Senior ML Engineer at MIT", type: "job" },
-  { time: "5m", text: "Policy section updated on europa.eu", type: "policy" },
-  { time: "12m", text: "Scholarship deadline added", type: "scholarship" },
+  { time: "now", text: "A section changed on your docs", type: "docs" },
+  { time: "2m", text: "A role was added on your careers page", type: "job" },
+  { time: "5m", text: "Your privacy policy was edited", type: "policy" },
+  { time: "12m", text: "A price changed on your pricing page", type: "pricing" },
 ];
 
 /** Animated hero visual only — LCP copy lives in the server LandingPage. */
@@ -126,7 +126,7 @@ export function HeroDashboardVisual() {
                 <span className="h-2 w-2 rounded-full bg-zinc-700" />
               </div>
               <span className="font-mono text-[10px] tracking-widest text-zinc-600">
-                WatchFlowing_OS v1.0 · 6 MONITORS ACTIVE
+                WatchFlowing · 6 of your sites
               </span>
               <span className="font-mono text-[10px] text-cyan-500/80">LIVE</span>
             </div>

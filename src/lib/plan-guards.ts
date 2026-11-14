@@ -57,7 +57,7 @@ export function assertMonitorQuota(user: AdminUserLike, currentCount: number): v
   const limits = getUserPlanLimits(user);
   if (currentCount >= limits.maxMonitors) {
     throw new ApiError(
-      `You're using all ${limits.maxMonitors} monitors on your plan. Upgrade to watch more websites without juggling limits.`,
+      `This plan already includes ${limits.maxMonitors} of your sites. Upgrade to add more.`,
       403
     );
   }

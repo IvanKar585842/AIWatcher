@@ -263,14 +263,14 @@ export function NetworkMap({ monitors }: { monitors: NetworkMonitor[] }) {
 
       <div className="absolute left-4 top-4 z-10 sm:left-5">
         <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-cyan-500/70">
-          Intelligence grid
+          Your sites
         </p>
         <h3 className="mt-1 text-sm font-medium text-zinc-200 sm:text-base">
-          Global Monitor Map
+          The pages you added
         </h3>
         <p className="mt-1 max-w-[240px] text-[11px] leading-relaxed text-zinc-600 sm:max-w-xs">
           {monitors.length === 0
-            ? "Your monitored sites appear around the AI Core."
+            ? "Pages your company owns show up here."
             : `${activeCount} active · ${recentChangeCount} changed in the last hour`}
         </p>
         {selected && (
@@ -285,14 +285,14 @@ export function NetworkMap({ monitors }: { monitors: NetworkMonitor[] }) {
           <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-500/10">
             <Globe2 className="h-6 w-6 text-cyan-400/80" />
           </div>
-          <p className="text-sm font-medium text-zinc-200">No monitored websites yet</p>
+          <p className="text-sm font-medium text-zinc-200">No sites added yet</p>
           <p className="mt-2 max-w-sm text-xs leading-relaxed text-zinc-500">
-            Create your first monitor to see your global monitoring map.
+            Add a page your company owns to see it here.
           </p>
           <div className="mt-6">
             <CreateMonitorDialog
               variant="os"
-              triggerLabel="Create Monitor"
+              triggerLabel="Add a site"
               triggerClassName="h-11 px-6 text-sm"
               onCreated={() => {
                 window.dispatchEvent(new CustomEvent("monitors-updated"));
