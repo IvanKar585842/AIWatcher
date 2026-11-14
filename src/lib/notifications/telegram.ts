@@ -124,6 +124,8 @@ interface ChangeNotificationParams {
   category?: string;
   recommendedAction?: string;
   changeId?: string;
+  appeared?: string[];
+  disappeared?: string[];
 }
 
 export async function sendTelegramChangeNotification(
@@ -137,25 +139,24 @@ export async function sendTelegramChangeNotification(
     ? `${appUrl}/dashboard/changes/${params.changeId}`
     : dashboardUrl;
 
-  const changeLine =
-    params.bulletPoints[0]?.trim() ||
-    params.summary.split(/[.!?]/)[0]?.trim() ||
-    "A meaningful page change was detected.";
+  const lines = (label: string, items: string[] | undefined) => {
+    const kept = (items ?? []).map((item) => item.trim()).filter(Boolean).slice(0, 3);
+    if (kept.length === 0) return [];
+    return ["", `<b>${label}</b>`, ...kept.map((item) => `• ${escapeHtml(item)}`)];
+  };
 
   const text = [
-    `🚨 <b>WatchFlowing Alert</b>`,
+    `🚨 <b>WatchFlowing</b>`,
     ``,
-    `<b>Monitor:</b>`,
-    escapeHtml(params.monitorName),
+    `<b>${escapeHtml(params.monitorName)}</b>`,
     ``,
-    `<b>Change detected:</b>`,
-    escapeHtml(changeLine),
-    ``,
-    `<b>AI Summary:</b>`,
-    escapeHtml(params.summary || "The monitored page was updated."),
-    ``,
-    `<b>Open Dashboard:</b>`,
-    escapeHtml(dashboardUrl),
+    escapeHtml(params.summary || "Something changed on your site."),
+    ...lines("What changed", params.bulletPoints),
+    ...lines("What appeared", params.appeared),
+    ...lines("What disappeared", params.disappeared),
+    ...(params.recommendedAction?.trim()
+      ? ["", `<b>Next</b>`, escapeHtml(params.recommendedAction.trim())]
+      : []),
   ].join("\n");
 
   return sendTelegramNotification(params.chatId, text, {

@@ -42,8 +42,8 @@ export function OsConnect() {
             <p className="mt-3 text-sm leading-relaxed text-zinc-500">
               The script runs as part of the site you own, so the outside bot wall does not
               stop it. It reports JavaScript errors and whether the pieces you name are still
-              there. It does not read forms, cookies, or page text, and it does not turn the
-              bot check off.
+              there. It does not read forms, cookies, page text, or who visited. Delete the
+              script, or revoke the key, and the reports stop.
             </p>
             <pre className="mt-4 overflow-x-auto rounded-xl border border-white/[0.06] bg-black/50 p-4 text-[11px] leading-relaxed text-cyan-100/90">
               <code>{`<script

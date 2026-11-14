@@ -133,6 +133,14 @@ interface CreateMonitorDialogProps {
   enableTourControl?: boolean;
 }
 
+function hostLabel(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
 function FieldLabel({
   children,
   hint,
@@ -250,6 +258,7 @@ export function CreateMonitorDialog({
   const [error, setError] = useState("");
   const [form, setForm] = useState(DEFAULT_FORM);
   const [selectedTypeId, setSelectedTypeId] = useState("full-page");
+  const [watchChoice, setWatchChoice] = useState<"everything" | "choose">("everything");
   const [typeFilter, setTypeFilter] = useState<MonitorTypeCategory | "All">("All");
   const [typeSearch, setTypeSearch] = useState("");
   const [showAdvancedTypes, setShowAdvancedTypes] = useState(false);
@@ -324,6 +333,7 @@ export function CreateMonitorDialog({
       setTypeSearch("");
       setTypeFilter("All");
       setSelectedTypeId("full-page");
+      setWatchChoice("everything");
       setShowAdvancedTypes(false);
       setCompatibility(null);
       setCompatCheckedUrl("");
@@ -438,7 +448,7 @@ export function CreateMonitorDialog({
     } catch {
       return "Please enter a valid URL (include https://)";
     }
-    if (!form.name.trim()) return "Name this page";
+    if (!form.name.trim() && !hostLabel(normalizeSubmittedUrl(form.url))) return "Name this page";
     return null;
   }
 
@@ -566,11 +576,11 @@ export function CreateMonitorDialog({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        name: form.name.trim(),
+        name: form.name.trim() || hostLabel(url),
         url,
         description: form.description.trim() || null,
         category: form.category || null,
-        mode: form.mode,
+        mode: watchChoice === "everything" ? MonitoringMode.ENTIRE_PAGE : form.mode,
         selector: form.selector.trim() || null,
         keywords: form.keywords
           ? form.keywords.split(",").map((k) => k.trim()).filter(Boolean)
@@ -578,8 +588,8 @@ export function CreateMonitorDialog({
         aiPrompt: form.aiPrompt.trim() || null,
         config: {
           monitorTypeId: selectedTypeId,
-          sourceType: form.sourceType,
-          watchScope: form.watchScope,
+          sourceType: watchChoice === "everything" ? "webpage" : form.sourceType,
+          watchScope: watchChoice === "everything" ? "page" : form.watchScope,
           visualMonitoring: form.visualMonitoring,
         },
         interval: form.interval,
@@ -639,7 +649,7 @@ export function CreateMonitorDialog({
               </p>
               <h2 className="mt-1 text-lg font-semibold text-zinc-50 sm:text-xl">A page your company owns</h2>
               <p className="mt-1 text-sm text-zinc-500">
-                Step {step} of 2 — {step === 1 ? "Your page" : "What should the assistant watch?"}
+                Step {step} of 2 — {step === 1 ? "Your site" : watchChoice === "everything" ? "Where to send the report" : "What to watch"}
               </p>
             </div>
             <Sparkles className="hidden h-5 w-5 shrink-0 text-cyan-500/40 sm:block" />
@@ -670,6 +680,9 @@ export function CreateMonitorDialog({
                 transition={{ duration: 0.2 }}
                 className="space-y-4"
               >
+                <p className="text-sm leading-relaxed text-zinc-400">
+                  Add the address. Then either watch everything important, or choose exactly what the company cares about.
+                </p>
                 <div>
                   <FieldLabel hint="A page on a website your company owns.">
                     Page on your site
@@ -704,8 +717,9 @@ export function CreateMonitorDialog({
                       <p>{protectedWarning}</p>
                     </div>
                   )}
-                  <SupportedSitesGuide className="mt-3" />
+                  {watchChoice === "choose" && <SupportedSitesGuide className="mt-3" />}
                 </div>
+                {watchChoice === "choose" && (
                 <div>
                   <FieldLabel hint="What kind of page this is on your site.">
                     Page type
@@ -735,7 +749,6 @@ export function CreateMonitorDialog({
                       {describeSource(normalizeSubmittedUrl(form.url), form.sourceType).detail}
                     </p>
                   )}
-                </div>
                   {(form.sourceType === "webpage" || form.sourceType === "changelog") && (
                     <div>
                       <FieldLabel hint="The whole page is the default. Narrower rules ignore unrelated parts of the page.">
@@ -794,8 +807,10 @@ export function CreateMonitorDialog({
                       />
                     </div>
                   )}
+                </div>
+                )}
                 <div>
-                  <FieldLabel hint="A short name for this page in the dashboard.">
+                  <FieldLabel hint="Leave this blank and we will use the site address.">
                     Name
                   </FieldLabel>
                   <OsInput
@@ -804,7 +819,39 @@ export function CreateMonitorDialog({
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
                   />
                 </div>
-                {clientChoices.length > 0 && (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => setWatchChoice("everything")}
+                    className={cn(
+                      "rounded-xl border p-4 text-left",
+                      watchChoice === "everything"
+                        ? "border-cyan-400/40 bg-cyan-500/10"
+                        : "border-white/[0.06] bg-black/30"
+                    )}
+                  >
+                    <p className="text-sm font-medium text-zinc-100">Watch everything important</p>
+                    <p className="mt-1 text-xs leading-relaxed text-zinc-500">
+                      The whole page. Reports say what appeared, what disappeared, which errors showed up, and how the server answered.
+                    </p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWatchChoice("choose")}
+                    className={cn(
+                      "rounded-xl border p-4 text-left",
+                      watchChoice === "choose"
+                        ? "border-cyan-400/40 bg-cyan-500/10"
+                        : "border-white/[0.06] bg-black/30"
+                    )}
+                  >
+                    <p className="text-sm font-medium text-zinc-100">Choose what matters</p>
+                    <p className="mt-1 text-xs leading-relaxed text-zinc-500">
+                      Pricing, docs, one section, or the words you name. The rest stays quiet.
+                    </p>
+                  </button>
+                </div>
+                {watchChoice === "choose" && clientChoices.length > 0 && (
                   <div>
                     <FieldLabel hint="Optional. The site stays on your account and is also filed under this client.">
                       Client
@@ -823,6 +870,8 @@ export function CreateMonitorDialog({
                     </select>
                   </div>
                 )}
+                {watchChoice === "choose" && (
+                <>
                 <div>
                   <FieldLabel hint="Optional. Helps you group pages later.">Category</FieldLabel>
                   <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
@@ -875,6 +924,8 @@ export function CreateMonitorDialog({
                     className="flex w-full rounded-md border border-white/[0.08] bg-black/50 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/40"
                   />
                 </div>
+                </>
+                )}
               </motion.div>
             ) : (
               <motion.div
@@ -885,6 +936,24 @@ export function CreateMonitorDialog({
                 transition={{ duration: 0.2 }}
                 className="space-y-5"
               >
+                {watchChoice === "everything" ? (
+                  <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/[0.06] px-4 py-4">
+                    <p className="text-sm font-medium text-zinc-100">A full report, not a casual glance</p>
+                    <p className="mt-2 text-sm leading-relaxed text-zinc-400">
+                      The whole page is compared. Each alert says what appeared, what disappeared, which errors showed up, and how the server answered. Nothing is invented.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setWatchChoice("choose");
+                        setStep(1);
+                      }}
+                      className="mt-3 text-xs text-cyan-300 hover:text-cyan-200"
+                    >
+                      Choose something specific instead
+                    </button>
+                  </div>
+                ) : (
                 <div>
                   <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                     <FieldLabel hint="The whole page is the right start for a site you own.">
@@ -1081,6 +1150,7 @@ export function CreateMonitorDialog({
                     </AnimatePresence>
                   </div>
                 </div>
+                )}
 
                 {(selectedType.requiresSelector || form.watchScope === "section") && (
                   <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}>
@@ -1210,6 +1280,7 @@ export function CreateMonitorDialog({
                   />
                 )}
 
+                {watchChoice === "choose" && (
                 <div className="flex items-center justify-between gap-3 rounded-lg border border-white/[0.06] bg-black/30 px-4 py-3">
                   <div className="min-w-0">
                     <Label htmlFor="robots" className="text-sm text-zinc-300">
@@ -1232,6 +1303,7 @@ export function CreateMonitorDialog({
                     className="data-[state=checked]:bg-cyan-500"
                   />
                 </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
@@ -1272,6 +1344,16 @@ export function CreateMonitorDialog({
               <Button
                 type="button"
                 onClick={() => {
+                  if (watchChoice === "everything") {
+                    selectMonitorType("full-page");
+                    setForm((prev) => ({
+                      ...prev,
+                      mode: MonitoringMode.ENTIRE_PAGE,
+                      sourceType: "webpage",
+                      watchScope: "page",
+                      category: prev.category || "Website Monitoring",
+                    }));
+                  }
                   const err = validateStep1();
                   if (err) {
                     setError(err);
@@ -1305,9 +1387,11 @@ export function CreateMonitorDialog({
                     ? "Confirm compatibility"
                     : compatibility?.risky
                       ? "Create anyway"
-                      : compatibility
-                        ? "Add this site"
-                        : "Check & create"}
+                      : watchChoice === "everything"
+                        ? "Start watching"
+                        : compatibility
+                          ? "Add this site"
+                          : "Check & create"}
               </Button>
             )}
           </div>

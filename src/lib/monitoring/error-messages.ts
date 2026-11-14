@@ -47,7 +47,7 @@ const KIND_COPY: Record<
       "Add a page on your site that loads without a login",
       "Verify the domain or install the site script",
       "Use a feed your company publishes, if you have one",
-      "If you own the site, the script reports errors without bypassing the challenge",
+      "The site script reports errors from your page. It does not bypass the challenge",
     ],
     statusLabel: "Access denied",
     tone: "red",

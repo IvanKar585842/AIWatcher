@@ -184,27 +184,27 @@ export function ChangeInsightBrief({
       )}
 
       {[
-        ["Sections added", sectionsAdded],
-        ["Sections removed", sectionsRemoved],
-        ["Visual differences", visualDifferences],
-        ["Structure differences", structureDifferences],
-        ["Links changed", linksChanged],
-        ["Buttons changed", buttonsChanged],
-        ["Text changed", textChanged],
-        ["Metadata changed", metadataChanged],
+        ["What appeared", sectionsAdded],
+        ["What disappeared", sectionsRemoved],
+        ["How the page looks", visualDifferences],
+        ["Layout", structureDifferences],
+        ["Links", linksChanged],
+        ["Buttons", buttonsChanged],
+        ["Words", textChanged],
+        ["Title and description", metadataChanged],
       ].filter(([, items]) => items.length > 0).length > 0 && (
         <div>
-          <SectionLabel>Detailed findings</SectionLabel>
+          <SectionLabel>The details</SectionLabel>
           <div className="mt-2.5 grid gap-3 sm:grid-cols-2">
             {[
-              ["Sections added", sectionsAdded],
-              ["Sections removed", sectionsRemoved],
-              ["Visual differences", visualDifferences],
-              ["Structure differences", structureDifferences],
-              ["Links changed", linksChanged],
-              ["Buttons changed", buttonsChanged],
-              ["Text changed", textChanged],
-              ["Metadata changed", metadataChanged],
+              ["What appeared", sectionsAdded],
+              ["What disappeared", sectionsRemoved],
+              ["How the page looks", visualDifferences],
+              ["Layout", structureDifferences],
+              ["Links", linksChanged],
+              ["Buttons", buttonsChanged],
+              ["Words", textChanged],
+              ["Title and description", metadataChanged],
             ].map(([label, items]) =>
               (items as string[]).length > 0 ? (
                 <div key={label as string} className="rounded-lg border border-white/[0.06] bg-black/20 p-3">

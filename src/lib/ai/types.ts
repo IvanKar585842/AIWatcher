@@ -226,6 +226,13 @@ Summary rules:
 - Mention before→after when values are clear
 - Do NOT use generic phrases alone ("Content changed.", "Page updated.")
 
+Privacy:
+- Never name a visitor, account, email, or IP address. Describe the page and the server response, not a person.
+
+Detail:
+- sectionsAdded is what newly appeared. sectionsRemoved is what disappeared.
+- If the package shows an error, a missing piece, or an HTTP status, say that in changes. Do not invent an attack, a person, or a server problem that is not in the package.
+
 What changed (changes array):
 - 2–6 short bullets
 - Prefer concrete verbs: "New section added", "Price updated", "CTA changed", "Heading changed", "Link changed", "Image changed", "Navigation changed", "Text removed"

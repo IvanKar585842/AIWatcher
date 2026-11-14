@@ -69,31 +69,42 @@ export function SiteScriptPanel({ monitorId }: { monitorId: string }) {
 
   return (
     <section className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-      <p className="font-mono text-[10px] uppercase tracking-widest text-zinc-500">First-party script</p>
-      <h2 className="text-lg font-medium text-zinc-100">Site script</h2>
-      <p className="mt-1 text-sm text-zinc-400">
-        Paste this into the site you own, before the closing head or body tag. It still reports
-        when a bot check blocks the outside look, because it runs as part of your page. It
-        reports JavaScript errors and, if you add data-watch, whether those elements are still
-        there. It does not read forms, cookies, or page text, and it does not turn the bot check off.
+      <p className="font-mono text-[10px] uppercase tracking-widest text-zinc-500">Your permission</p>
+      <h2 className="text-lg font-medium text-zinc-100">Allow watching from inside your site</h2>
+      <p className="mt-1 text-sm leading-relaxed text-zinc-400">
+        Paste one script into the site you own. That is your consent. Delete the script, or revoke the key here, and the reports stop.
       </p>
+      <ul className="mt-3 space-y-1 text-sm text-zinc-300">
+        <li>Reports page errors and whether the pieces you name are still there.</li>
+        <li>Does not read forms, cookies, page text, names, or email addresses.</li>
+        <li>Does not store who visited. A sensitive error is saved only as the word error.</li>
+      </ul>
       {installation?.active && (
         <p className="mt-3 text-sm text-zinc-300">Active key {installation.prefix}…</p>
       )}
       {snippet && (
-        <textarea
-          readOnly
-          value={snippet}
-          className="mt-3 h-24 w-full rounded-md border border-white/10 bg-black/40 p-2 text-xs text-zinc-100"
-        />
+        <div className="mt-3">
+          <textarea
+            readOnly
+            value={snippet}
+            className="h-24 w-full rounded-md border border-white/10 bg-black/40 p-2 text-xs text-zinc-100"
+          />
+          <Button
+            type="button"
+            className="mt-2"
+            onClick={() => void navigator.clipboard.writeText(snippet).then(() => setMessage("Copied. Paste it before the closing head or body tag."))}
+          >
+            Copy script
+          </Button>
+        </div>
       )}
       <div className="mt-3 flex flex-wrap gap-2">
         <Button type="button" disabled={busy} onClick={() => void issue()}>
-          {installation?.active ? "Rotate key" : "Create key"}
+          {installation?.active ? "New key" : "Allow watching"}
         </Button>
         {installation?.active && (
           <Button type="button" disabled={busy} onClick={() => void revoke()}>
-            Revoke key
+            Stop watching
           </Button>
         )}
       </div>

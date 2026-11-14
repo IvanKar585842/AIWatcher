@@ -610,6 +610,8 @@ async function analyzeChangeRecord(change: ChangeWithMonitor): Promise<void> {
       analysis.recommendedAction ||
       defaultRecommendedAction(analysis.importance, analysis.category),
     shouldNotify: analysis.shouldNotify,
+    appeared: analysis.sectionsAdded,
+    disappeared: analysis.sectionsRemoved,
   });
 }
 
@@ -635,6 +637,8 @@ async function sendNotifications(
     category: string;
     recommendedAction: string;
     shouldNotify: boolean;
+    appeared?: string[];
+    disappeared?: string[];
   }
 ) {
   if (!analysis.shouldNotify) return;
@@ -754,6 +758,8 @@ async function sendNotifications(
             changeId,
             detectedAt: new Date(),
             faviconUrl: monitor.faviconUrl,
+            appeared: analysis.appeared,
+            disappeared: analysis.disappeared,
           });
 
           await recordAlertDelivery(monitor.userId, changeId, NotificationChannel.EMAIL, "SENT");
@@ -827,6 +833,8 @@ async function sendNotifications(
             category: analysis.category,
             recommendedAction: analysis.recommendedAction,
             changeId,
+            appeared: analysis.appeared,
+            disappeared: analysis.disappeared,
           });
 
           if (!result.ok) {

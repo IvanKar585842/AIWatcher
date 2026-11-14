@@ -127,6 +127,8 @@ interface ChangeEmailParams {
   changeId: string;
   detectedAt?: Date | string;
   faviconUrl?: string | null;
+  appeared?: string[];
+  disappeared?: string[];
 }
 
 export async function sendChangeEmail(params: ChangeEmailParams) {
@@ -173,6 +175,8 @@ export async function sendChangeEmail(params: ChangeEmailParams) {
     logoUrl: escapeHtml(logoUrl),
     brandLogo: escapeHtml(brandLogo),
     changes: params.changes.map(escapeHtml),
+    appeared: (params.appeared ?? []).map(escapeHtml).slice(0, 4),
+    disappeared: (params.disappeared ?? []).map(escapeHtml).slice(0, 4),
   };
 
   const importanceColor: Record<string, string> = {
@@ -204,6 +208,14 @@ export async function sendChangeEmail(params: ChangeEmailParams) {
                 A meaningful change was detected on this page.
               </td>
             </tr>`;
+
+  const detailBlock = (label: string, items: string[]) =>
+    items.length === 0
+      ? ""
+      : `<div style="margin-top:12px;">
+          <p style="margin:0 0 6px;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#71717a;">${label}</p>
+          <p style="margin:0;color:#d4d4d8;font-size:14px;line-height:1.6;">${items.map((item) => `• ${item}`).join("<br>")}</p>
+        </div>`;
 
   const logoBlock = safe.logoUrl
     ? `<img src="${safe.logoUrl}" width="40" height="40" alt="" style="display:block;border-radius:10px;border:1px solid rgba(255,255,255,0.08);background:#0a0a0a;" />`
@@ -286,6 +298,8 @@ export async function sendChangeEmail(params: ChangeEmailParams) {
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                   ${changeRows}
                 </table>
+                ${detailBlock("What appeared", safe.appeared)}
+                ${detailBlock("What disappeared", safe.disappeared)}
               </div>
 
               <div style="margin-top:16px;padding:14px 16px;background:rgba(34,211,238,0.06);border:1px solid rgba(34,211,238,0.18);border-radius:12px;">
