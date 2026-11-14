@@ -21,6 +21,11 @@ import {
   type DashboardBootstrapStats,
 } from "@/hooks/use-dashboard-bootstrap";
 
+const AgencyStrip = dynamic(
+  () => import("@/components/dashboard/agency-strip").then((m) => m.AgencyStrip),
+  { ssr: false, loading: () => null }
+);
+
 const NetworkMap = dynamic(
   () => import("./network-map").then((m) => m.NetworkMap),
   {
@@ -255,6 +260,8 @@ export function CommandCenter({
           </button>
         </div>
       )}
+
+      <AgencyStrip />
 
       {unreadImportantCount > 0 && (
         <button

@@ -259,6 +259,24 @@ export function CreateMonitorDialog({
   const [compatCheckedUrl, setCompatCheckedUrl] = useState("");
   const [checkingCompat, setCheckingCompat] = useState(false);
   const [compatAcknowledged, setCompatAcknowledged] = useState(false);
+  const [clientChoices, setClientChoices] = useState<Array<{ id: string; name: string; workspaceName: string }>>([]);
+  const [clientId, setClientId] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    void fetch("/api/workspaces/monitor-clients")
+      .then((response) => (response.ok ? response.json() : { clients: [] }))
+      .then((data: { clients?: Array<{ id: string; name: string; workspaceName: string }> }) => {
+        if (!cancelled) setClientChoices(data.clients ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setClientChoices([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   useEffect(() => {
     if (prefillRequest) {
@@ -563,6 +581,7 @@ export function CreateMonitorDialog({
         interval: form.interval,
         notificationMethod: form.notificationMethod,
         respectRobots: form.respectRobots,
+        ...(clientId ? { clientId } : {}),
       }),
     });
 
@@ -578,6 +597,7 @@ export function CreateMonitorDialog({
     toast("Monitor created successfully", "success");
     setOpen(false);
     setForm(formDefaultsFromUserSettings());
+    setClientId("");
     setStep(1);
     onCreated?.(monitorId);
     router.push(`/dashboard/monitors/${monitorId}`);
@@ -783,6 +803,25 @@ export function CreateMonitorDialog({
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
                   />
                 </div>
+                {clientChoices.length > 0 && (
+                  <div>
+                    <FieldLabel hint="Optional. The site stays on your account and is also filed under this client.">
+                      Client
+                    </FieldLabel>
+                    <select
+                      value={clientId}
+                      onChange={(event) => setClientId(event.target.value)}
+                      className="h-10 w-full rounded-md border border-white/10 bg-black/50 px-2 text-sm text-zinc-100"
+                    >
+                      <option value="">No client</option>
+                      {clientChoices.map((choice) => (
+                        <option key={choice.id} value={choice.id}>
+                          {choice.name} · {choice.workspaceName}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div>
                   <FieldLabel hint="Optional — helps you organize monitors later.">Category</FieldLabel>
                   <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">

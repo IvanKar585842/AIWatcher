@@ -74,6 +74,9 @@ const monitorBaseSchema = z.object({
 });
 
 export const createMonitorSchema = monitorBaseSchema
+  .extend({
+    clientId: z.string().trim().min(1).max(80).optional(),
+  })
   .refine(
     (data) => {
       if (data.mode === MonitoringMode.CSS_SELECTOR || data.mode === MonitoringMode.XPATH) {

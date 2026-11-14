@@ -63,6 +63,33 @@ export function assertMonitorQuota(user: AdminUserLike, currentCount: number): v
   }
 }
 
+/** Agency workspaces and seats reuse the existing team-member allowance. */
+export function agencySeatAllowance(user: AdminUserLike): number {
+  if (isAdminUser(user)) return Number.POSITIVE_INFINITY;
+  const seats = getUserPlanEntitlements(user).teamMembers;
+  return Number.isFinite(seats) && seats > 0 ? seats : 1;
+}
+
+export function assertAgencyWorkspaceQuota(user: AdminUserLike, ownedCount: number): void {
+  const allowance = agencySeatAllowance(user);
+  if (ownedCount >= allowance) {
+    throw new ApiError(
+      `This plan includes ${allowance} agency workspace${allowance === 1 ? "" : "s"}. Business includes 25.`,
+      403
+    );
+  }
+}
+
+export function assertAgencySeatQuota(user: AdminUserLike, memberCount: number): void {
+  const allowance = agencySeatAllowance(user);
+  if (memberCount >= allowance) {
+    throw new ApiError(
+      `This plan includes ${allowance} agency seat${allowance === 1 ? "" : "s"}. Business includes 25.`,
+      403
+    );
+  }
+}
+
 export function assertVisualMonitorQuota(
   user: AdminUserLike,
   currentVisualCount: number

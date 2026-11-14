@@ -14,7 +14,7 @@ import {
 import { withRateLimit } from "@/lib/rate-limit";
 import { resolveFaviconUrl } from "@/lib/favicon";
 import { getFaviconUrl } from "@/lib/utils";
-import { assertMonitorOwnedBy, monitorReadFilter } from "@/lib/security/ownership";
+import { monitorReadFilter } from "@/lib/security/ownership";
 import { updateMonitorSchema } from "@/lib/validations";
 import {
   prepareMonitorConfigForStorage,
@@ -244,9 +244,10 @@ export async function DELETE(
     return withRateLimit(
       `monitor-delete-${id}`,
       async () => {
-        // Ownership check — prevents deleting another user's monitor
-        await assertMonitorOwnedBy(user.id, id);
-        await prisma.monitor.delete({ where: { id } });
+        const deleted = await prisma.monitor.deleteMany({ where: { id, userId: user.id } });
+        if (deleted.count !== 1) {
+          return NextResponse.json({ error: "Monitor not found" }, { status: 404 });
+        }
         const { dropMonitorQueue } = await import("@/lib/monitoring/queue");
         await dropMonitorQueue(id);
         invalidateUserMonitoringContext(user.id);

@@ -54,6 +54,8 @@ import {
 } from "@/lib/monitor-config";
 import { getProtectedSiteWarning } from "@/lib/monitor-types";
 import { WebsiteLogo } from "@/components/dashboard/website-logo";
+import { SiteScriptPanel } from "@/components/dashboard/site-script-panel";
+import { DomainVerificationPanel } from "@/components/dashboard/domain-verification-panel";
 import { cn, formatRelativeTime, getDomainFromUrl } from "@/lib/utils";
 
 interface MonitorChange {
@@ -1190,6 +1192,9 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
           </div>
         </SettingsSection>
       </div>
+
+      <SiteScriptPanel monitorId={monitorId} />
+      <DomainVerificationPanel monitorId={monitorId} errorMessage={monitor.errorMessage} />
 
       {/* Recent Changes */}
       <motion.div

@@ -25,6 +25,7 @@ import {
 import { MonitoringInterval, MonitoringMode, NotificationMethod, Plan } from "@prisma/client";
 import { CommandPageHeader } from "@/components/dashboard/command/command-page-header";
 import { ProductAccessPanel } from "@/components/dashboard/product-access-panel";
+import { WorkspacePanel } from "@/components/dashboard/workspace-panel";
 import {
   IntervalSelectItems,
   IntervalUpgradeHint,
@@ -1234,6 +1235,8 @@ function SettingsScreen({ clerkUser }: { clerkUser: ClerkAccount }) {
             </SettingRow>
           </div>
         </OsExpandableSection>
+
+        <WorkspacePanel />
 
         <ProductAccessPanel />
 

@@ -140,8 +140,8 @@ export async function buildDashboardStats(userId: string, options: DashboardStat
         changeCount: monitorActivity[0]._count.id,
       };
     } else {
-      const monitor = await prisma.monitor.findUnique({
-        where: { id: monitorActivity[0].monitorId },
+      const monitor = await prisma.monitor.findFirst({
+        where: { id: monitorActivity[0].monitorId, userId },
         select: { name: true, url: true },
       });
       mostActiveWebsite = monitor

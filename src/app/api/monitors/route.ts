@@ -25,6 +25,7 @@ import {
 } from "@/lib/monitoring/session-cookies";
 import { invalidateUserMonitoringContext } from "@/lib/ai/chat-user-context";
 import { monitorReadFilter } from "@/lib/security/ownership";
+import { resolveClientForNewMonitor } from "@/lib/workspace-access";
 
 function isVisualMode(mode: MonitoringMode): boolean {
   return mode === MonitoringMode.VISUAL_CHANGES || mode === MonitoringMode.SCREENSHOT_DIFF;
@@ -165,6 +166,10 @@ export async function POST(request: NextRequest) {
             );
           }
 
+          const tenancy = parsed.data.clientId
+            ? await resolveClientForNewMonitor(user.id, parsed.data.clientId)
+            : null;
+
           const nextCheckAt = new Date();
           const faviconUrl = await resolveFaviconUrl(parsed.data.url).catch(() =>
             getFaviconUrl(parsed.data.url, 128)
@@ -191,6 +196,8 @@ export async function POST(request: NextRequest) {
           const monitor = await prisma.monitor.create({
             data: {
               userId: user.id,
+              workspaceId: tenancy?.workspaceId,
+              clientId: tenancy?.clientId,
               name: parsed.data.name,
               url: parsed.data.url,
               faviconUrl,

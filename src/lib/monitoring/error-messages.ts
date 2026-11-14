@@ -47,6 +47,7 @@ const KIND_COPY: Record<
       "Try another public page on the same site",
       "Choose a page that loads without signing in",
       "Use a public API or RSS feed if the site provides one",
+      "If you own the site, verify the domain or install the site script. That does not bypass the challenge",
     ],
     statusLabel: "Access denied",
     tone: "red",

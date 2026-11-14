@@ -723,6 +723,9 @@ async function sendNotifications(
           monitorId: monitor.id,
           channel: NotificationChannel.EMAIL,
           summary: analysis.summary,
+          clientId: monitor.clientId,
+          category: analysis.category,
+          importance: analysis.importance,
         });
         if (dedupe.skip) {
           monitorLog({
@@ -796,6 +799,9 @@ async function sendNotifications(
           monitorId: monitor.id,
           channel: NotificationChannel.TELEGRAM,
           summary: analysis.summary,
+          clientId: monitor.clientId,
+          category: analysis.category,
+          importance: analysis.importance,
         });
         if (dedupe.skip) {
           monitorLog({
@@ -861,6 +867,25 @@ async function sendNotifications(
   if (webhookAllowed && webhookUrl && webhookSecret) {
     tasks.push(
       (async () => {
+        const dedupe = await shouldSkipDuplicateOutboundAlert({
+          userId: monitor.userId,
+          changeId,
+          monitorId: monitor.id,
+          channel: NotificationChannel.WEBHOOK,
+          summary: analysis.summary,
+          clientId: monitor.clientId,
+          category: analysis.category,
+          importance: analysis.importance,
+        });
+        if (dedupe.skip) {
+          monitorLog({
+            step: "database_updated",
+            monitorId: monitor.id,
+            message: "Webhook skipped — duplicate/cooldown",
+            data: { changeId, reason: dedupe.reason },
+          });
+          return;
+        }
         await recordAlertDelivery(monitor.userId, changeId, NotificationChannel.WEBHOOK, "PENDING");
         const result = await deliverCustomerWebhook({
           url: webhookUrl,

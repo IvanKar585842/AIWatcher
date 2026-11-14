@@ -95,6 +95,13 @@ enum TeamRole {
   MEMBER
 }
 
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
 enum NotificationStatus {
   PENDING
   SENT
@@ -167,6 +174,8 @@ model User {
   apiKeys             ApiKey[]
   ownedTeam           Team?          @relation("TeamOwner")
   teamMemberships     TeamMember[]
+  ownedWorkspaces     Workspace[]
+  workspaceMemberships WorkspaceMember[]
 
   @@index([clerkId])
   @@index([email])
@@ -226,18 +235,127 @@ model Monitor {
   statusPageVisible  Boolean            @default(true)
   teamId             String?
   team               Team?              @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  /// Nullable until a monitor is placed in an agency workspace. Deleting the workspace clears the link and keeps the monitor.
+  workspaceId        String?
+  workspace          Workspace?         @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  /// Must belong to workspaceId. Null on every monitor that existed before workspaces.
+  clientId           String?
+  client             Client?            @relation(fields: [clientId], references: [id], onDelete: SetNull)
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
   snapshots          Snapshot[]
   changes            Change[]
   alerts             MonitorAlert[]
+  siteToken          SiteToken?
+  siteSignals        SiteSignal[]
+  domainVerification DomainVerification?
 
   @@index([userId])
   @@index([status])
   @@index([nextCheckAt])
   @@index([status, nextCheckAt])
   @@index([teamId])
+  @@index([workspaceId])
+  @@index([clientId])
   @@unique([userId, url])
+}
+
+/// Agency boundary. Billing and login stay on User.
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  /// Reserved for later workspace settings. Empty until those settings exist.
+  settings  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  clients   Client[]
+  monitors  Monitor[]
+  members   WorkspaceMember[]
+  invites   WorkspaceInvite[]
+
+  @@index([ownerId])
+}
+
+/// A customer of one workspace. A client cannot move to another workspace.
+model Client {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  monitors    Monitor[]
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId])
+}
+
+/// Hashed key for the owner-installed site script. The plaintext key is shown once.
+model SiteToken {
+  id         String    @id @default(cuid())
+  monitorId  String    @unique
+  monitor    Monitor   @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique
+  prefix     String
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+}
+
+/// A short signal from the owner-installed script. No visitor identity and no page HTML.
+model SiteSignal {
+  id        String   @id @default(cuid())
+  monitorId String
+  monitor   Monitor  @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  kind      String
+  message   String
+  selector  String?
+  createdAt DateTime @default(now())
+
+  @@index([monitorId, createdAt])
+}
+
+/// Public proof that the monitor owner controls the host. It does not change page fetching.
+model DomainVerification {
+  id         String    @id @default(cuid())
+  monitorId  String    @unique
+  monitor    Monitor   @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  token      String
+  verifiedAt DateTime?
+  method     String?
+  checkedAt  DateTime?
+  lastError  String?
+  createdAt  DateTime  @default(now())
+}
+
+model WorkspaceMember {
+  id          String        @id @default(cuid())
+  workspaceId String
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        WorkspaceRole
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+}
+
+/// One-time code. It does not create a user and it cannot grant OWNER.
+model WorkspaceInvite {
+  id           String        @id @default(cuid())
+  workspaceId  String
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  codeHash     String        @unique
+  role         WorkspaceRole
+  expiresAt    DateTime
+  createdById  String
+  acceptedAt   DateTime?
+  acceptedById String?
+
+  @@index([workspaceId])
 }
 
 model Snapshot {

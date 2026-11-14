@@ -89,8 +89,8 @@ export async function POST(
           );
         }
 
-        const monitor = await prisma.monitor.findUnique({
-          where: { id },
+        const monitor = await prisma.monitor.findFirst({
+          where: { id, userId: user.id },
           select: { url: true, errorMessage: true, name: true },
         });
 
