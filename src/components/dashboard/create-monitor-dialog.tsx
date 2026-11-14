@@ -763,6 +763,20 @@ export function CreateMonitorDialog({
                 transition={{ duration: 0.2 }}
                 className="space-y-4"
               >
+                <div className="rounded-lg border border-cyan-500/25 bg-cyan-500/[0.06] px-4 py-3">
+                  <p className="text-sm font-medium text-zinc-100">Paste one script or the watch cannot see the page</p>
+                  <p className="mt-1 text-sm leading-relaxed text-zinc-400">
+                    Open the HTML of the page you add. Paste the script once, just before the closing body tag. The closing head tag also works. Then publish the site. The real key appears on the last step and is shown only then.
+                  </p>
+                  <pre className="mt-3 overflow-x-auto rounded-md border border-white/10 bg-black/40 p-2 text-[11px] leading-relaxed text-cyan-100/90">
+                    <code>{`<script src="https://watchflowing.com/monitor.js" data-site-key="YOUR_KEY" defer></script>`}</code>
+                  </pre>
+                  <ul className="mt-3 space-y-1 text-sm text-zinc-300">
+                    <li>It sends the public words on the page. It removes forms and fields before reading.</li>
+                    <li>It does not read cookies or browser storage, and it does not send who opened the page.</li>
+                    <li>The report stays on this account. Remove the script and the reports stop.</li>
+                  </ul>
+                </div>
                 <p className="text-sm leading-relaxed text-zinc-400">
                   Add the address. Then either watch everything important, or choose exactly what the company cares about.
                 </p>
