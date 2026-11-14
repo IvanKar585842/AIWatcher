@@ -15,7 +15,7 @@ import { getPlanEntitlements } from "@/lib/plan-features";
 import { captureAssets, urlsForAssetCheck } from "./asset-content";
 import { compareSnapshots } from "./compare";
 import { generateTextDiff } from "./diff";
-import { closeBrowser, fetchPageContent } from "./fetcher";
+import { closeBrowser, fetchPageContent, type FetchResult } from "./fetcher";
 import {
   acquireCheckSlot,
   acquireMonitorLock,
@@ -125,6 +125,361 @@ async function saveSnapshot(
   });
 
   return snapshot.id;
+}
+
+export async function persistSuccessfulCheck(input: {
+  monitor: Prisma.MonitorGetPayload<{
+    include: { user: { include: { subscription: true } }; snapshots: true };
+  }>;
+  result: FetchResult;
+  plan: Plan;
+  nextCheckAt: Date;
+  now: Date;
+  config: ReturnType<typeof parseMonitorConfig>;
+  allowAssetFetch?: boolean;
+}): Promise<ProcessMonitorResult> {
+  const { monitor, result, plan, nextCheckAt, now, config } = input;
+  const monitorId = monitor.id;
+  const allowAssetFetch = input.allowAssetFetch !== false;
+  const recovered: Prisma.MonitorUpdateInput =
+    result.metadata.engine === "owner" || result.metadata.engine === "site-script"
+      ? { status: MonitorStatus.ACTIVE }
+      : {};
+
+    monitorLog({
+      step: "fetch_success",
+      monitorId,
+      url: monitor.url,
+      mode: monitor.mode,
+      message: "Website fetched successfully",
+      data: {
+        hash: result.contentHash.slice(0, 16),
+        captureType: result.metadata.captureType,
+      },
+    });
+
+    result.metadata.watchScope = config.watchScope ?? "page";
+    result.metadata.keywords = monitor.keywords;
+    result.metadata.visualIgnore = config.visualIgnore ?? "none";
+    if (allowAssetFetch && (config.watchScope === "images" || config.watchScope === "files" || config.compareAssetContent)) {
+      const profile = result.metadata.pageProfile as { images?: string[]; links?: string[] } | undefined;
+      const urls = urlsForAssetCheck(profile, monitor.url, config.watchScope === "files");
+      const assets = await captureAssets(urls, { referer: monitor.url });
+      result.metadata.assets = assets;
+      const blocked = assets.find((asset) => asset.status !== "hashed");
+      if (blocked) {
+        throw new Error(
+          `Partial extraction: ${blocked.kind} at ${blocked.url} was ${blocked.status}. ${blocked.detail ?? "It was not treated as unchanged."}`
+        );
+      }
+    }
+
+    if (result.metadata.checkStatus && result.metadata.checkStatus !== "success") {
+      throw new Error(
+        `Partial extraction: check finished as ${String(result.metadata.checkStatus)}`
+      );
+    }
+
+    const previousSnapshot = monitor.snapshots[0];
+
+    if (!previousSnapshot) {
+      const snapshotId = await saveSnapshot(monitor.id, result);
+
+      monitorLog({
+        step: "snapshot_created",
+        monitorId,
+        url: monitor.url,
+        mode: monitor.mode,
+        message: "Baseline snapshot stored",
+        data: { snapshotId, hash: result.contentHash.slice(0, 16) },
+      });
+
+      await updateMonitorChecked(monitor.id, nextCheckAt, recovered);
+
+      monitorLog({
+        step: "database_updated",
+        monitorId,
+        message: "lastCheckedAt updated (baseline)",
+        data: { nextCheckAt: nextCheckAt.toISOString() },
+      });
+
+      await trackEvent({
+        type: "monitor.check",
+        userId: monitor.userId,
+        metadata: {
+          monitorId,
+          baseline: true,
+          snapshotId,
+          engine: result.metadata.engine ?? null,
+          fetchStrategy: result.metadata.fetchStrategy ?? null,
+          browserLaunches: result.metadata.browserLaunches ?? null,
+          marketplaceApiCalls: result.metadata.marketplaceApiCalls ?? null,
+          durationMs: result.metadata.durationMs ?? null,
+        },
+      });
+
+      return { status: "baseline", capture: summarizeCapture(result.metadata, result.extractedText) };
+    }
+
+    const previous = await readSnapshotHtml(previousSnapshot);
+    const previousMeta =
+      previousSnapshot.metadata &&
+      typeof previousSnapshot.metadata === "object" &&
+      !Array.isArray(previousSnapshot.metadata)
+        ? (previousSnapshot.metadata as Record<string, unknown>)
+        : null;
+
+    const comparison = compareSnapshots({
+      monitorId: monitor.id,
+      mode: monitor.mode,
+      previousHash: previousSnapshot.contentHash,
+      previousText: previous.extractedText,
+      previousCleanedHtml: previous.cleanedHtml,
+      previousMetadata: previousMeta,
+      current: result,
+    });
+
+    if (!comparison.changed) {
+      const step = comparison.reason === "noise_filtered" ? "noise_filtered" : "no_change";
+
+      monitorLog({
+        step,
+        monitorId,
+        url: monitor.url,
+        mode: monitor.mode,
+        message:
+          comparison.reason === "noise_filtered"
+            ? "Hash changed but difference was below noise threshold"
+            : "No meaningful change detected",
+        data: { reason: comparison.reason },
+      });
+
+      await updateMonitorChecked(monitor.id, nextCheckAt, recovered);
+
+      monitorLog({
+        step: "database_updated",
+        monitorId,
+        message: "lastCheckedAt updated (no change)",
+        data: { nextCheckAt: nextCheckAt.toISOString() },
+      });
+
+      await trackEvent({
+        type: "monitor.check",
+        userId: monitor.userId,
+        metadata: {
+          monitorId,
+          changed: false,
+          reason: comparison.reason,
+          engine: result.metadata.engine ?? null,
+          fetchStrategy: result.metadata.fetchStrategy ?? null,
+          browserLaunches: result.metadata.browserLaunches ?? null,
+          marketplaceApiCalls: result.metadata.marketplaceApiCalls ?? null,
+          durationMs: result.metadata.durationMs ?? null,
+        },
+      });
+
+      return {
+        status: "no_change",
+        reason: comparison.reason,
+        capture: summarizeCapture(result.metadata, result.extractedText),
+      };
+    }
+
+    monitorLog({
+      step: "difference_detected",
+      monitorId,
+      url: monitor.url,
+      mode: monitor.mode,
+      message: "Change detected",
+      data: {
+        reason: comparison.reason,
+        previousHash: previousSnapshot.contentHash.slice(0, 16),
+        currentHash: comparison.currentHash.slice(0, 16),
+      },
+    });
+
+    const visual = isVisualMode(monitor.mode);
+    const structureLines =
+      comparison.summaryLines && comparison.summaryLines.length > 0
+        ? comparison.summaryLines
+        : comparison.structureDiff?.summaryLines ?? [];
+    const visualPct = comparison.visualDiffPercent;
+
+    const diffHtml = visual
+      ? `<div class="visual-diff"><p>Visual change detected${
+          visualPct != null ? ` — ~${visualPct.toFixed(1)}% difference` : ""
+        }.</p><p>Previous hash: <code>${previousSnapshot.contentHash.slice(0, 16)}…</code></p><p>Current hash: <code>${comparison.currentHash.slice(0, 16)}…</code></p></div>`
+      : structureLines.length > 0
+        ? `<ul>${structureLines.map((l) => `<li>${l.replace(/</g, "&lt;")}</li>`).join("")}</ul>${generateTextDiff(
+            previous.extractedText.slice(0, 4000),
+            result.extractedText.slice(0, 4000)
+          )}`
+        : generateTextDiff(
+            previous.extractedText.slice(0, 5000),
+            result.extractedText.slice(0, 5000)
+          );
+
+    const [storedOldHtml, storedNewHtml] = await Promise.all([
+      prepareHtmlForStorage(
+        visual
+          ? JSON.stringify({
+              type: "visual",
+              hash: previousSnapshot.contentHash,
+              preview: previousMeta?.screenshotPreview ?? null,
+              mime: previousMeta?.screenshotMime ?? "image/jpeg",
+            })
+          : previous.cleanedHtml
+      ),
+      prepareHtmlForStorage(
+        visual
+          ? JSON.stringify({
+              type: "visual",
+              hash: comparison.currentHash,
+              preview: result.metadata.screenshotPreview ?? null,
+              mime: result.metadata.screenshotMime ?? "image/jpeg",
+            })
+          : result.cleanedHtml
+      ),
+    ]);
+
+    const change = await prisma.change.create({
+      data: {
+        monitorId: monitor.id,
+        summary: visual
+          ? `Visual change detected${visualPct != null ? ` (~${visualPct.toFixed(1)}%)` : ""} — analysis pending`
+          : structureLines[0]
+            ? `${structureLines[0]} — analysis pending`
+            : "Change detected — analysis pending",
+        importance: "MEDIUM",
+        category: "CONTENT",
+        oldHtml: storedOldHtml.slice(0, 50000),
+        newHtml: storedNewHtml.slice(0, 50000),
+        diffHtml,
+        bulletPoints: structureLines.slice(0, 5),
+        emoji: visual ? "👁️" : "🔔",
+        analysisStatus: AnalysisStatus.PENDING,
+        aiRawResponse: {
+          detectedAt: now.toISOString(),
+          previousSnapshotId: previousSnapshot.id,
+          comparisonReason: comparison.reason,
+          previousHash: previousSnapshot.contentHash,
+          currentHash: comparison.currentHash,
+          captureType: result.metadata.captureType ?? null,
+          visualDiffPercent: visualPct ?? null,
+          structureSummary: structureLines,
+          evidence: (comparison.evidence ?? []) as unknown as Prisma.InputJsonValue,
+          adapter: result.metadata.adapter ?? result.metadata.provider ?? result.metadata.engine ?? null,
+          previousScreenshot: previousMeta?.screenshotPreview
+            ? {
+                mime: previousMeta.screenshotMime ?? "image/jpeg",
+                data: previousMeta.screenshotPreview,
+              }
+            : null,
+          currentScreenshot: result.metadata.screenshotPreview
+            ? {
+                mime: result.metadata.screenshotMime ?? "image/jpeg",
+                data: result.metadata.screenshotPreview,
+              }
+            : null,
+        },
+      },
+    });
+
+    invalidateUserMonitoringContext(monitor.userId);
+
+    monitorLog({
+      step: "change_stored",
+      monitorId,
+      url: monitor.url,
+      mode: monitor.mode,
+      message: "Change record stored",
+      data: {
+        changeId: change.id,
+        detectedAt: now.toISOString(),
+        previousSnapshotId: previousSnapshot.id,
+      },
+    });
+
+    const snapshotId = await saveSnapshot(monitor.id, result);
+
+    monitorLog({
+      step: "snapshot_created",
+      monitorId,
+      message: "New snapshot stored after change",
+      data: { snapshotId, hash: result.contentHash.slice(0, 16) },
+    });
+
+    await updateMonitorChecked(monitor.id, nextCheckAt, {
+      lastChangedAt: now,
+      ...recovered,
+    });
+
+    monitorLog({
+      step: "database_updated",
+      monitorId,
+      message: "Monitor timestamps updated after change",
+      data: {
+        lastChangedAt: now.toISOString(),
+        nextCheckAt: nextCheckAt.toISOString(),
+      },
+    });
+
+    monitorLog({
+      step: "analysis_queued",
+      monitorId,
+      message: "Starting Gemini analysis",
+      data: { changeId: change.id },
+    });
+
+    try {
+      await analyzeChangeById(change.id);
+    } catch (error) {
+      monitorLogError("error", "Change analysis failed", error, {
+        monitorId,
+        data: { changeId: change.id },
+      });
+    }
+
+    await trackEvent({
+      type: "monitor.check",
+      userId: monitor.userId,
+        metadata: {
+          monitorId,
+          changed: true,
+          changeId: change.id,
+          engine: result.metadata.engine ?? null,
+          fetchStrategy: result.metadata.fetchStrategy ?? null,
+          browserLaunches: result.metadata.browserLaunches ?? null,
+          marketplaceApiCalls: result.metadata.marketplaceApiCalls ?? null,
+          durationMs: result.metadata.durationMs ?? null,
+        },
+    });
+
+    await trackEvent({
+      type: "change.detected",
+      userId: monitor.userId,
+      metadata: { monitorId, changeId: change.id, pendingAnalysis: true },
+    });
+
+    const priorChanges = await prisma.change.count({
+      where: { monitor: { userId: monitor.userId } },
+    });
+    if (priorChanges <= 1) {
+      void trackEvent({
+        type: "alert.first",
+        userId: monitor.userId,
+        metadata: { monitorId, changeId: change.id },
+      });
+    }
+
+    await cleanupOldHistory(monitor.id, plan, monitor.user);
+    await releaseMonitorQueue(monitor.id, nextCheckAt);
+
+    return {
+      status: "change_detected",
+      changeId: change.id,
+      capture: summarizeCapture(result.metadata, result.extractedText),
+    };
 }
 
 export async function processMonitor(
@@ -326,339 +681,14 @@ async function processMonitorInternal(
       });
     }
 
-    monitorLog({
-      step: "fetch_success",
-      monitorId,
-      url: monitor.url,
-      mode: monitor.mode,
-      message: "Website fetched successfully",
-      data: {
-        hash: result.contentHash.slice(0, 16),
-        captureType: result.metadata.captureType,
-      },
+    return persistSuccessfulCheck({
+      monitor,
+      result,
+      plan,
+      nextCheckAt,
+      now,
+      config,
     });
-
-    result.metadata.watchScope = config.watchScope ?? "page";
-    result.metadata.keywords = monitor.keywords;
-    result.metadata.visualIgnore = config.visualIgnore ?? "none";
-    if (config.watchScope === "images" || config.watchScope === "files" || config.compareAssetContent) {
-      const profile = result.metadata.pageProfile as { images?: string[]; links?: string[] } | undefined;
-      const urls = urlsForAssetCheck(profile, monitor.url, config.watchScope === "files");
-      const assets = await captureAssets(urls, { referer: monitor.url });
-      result.metadata.assets = assets;
-      const blocked = assets.find((asset) => asset.status !== "hashed");
-      if (blocked) {
-        throw new Error(
-          `Partial extraction: ${blocked.kind} at ${blocked.url} was ${blocked.status}. ${blocked.detail ?? "It was not treated as unchanged."}`
-        );
-      }
-    }
-
-    if (result.metadata.checkStatus && result.metadata.checkStatus !== "success") {
-      throw new Error(
-        `Partial extraction: check finished as ${String(result.metadata.checkStatus)}`
-      );
-    }
-
-    const previousSnapshot = monitor.snapshots[0];
-
-    if (!previousSnapshot) {
-      const snapshotId = await saveSnapshot(monitor.id, result);
-
-      monitorLog({
-        step: "snapshot_created",
-        monitorId,
-        url: monitor.url,
-        mode: monitor.mode,
-        message: "Baseline snapshot stored",
-        data: { snapshotId, hash: result.contentHash.slice(0, 16) },
-      });
-
-      await updateMonitorChecked(monitor.id, nextCheckAt);
-
-      monitorLog({
-        step: "database_updated",
-        monitorId,
-        message: "lastCheckedAt updated (baseline)",
-        data: { nextCheckAt: nextCheckAt.toISOString() },
-      });
-
-      await trackEvent({
-        type: "monitor.check",
-        userId: monitor.userId,
-        metadata: {
-          monitorId,
-          baseline: true,
-          snapshotId,
-          engine: result.metadata.engine ?? null,
-          fetchStrategy: result.metadata.fetchStrategy ?? null,
-          browserLaunches: result.metadata.browserLaunches ?? null,
-          marketplaceApiCalls: result.metadata.marketplaceApiCalls ?? null,
-          durationMs: result.metadata.durationMs ?? null,
-        },
-      });
-
-      return { status: "baseline", capture: summarizeCapture(result.metadata, result.extractedText) };
-    }
-
-    const previous = await readSnapshotHtml(previousSnapshot);
-    const previousMeta =
-      previousSnapshot.metadata &&
-      typeof previousSnapshot.metadata === "object" &&
-      !Array.isArray(previousSnapshot.metadata)
-        ? (previousSnapshot.metadata as Record<string, unknown>)
-        : null;
-
-    const comparison = compareSnapshots({
-      monitorId: monitor.id,
-      mode: monitor.mode,
-      previousHash: previousSnapshot.contentHash,
-      previousText: previous.extractedText,
-      previousCleanedHtml: previous.cleanedHtml,
-      previousMetadata: previousMeta,
-      current: result,
-    });
-
-    if (!comparison.changed) {
-      const step = comparison.reason === "noise_filtered" ? "noise_filtered" : "no_change";
-
-      monitorLog({
-        step,
-        monitorId,
-        url: monitor.url,
-        mode: monitor.mode,
-        message:
-          comparison.reason === "noise_filtered"
-            ? "Hash changed but difference was below noise threshold"
-            : "No meaningful change detected",
-        data: { reason: comparison.reason },
-      });
-
-      await updateMonitorChecked(monitor.id, nextCheckAt);
-
-      monitorLog({
-        step: "database_updated",
-        monitorId,
-        message: "lastCheckedAt updated (no change)",
-        data: { nextCheckAt: nextCheckAt.toISOString() },
-      });
-
-      await trackEvent({
-        type: "monitor.check",
-        userId: monitor.userId,
-        metadata: {
-          monitorId,
-          changed: false,
-          reason: comparison.reason,
-          engine: result.metadata.engine ?? null,
-          fetchStrategy: result.metadata.fetchStrategy ?? null,
-          browserLaunches: result.metadata.browserLaunches ?? null,
-          marketplaceApiCalls: result.metadata.marketplaceApiCalls ?? null,
-          durationMs: result.metadata.durationMs ?? null,
-        },
-      });
-
-      return {
-        status: "no_change",
-        reason: comparison.reason,
-        capture: summarizeCapture(result.metadata, result.extractedText),
-      };
-    }
-
-    monitorLog({
-      step: "difference_detected",
-      monitorId,
-      url: monitor.url,
-      mode: monitor.mode,
-      message: "Change detected",
-      data: {
-        reason: comparison.reason,
-        previousHash: previousSnapshot.contentHash.slice(0, 16),
-        currentHash: comparison.currentHash.slice(0, 16),
-      },
-    });
-
-    const visual = isVisualMode(monitor.mode);
-    const structureLines =
-      comparison.summaryLines && comparison.summaryLines.length > 0
-        ? comparison.summaryLines
-        : comparison.structureDiff?.summaryLines ?? [];
-    const visualPct = comparison.visualDiffPercent;
-
-    const diffHtml = visual
-      ? `<div class="visual-diff"><p>Visual change detected${
-          visualPct != null ? ` — ~${visualPct.toFixed(1)}% difference` : ""
-        }.</p><p>Previous hash: <code>${previousSnapshot.contentHash.slice(0, 16)}…</code></p><p>Current hash: <code>${comparison.currentHash.slice(0, 16)}…</code></p></div>`
-      : structureLines.length > 0
-        ? `<ul>${structureLines.map((l) => `<li>${l.replace(/</g, "&lt;")}</li>`).join("")}</ul>${generateTextDiff(
-            previous.extractedText.slice(0, 4000),
-            result.extractedText.slice(0, 4000)
-          )}`
-        : generateTextDiff(
-            previous.extractedText.slice(0, 5000),
-            result.extractedText.slice(0, 5000)
-          );
-
-    const [storedOldHtml, storedNewHtml] = await Promise.all([
-      prepareHtmlForStorage(
-        visual
-          ? JSON.stringify({
-              type: "visual",
-              hash: previousSnapshot.contentHash,
-              preview: previousMeta?.screenshotPreview ?? null,
-              mime: previousMeta?.screenshotMime ?? "image/jpeg",
-            })
-          : previous.cleanedHtml
-      ),
-      prepareHtmlForStorage(
-        visual
-          ? JSON.stringify({
-              type: "visual",
-              hash: comparison.currentHash,
-              preview: result.metadata.screenshotPreview ?? null,
-              mime: result.metadata.screenshotMime ?? "image/jpeg",
-            })
-          : result.cleanedHtml
-      ),
-    ]);
-
-    const change = await prisma.change.create({
-      data: {
-        monitorId: monitor.id,
-        summary: visual
-          ? `Visual change detected${visualPct != null ? ` (~${visualPct.toFixed(1)}%)` : ""} — analysis pending`
-          : structureLines[0]
-            ? `${structureLines[0]} — analysis pending`
-            : "Change detected — analysis pending",
-        importance: "MEDIUM",
-        category: "CONTENT",
-        oldHtml: storedOldHtml.slice(0, 50000),
-        newHtml: storedNewHtml.slice(0, 50000),
-        diffHtml,
-        bulletPoints: structureLines.slice(0, 5),
-        emoji: visual ? "👁️" : "🔔",
-        analysisStatus: AnalysisStatus.PENDING,
-        aiRawResponse: {
-          detectedAt: now.toISOString(),
-          previousSnapshotId: previousSnapshot.id,
-          comparisonReason: comparison.reason,
-          previousHash: previousSnapshot.contentHash,
-          currentHash: comparison.currentHash,
-          captureType: result.metadata.captureType ?? null,
-          visualDiffPercent: visualPct ?? null,
-          structureSummary: structureLines,
-          evidence: (comparison.evidence ?? []) as unknown as Prisma.InputJsonValue,
-          adapter: result.metadata.adapter ?? result.metadata.provider ?? result.metadata.engine ?? null,
-          previousScreenshot: previousMeta?.screenshotPreview
-            ? {
-                mime: previousMeta.screenshotMime ?? "image/jpeg",
-                data: previousMeta.screenshotPreview,
-              }
-            : null,
-          currentScreenshot: result.metadata.screenshotPreview
-            ? {
-                mime: result.metadata.screenshotMime ?? "image/jpeg",
-                data: result.metadata.screenshotPreview,
-              }
-            : null,
-        },
-      },
-    });
-
-    invalidateUserMonitoringContext(monitor.userId);
-
-    monitorLog({
-      step: "change_stored",
-      monitorId,
-      url: monitor.url,
-      mode: monitor.mode,
-      message: "Change record stored",
-      data: {
-        changeId: change.id,
-        detectedAt: now.toISOString(),
-        previousSnapshotId: previousSnapshot.id,
-      },
-    });
-
-    const snapshotId = await saveSnapshot(monitor.id, result);
-
-    monitorLog({
-      step: "snapshot_created",
-      monitorId,
-      message: "New snapshot stored after change",
-      data: { snapshotId, hash: result.contentHash.slice(0, 16) },
-    });
-
-    await updateMonitorChecked(monitor.id, nextCheckAt, {
-      lastChangedAt: now,
-    });
-
-    monitorLog({
-      step: "database_updated",
-      monitorId,
-      message: "Monitor timestamps updated after change",
-      data: {
-        lastChangedAt: now.toISOString(),
-        nextCheckAt: nextCheckAt.toISOString(),
-      },
-    });
-
-    monitorLog({
-      step: "analysis_queued",
-      monitorId,
-      message: "Starting Gemini analysis",
-      data: { changeId: change.id },
-    });
-
-    try {
-      await analyzeChangeById(change.id);
-    } catch (error) {
-      monitorLogError("error", "Change analysis failed", error, {
-        monitorId,
-        data: { changeId: change.id },
-      });
-    }
-
-    await trackEvent({
-      type: "monitor.check",
-      userId: monitor.userId,
-        metadata: {
-          monitorId,
-          changed: true,
-          changeId: change.id,
-          engine: result.metadata.engine ?? null,
-          fetchStrategy: result.metadata.fetchStrategy ?? null,
-          browserLaunches: result.metadata.browserLaunches ?? null,
-          marketplaceApiCalls: result.metadata.marketplaceApiCalls ?? null,
-          durationMs: result.metadata.durationMs ?? null,
-        },
-    });
-
-    await trackEvent({
-      type: "change.detected",
-      userId: monitor.userId,
-      metadata: { monitorId, changeId: change.id, pendingAnalysis: true },
-    });
-
-    const priorChanges = await prisma.change.count({
-      where: { monitor: { userId: monitor.userId } },
-    });
-    if (priorChanges <= 1) {
-      void trackEvent({
-        type: "alert.first",
-        userId: monitor.userId,
-        metadata: { monitorId, changeId: change.id },
-      });
-    }
-
-    await cleanupOldHistory(monitor.id, plan, monitor.user);
-    await releaseMonitorQueue(monitor.id, nextCheckAt);
-
-    return {
-      status: "change_detected",
-      changeId: change.id,
-      capture: summarizeCapture(result.metadata, result.extractedText),
-    };
   } catch (error) {
     const classified = classifyMonitoringError(error);
     const errorMessage = serializeMonitorError(classified);

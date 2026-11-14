@@ -10,6 +10,7 @@ export type RateLimitTier =
   | "ai"
   | "public"
   | "ingest"
+  | "ownerReport"
   | "admin"
   | "email";
 
@@ -29,6 +30,8 @@ const TIER_CONFIG: Record<
   public: { requests: 30, window: "1 m", prefix: "rl:public" },
   /** Owner-installed site script. One key, many visitors. */
   ingest: { requests: 120, window: "1 m", prefix: "rl:ingest" },
+  /** Page reports from the owner's server. Caps snapshot growth. */
+  ownerReport: { requests: 30, window: "1 h", prefix: "rl:owner-report" },
   /** Admin panel */
   admin: { requests: 30, window: "1 m", prefix: "rl:admin" },
   /** Outbound email / notification bursts */

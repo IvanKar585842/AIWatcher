@@ -9,7 +9,7 @@ const FAQS = [
   },
   {
     q: "What if our site blocks automated checks?",
-    a: "The outside look stops, and the last good snapshot stays. Paste the site script into the HTML you control. It runs as part of your page, so the bot wall does not stop those reports. It tells you about JavaScript errors and whether the elements you name are still there. It does not read forms, cookies, or page text, and it does not turn the bot check off.",
+    a: "The outside look stops, and the last good snapshot stays. WatchFlowing does not bypass the bot check. Paste one script into the site you own. After the page loads, it sends the public text with forms, cookies, and email addresses removed. Nobody is identified. Delete the script and the reports stop. A call from your server can send the same page, plus the HTTP status, when nobody is visiting.",
   },
   {
     q: "What can the assistant watch on our site?",

@@ -26,6 +26,7 @@ import {
 import { invalidateUserMonitoringContext } from "@/lib/ai/chat-user-context";
 import { monitorReadFilter } from "@/lib/security/ownership";
 import { resolveClientForNewMonitor } from "@/lib/workspace-access";
+import { buildSiteInstall, issueSiteToken } from "@/lib/site-sdk";
 
 function isVisualMode(mode: MonitoringMode): boolean {
   return mode === MonitoringMode.VISUAL_CHANGES || mode === MonitoringMode.SCREENSHOT_DIFF;
@@ -229,6 +230,14 @@ export async function POST(request: NextRequest) {
             });
           }
 
+          let installation: { snippet: string; serverReport: string } | null = null;
+          try {
+            const material = await issueSiteToken(user.id, monitor.id);
+            installation = buildSiteInstall(request.nextUrl.origin, material.token);
+          } catch (error) {
+            console.error("Could not create the site script", error instanceof Error ? error.name : "error");
+          }
+
           void trackEvent({
             type: "monitor.created",
             userId: user.id,
@@ -250,6 +259,7 @@ export async function POST(request: NextRequest) {
                 ...monitor,
                 config: sanitizeMonitorConfigForClient(monitor.config),
               },
+              installation,
             },
             { status: 201 }
           );

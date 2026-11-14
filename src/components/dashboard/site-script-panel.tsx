@@ -4,11 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 
 type Signal = { id: string; kind: string; message: string; selector: string | null };
-type Installation = { active: boolean; prefix: string | null; signals: Signal[] };
+type Installation = { active: boolean; prefix: string | null; scriptSeen?: boolean; signals: Signal[] };
 
 export function SiteScriptPanel({ monitorId }: { monitorId: string }) {
   const [installation, setInstallation] = useState<Installation | null>(null);
   const [snippet, setSnippet] = useState<string | null>(null);
+  const [serverReport, setServerReport] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -42,6 +43,7 @@ export function SiteScriptPanel({ monitorId }: { monitorId: string }) {
         return;
       }
       setSnippet(typeof data.snippet === "string" ? data.snippet : null);
+      setServerReport(typeof data.serverReport === "string" ? data.serverReport : null);
       await load();
     } finally {
       setBusy(false);
@@ -52,6 +54,7 @@ export function SiteScriptPanel({ monitorId }: { monitorId: string }) {
     setBusy(true);
     setMessage(null);
     setSnippet(null);
+    setServerReport(null);
     try {
       const response = await fetch(`/api/monitors/${monitorId}/site-token`, { method: "DELETE" });
       const data = await response.json().catch(() => ({}));
@@ -70,20 +73,27 @@ export function SiteScriptPanel({ monitorId }: { monitorId: string }) {
   return (
     <section className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
       <p className="font-mono text-[10px] uppercase tracking-widest text-zinc-500">Your permission</p>
-      <h2 className="text-lg font-medium text-zinc-100">Allow watching from inside your site</h2>
+      <h2 className="text-lg font-medium text-zinc-100">Paste one script into the site you own</h2>
       <p className="mt-1 text-sm leading-relaxed text-zinc-400">
-        Paste one script into the site you own. That is your consent. Delete the script, or revoke the key here, and the reports stop.
+        The script is shown when you add the site. Until it is on the page, this watch cannot see it. Place it once, just before the closing body tag.
       </p>
+      {installation?.scriptSeen ? (
+        <p className="mt-3 text-sm text-emerald-300">The script has reported this page.</p>
+      ) : (
+        <p className="mt-3 text-sm text-amber-200">Waiting for the script. Without it, the page is not being watched.</p>
+      )}
       <ul className="mt-3 space-y-1 text-sm text-zinc-300">
-        <li>Reports page errors and whether the pieces you name are still there.</li>
-        <li>Does not read forms, cookies, page text, names, or email addresses.</li>
-        <li>Does not store who visited. A sensitive error is saved only as the word error.</li>
+        <li>You see the public page, including prices, headings, and the words on it.</li>
+        <li>Forms, cookies, and email addresses are removed. No visitor is identified.</li>
+        <li>Delete the script, or revoke the key, and the reports stop.</li>
+        <li>With no visitors, the same key can send the page from your server, including the HTTP status.</li>
       </ul>
       {installation?.active && (
         <p className="mt-3 text-sm text-zinc-300">Active key {installation.prefix}…</p>
       )}
       {snippet && (
         <div className="mt-3">
+          <p className="mb-1 text-sm text-zinc-300">Paste this script before the closing head or body tag. The key is shown only now.</p>
           <textarea
             readOnly
             value={snippet}
@@ -95,6 +105,23 @@ export function SiteScriptPanel({ monitorId }: { monitorId: string }) {
             onClick={() => void navigator.clipboard.writeText(snippet).then(() => setMessage("Copied. Paste it before the closing head or body tag."))}
           >
             Copy script
+          </Button>
+        </div>
+      )}
+      {serverReport && (
+        <div className="mt-3">
+          <p className="mb-1 text-sm text-zinc-300">Only if nobody visits the page: send it from your server, with the HTTP status.</p>
+          <textarea
+            readOnly
+            value={serverReport}
+            className="h-36 w-full rounded-md border border-white/10 bg-black/40 p-2 text-xs text-zinc-100"
+          />
+          <Button
+            type="button"
+            className="mt-2"
+            onClick={() => void navigator.clipboard.writeText(serverReport).then(() => setMessage("Copied the server report."))}
+          >
+            Copy server report
           </Button>
         </div>
       )}

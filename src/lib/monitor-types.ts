@@ -417,7 +417,7 @@ const PRIVATE_PATH_HINT =
   /\/(login|signin|sign-in|signup|sign-up|account|dashboard|app|portal|auth|oauth|checkout|cart)(\/|$)/i;
 
 export const PROTECTED_SITE_WARNING =
-  "This page may block an automated check. WatchFlowing does not bypass that protection. Add a page your company owns that loads without a login, or verify the domain and install the site script.";
+  "This page may block an automated check. WatchFlowing does not bypass that protection. Send the public page from the server you control.";
 
 /**
  * Returns a user-facing warning when the URL looks like a protected /

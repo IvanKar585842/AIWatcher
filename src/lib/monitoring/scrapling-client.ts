@@ -12,7 +12,13 @@ export class ScraplingUnavailableError extends Error {
 }
 
 export function isScraplingRuntimeUnavailable(error: unknown): boolean {
-  return error instanceof ScraplingUnavailableError || (error instanceof Error && error.name === "ScraplingUnavailableError");
+  if (error instanceof ScraplingUnavailableError) return true;
+  if (!(error instanceof Error)) return false;
+  if (error.name === "ScraplingUnavailableError") return true;
+  return (
+    error.message.includes("Scrapling Python runtime is not installed") ||
+    error.message.includes("Scrapling worker script is missing")
+  );
 }
 
 export interface ScraplingWorkerResponse {

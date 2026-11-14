@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { apiFailureFromError } from "@/lib/api-response";
 import { withRateLimit } from "@/lib/rate-limit";
-import { issueSiteToken, readSiteInstallation, revokeSiteToken } from "@/lib/site-sdk";
+import { buildSiteInstall, issueSiteToken, readSiteInstallation, revokeSiteToken } from "@/lib/site-sdk";
 
 export async function GET(
   _request: NextRequest,
@@ -29,8 +29,11 @@ export async function POST(
     const user = await requireUser();
     return withRateLimit(`site-token-issue-${id}`, async () => {
       const material = await issueSiteToken(user.id, id);
-      const snippet = `<script src="${request.nextUrl.origin}/monitor.js" data-site-key="${material.token}" defer></script>`;
-      return NextResponse.json({ token: material.token, prefix: material.prefix, snippet }, { status: 201 });
+      const installation = buildSiteInstall(request.nextUrl.origin, material.token);
+      return NextResponse.json(
+        { token: material.token, prefix: material.prefix, ...installation },
+        { status: 201 }
+      );
     }, user.id, "sensitive");
   } catch (error) {
     return apiFailureFromError(error);

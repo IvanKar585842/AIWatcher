@@ -1,14 +1,17 @@
 /**
- * Owner-installed site script: hashed key, origin check, no page content.
+ * Owner-installed site script: hashed key, origin check, public page text only.
  *
  * Usage: npx tsx scripts/test-site-sdk.ts
  */
 import { readFileSync } from "node:fs";
 import { PrismaClient } from "@prisma/client";
 import { NextRequest } from "next/server";
+import { loadEnv } from "./load-env";
 import { hashSecret } from "../src/lib/access/secrets";
 import { ApiError } from "../src/lib/errors";
 import { POST } from "../src/app/api/ingest/site/route";
+import { POST as postReport } from "../src/app/api/ingest/report/route";
+import { acceptOwnerReport, acceptScriptPage, ownerReportSchema } from "../src/lib/monitoring/owner-report";
 import {
   acceptSiteSignal,
   cleanSignalMessage,
@@ -20,6 +23,7 @@ import {
 } from "../src/lib/site-sdk";
 import { createWorkspace, listWorkspaceProblems } from "../src/lib/workspace-access";
 
+loadEnv();
 const prisma = new PrismaClient();
 
 function assert(name: string, condition: boolean, detail = "") {
@@ -43,8 +47,14 @@ async function denied(name: string, run: () => Promise<unknown>, status: number)
 async function main() {
   const script = readFileSync("public/monitor.js", "utf8");
   assert(
-    "the script does not read cookies, storage, or page text",
-    !script.includes("document.cookie") && !script.includes("localStorage") && !script.includes("innerText") && !script.includes("innerHTML")
+    "the script does not read cookies, storage, or form values",
+    !script.includes("document.cookie") &&
+      !script.includes("localStorage") &&
+      !script.includes("sessionStorage") &&
+      !script.includes("innerHTML") &&
+      !script.includes(".value") &&
+      script.includes("textContent") &&
+      script.includes("form,input,textarea")
   );
   assert("a matching origin is accepted", originMatchesMonitor("https://example.com", "https://example.com/pricing"));
   assert("another host is rejected", !originMatchesMonitor("https://evil.test", "https://example.com/pricing"));
@@ -150,7 +160,98 @@ async function main() {
   );
   assert("the ingest route stores a valid event", accepted.status === 200);
 
+  const page = `<main><h1>Pricing</h1><p>${"The public plan costs nineteen dollars. ".repeat(3)}</p></main>`;
+  assert(
+    "a browser cannot submit an owner report",
+    (
+      await postReport(
+        new NextRequest("http://localhost:3000/api/ingest/report", {
+          method: "POST",
+          headers: { origin: "https://example.com", "content-type": "application/json" },
+          body: JSON.stringify({ siteKey: issued.token, status: 200, html: page }),
+        })
+      )
+    ).status === 403
+  );
+  assert(
+    "extra owner report fields are rejected",
+    !ownerReportSchema.safeParse({ siteKey: issued.token, status: 200, html: page, cookie: "session" }).success
+  );
+  const first = await acceptOwnerReport({ siteKey: issued.token, status: 200, html: page });
+  const afterFirst = await prisma.snapshot.count({ where: { monitorId: monitor.id } });
+  assert("the first server report stores a baseline snapshot", first.storedPage && first.result === "baseline" && afterFirst === 1);
+  const same = await acceptOwnerReport({ siteKey: issued.token, status: 200, html: page });
+  const afterSame = await prisma.snapshot.count({ where: { monitorId: monitor.id } });
+  assert("an unchanged server report does not add a snapshot", same.storedPage && same.result === "no_change" && afterSame === 1);
+  await acceptOwnerReport({ siteKey: issued.token, status: 503 });
+  const afterStatus = await prisma.snapshot.findFirst({
+    where: { monitorId: monitor.id },
+    orderBy: { createdAt: "desc" },
+    select: { contentHash: true },
+  });
+  const statusMonitor = await prisma.monitor.findUnique({
+    where: { id: monitor.id },
+    select: { errorMessage: true, status: true },
+  });
+  assert(
+    "an error status keeps the snapshot and records the server code",
+    afterStatus != null &&
+      (await prisma.snapshot.count({ where: { monitorId: monitor.id } })) === 1 &&
+      (statusMonitor?.errorMessage ?? "").includes("HTTP 503") &&
+      statusMonitor?.status === "ACTIVE"
+  );
+  await prisma.monitor.update({ where: { id: monitor.id }, data: { status: "PAUSED" } });
+  await denied("a paused site does not accept a server report", () => acceptOwnerReport({ siteKey: issued.token, status: 200, html: page }), 409);
+  await prisma.monitor.update({ where: { id: monitor.id }, data: { status: "ACTIVE" } });
+
+  const watched = await prisma.monitor.create({
+    data: {
+      userId: owner.id,
+      workspaceId: workspace.id,
+      clientId: client.id,
+      name: "Script site",
+      url: `https://example.com/script-${stamp}`,
+    },
+  });
+  const scriptKey = await issueSiteToken(owner.id, watched.id);
+  const pageText = "Pricing The public plan costs nineteen dollars. Contact [email] for the company plan.";
+  const seen = await acceptScriptPage({
+    token: scriptKey.token,
+    origin: "https://example.com",
+    text: pageText.replace("[email]", "sales@example.com"),
+  });
+  const scriptSnapshot = await prisma.snapshot.findFirst({
+    where: { monitorId: watched.id },
+    orderBy: { createdAt: "desc" },
+    select: { extractedText: true },
+  });
+  assert(
+    "a consented script stores the public page and redacts email addresses",
+    seen.storedPage &&
+      seen.result === "baseline" &&
+      (scriptSnapshot?.extractedText ?? "").includes("[email]") &&
+      !(scriptSnapshot?.extractedText ?? "").includes("sales@example.com")
+  );
+  const again = await acceptScriptPage({ token: scriptKey.token, origin: "https://example.com", text: pageText });
+  const scriptSnapshots = await prisma.snapshot.count({ where: { monitorId: watched.id } });
+  assert("a second look in the same minute does not store another snapshot", !again.storedPage && scriptSnapshots === 1);
+  await denied("another host cannot send the public page", () =>
+    acceptScriptPage({ token: scriptKey.token, origin: "https://evil.test", text: pageText }),
+  403);
+  await denied("cookies are not accepted in the public page", () =>
+    acceptScriptPage({
+      token: scriptKey.token,
+      origin: "https://example.com",
+      text: "authorization: Bearer secret The public plan costs nineteen dollars today.",
+    }),
+  400);
+  assert(
+    "a small error event cannot carry page text",
+    !siteEventSchema.safeParse({ siteKey: scriptKey.token, kind: "js_error", message: "broken", text: pageText }).success
+  );
+
   await revokeSiteToken(owner.id, monitor.id);
+  await denied("a revoked key cannot send a server report", () => acceptOwnerReport({ siteKey: issued.token, status: 200, html: page }), 404);
   await denied("a revoked key is rejected", () =>
     acceptSiteSignal({
       token: issued.token,

@@ -6,7 +6,11 @@ import type { PlaywrightCookieInput } from "./session-cookies";
 import { MonitorCheckError } from "./check-error";
 import { recordFetchSample, withDomainTurn } from "./fetch-budget";
 import { httpResponseNeedsBrowser } from "./render-need";
-import { scraplingRequest, type ScraplingWorkerResponse } from "./scrapling-client";
+import {
+  isScraplingRuntimeUnavailable,
+  scraplingRequest,
+  type ScraplingWorkerResponse,
+} from "./scrapling-client";
 import {
   extractStructuredFields,
   type StructuredSnapshot,
@@ -253,6 +257,8 @@ export async function fetchViaScrapling(request: ScraplingFetchRequest): Promise
     try {
       response = await runStrategy(request, strategy);
     } catch (error) {
+      // A missing Python runtime is not a failed page check. The caller falls back to Playwright.
+      if (isScraplingRuntimeUnavailable(error)) throw error;
       const message = error instanceof Error ? error.message : "Scrapling fetch failed";
       if (!retriedTransient && strategy === "http" && /timed out|timeout/i.test(message)) {
         retriedTransient = true;

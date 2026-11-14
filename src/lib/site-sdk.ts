@@ -14,13 +14,41 @@ const SENSITIVE_MESSAGE = /password|credit card|card number|ssn|cvv/i;
 export const siteEventSchema = z
   .object({
     siteKey: z.string().trim().min(20).max(200),
-    kind: z.enum(["js_error", "element_missing", "element_present"]),
+    kind: z.enum(["js_error", "element_missing", "element_present", "page"]),
     message: z.string().max(180).optional(),
     selector: z.string().max(120).optional(),
+    text: z.string().max(50_000).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, ctx) => {
+    if (value.kind === "page") {
+      if ((value.text?.trim().length ?? 0) < 20) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["text"], message: "Public page text is required" });
+      }
+      return;
+    }
+    if (value.text) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["text"], message: "Text is only allowed for a page report" });
+    }
+  });
 
 export type SiteEventInput = z.infer<typeof siteEventSchema>;
+
+export function buildSiteInstall(origin: string, token: string) {
+  const base = origin.replace(/\/$/, "");
+  const snippet = `<script src="${base}/monitor.js" data-site-key="${token}" defer></script>`;
+  const serverReport = [
+    `POST ${base}/api/ingest/report`,
+    "Content-Type: application/json",
+    "",
+    JSON.stringify(
+      { siteKey: token, status: 200, html: "<html><!-- the public page your server rendered --></html>" },
+      null,
+      2
+    ),
+  ].join("\n");
+  return { snippet, serverReport };
+}
 
 export function createSiteTokenMaterial() {
   const token = `wfsite_${randomBytes(24).toString("base64url")}`;
@@ -100,10 +128,26 @@ export async function readSiteInstallation(userId: string, monitorId: string) {
       take: 8,
       select: { id: true, kind: true, message: true, selector: true, createdAt: true },
     });
+    const recent = await prisma.snapshot.findMany({
+      where: { monitorId },
+      orderBy: { createdAt: "desc" },
+      take: 8,
+      select: { metadata: true },
+    });
+    const scriptSeen = recent.some((item) => {
+      const meta = item.metadata;
+      return Boolean(
+        meta &&
+          typeof meta === "object" &&
+          !Array.isArray(meta) &&
+          (meta as { adapter?: unknown }).adapter === "site-script"
+      );
+    });
     return {
       active: Boolean(token && !token.revokedAt),
       prefix: token?.prefix ?? null,
       createdAt: token?.createdAt ?? null,
+      scriptSeen,
       signals,
     };
   } catch (error) {

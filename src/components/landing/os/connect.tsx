@@ -16,7 +16,7 @@ export function OsConnect() {
           </h2>
           <p className="mt-4 text-sm leading-relaxed text-zinc-500">
             Every plan includes both. The outside look compares the page on a schedule.
-            If a bot check blocks that look, paste one script tag into the site you own.
+            When a bot check stops that look, paste one script into the site you own.
           </p>
         </div>
 
@@ -37,24 +37,24 @@ export function OsConnect() {
               From your code
             </p>
             <h3 className="mt-2 text-lg font-medium text-zinc-100">
-              Paste a script when a bot check blocks the look
+              Paste one script into your site
             </h3>
             <p className="mt-3 text-sm leading-relaxed text-zinc-500">
-              The script runs as part of the site you own, so the outside bot wall does not
-              stop it. It reports JavaScript errors and whether the pieces you name are still
-              there. It does not read forms, cookies, page text, or who visited. Delete the
-              script, or revoke the key, and the reports stop.
+              You add it, so the watch is your decision. After the page loads, WatchFlowing
+              receives the public text and reports what appeared or disappeared. Forms, cookies,
+              and email addresses are removed, and no visitor is identified. Delete the script,
+              or revoke the key, and the reports stop. It does not bypass a bot check.
             </p>
             <pre className="mt-4 overflow-x-auto rounded-xl border border-white/[0.06] bg-black/50 p-4 text-[11px] leading-relaxed text-cyan-100/90">
               <code>{`<script
   src="https://watchflowing.com/monitor.js"
   data-site-key="YOUR_KEY"
-  data-watch="#price,.hero"
   defer></script>`}</code>
             </pre>
             <p className="mt-3 text-xs leading-relaxed text-zinc-600">
               Put it before the closing head or body tag. The real key is shown once, on the
-              page settings, after you add the site.
+              page settings. If the site has no visitors, the same key can send the page from
+              your server, including the HTTP status.
             </p>
           </article>
         </div>

@@ -36,7 +36,14 @@ export async function fetchApi<T>(
         return { success: true, data: body.data as T, status: res.status };
       }
       if ("monitor" in body) {
-        return { success: true, data: { monitor: body.monitor } as T, status: res.status };
+        return {
+          success: true,
+          data: {
+            monitor: body.monitor,
+            ...(body.installation ? { installation: body.installation } : {}),
+          } as T,
+          status: res.status,
+        };
       }
       if ("monitors" in body) {
         const monitors = Array.isArray(body.monitors) ? body.monitors : [];

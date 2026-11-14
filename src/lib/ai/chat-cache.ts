@@ -104,7 +104,7 @@ If no AI key is configured, a built-in summary is still written.`,
 - **Your API or feed** — a response or feed you publish
 - **Say what matters** — describe the change in plain language
 
-Start with **The whole page**. If your site blocks the check, verify the domain or install the site script.`,
+Start with **The whole page**. If your site blocks the check, send the public page from your server.`,
   },
   {
     patterns: [

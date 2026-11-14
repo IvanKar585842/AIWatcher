@@ -69,7 +69,7 @@ export function refusalGuidance(errorMessage: string | null | undefined, verifie
   if (verified) {
     return "This domain is verified. The page still refused the check. Verification does not bypass that protection.";
   }
-  return "Watchflowing does not bypass this refusal. If you own the site, verify the domain or install the site script.";
+  return "Watchflowing does not bypass this refusal. If you own the site, send the public page from your server.";
 }
 
 function missingTable(error: unknown): boolean {

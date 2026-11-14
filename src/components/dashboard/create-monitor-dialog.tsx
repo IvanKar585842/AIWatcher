@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -254,6 +254,10 @@ export function CreateMonitorDialog({
   const open = controlledOpen ?? internalOpen;
   const setOpen = controlledOnOpenChange ?? setInternalOpen;
   const [step, setStep] = useState(1);
+  const [installSnippet, setInstallSnippet] = useState<string | null>(null);
+  const [installServer, setInstallServer] = useState<string | null>(null);
+  const [createdId, setCreatedId] = useState<string | null>(null);
+  const allowCloseRef = useRef(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState(DEFAULT_FORM);
@@ -572,7 +576,10 @@ export function CreateMonitorDialog({
     setLoading(true);
     setError("");
 
-    const result = await fetchApi<{ monitor: Monitor }>("/api/monitors", {
+    const result = await fetchApi<{
+      monitor: Monitor;
+      installation?: { snippet: string; serverReport: string } | null;
+    }>("/api/monitors", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -608,17 +615,46 @@ export function CreateMonitorDialog({
     }
 
     const monitorId = result.data.monitor.id;
-    toast("Site added", "success");
-    setOpen(false);
+    const installation = result.data.installation;
+    onCreated?.(monitorId);
+    if (!installation?.snippet) {
+      setError("The site was added, but the script was not created. Open the site and choose Allow watching.");
+      return;
+    }
+    allowCloseRef.current = false;
+    setCreatedId(monitorId);
+    setInstallSnippet(installation.snippet);
+    setInstallServer(installation.serverReport);
+    setStep(3);
+    toast("Paste the script to start watching", "success");
+  }
+
+  function finishInstall() {
+    const id = createdId;
+    allowCloseRef.current = true;
+    setInstallSnippet(null);
+    setInstallServer(null);
+    setCreatedId(null);
     setForm(formDefaultsFromUserSettings());
     setClientId("");
     setStep(1);
-    onCreated?.(monitorId);
-    router.push(`/dashboard/monitors/${monitorId}`);
+    setOpen(false);
+    if (id) router.push(`/dashboard/monitors/${id}`);
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next && step === 3 && !allowCloseRef.current) return;
+        if (!next) {
+          setStep(1);
+          setInstallSnippet(null);
+          setInstallServer(null);
+        }
+        setOpen(next);
+      }}
+    >
       {!hideTrigger && (
         <DialogTrigger asChild>
           <Button
@@ -649,14 +685,14 @@ export function CreateMonitorDialog({
               </p>
               <h2 className="mt-1 text-lg font-semibold text-zinc-50 sm:text-xl">A page your company owns</h2>
               <p className="mt-1 text-sm text-zinc-500">
-                Step {step} of 2 — {step === 1 ? "Your site" : watchChoice === "everything" ? "Where to send the report" : "What to watch"}
+                Step {step} of 3 — {step === 1 ? "Your site" : step === 3 ? "Paste the script" : watchChoice === "everything" ? "Where to send the report" : "What to watch"}
               </p>
             </div>
             <Sparkles className="hidden h-5 w-5 shrink-0 text-cyan-500/40 sm:block" />
           </div>
 
           <div className="mt-4 flex gap-2">
-            {[1, 2].map((s) => (
+            {[1, 2, 3].map((s) => (
               <div
                 key={s}
                 className={cn(
@@ -671,7 +707,54 @@ export function CreateMonitorDialog({
         {/* Body */}
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5 sm:px-7">
           <AnimatePresence mode="wait">
-            {step === 1 ? (
+            {step === 3 ? (
+              <motion.div
+                key="step3"
+                initial={{ opacity: 0, x: 16 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -16 }}
+                className="space-y-4"
+              >
+                <div>
+                  <h3 className="text-base font-medium text-zinc-50">Paste this script or the watch cannot see the page</h3>
+                  <p className="mt-1 text-sm leading-relaxed text-zinc-400">
+                    Open the HTML of the page you just added. Paste the script once, just before the closing body tag. The closing head tag also works. Then publish the site.
+                  </p>
+                </div>
+                <textarea
+                  readOnly
+                  value={installSnippet ?? ""}
+                  className="h-24 w-full rounded-md border border-white/10 bg-black/40 p-2 text-xs text-zinc-100"
+                />
+                <Button
+                  type="button"
+                  onClick={() => {
+                    if (!installSnippet) return;
+                    void navigator.clipboard.writeText(installSnippet).then(() => toast("Script copied", "success"));
+                  }}
+                  className="bg-cyan-500 text-black hover:bg-cyan-400"
+                >
+                  Copy script
+                </Button>
+                <ul className="space-y-1 text-sm text-zinc-300">
+                  <li>It sends the public words in main. If the page has no main, it sends the body.</li>
+                  <li>It removes forms and fields before reading. It does not read cookies or browser storage.</li>
+                  <li>An email address is replaced with the word email. It does not send who opened the page.</li>
+                  <li>A report from a different site is rejected. The key is stored as a hash and shown only here.</li>
+                  <li>Remove the script, or choose Stop watching later, and the reports stop. It does not bypass a bot check.</li>
+                </ul>
+                {installServer && (
+                  <div>
+                    <p className="mb-1 text-sm text-zinc-400">Only if nobody visits the page, send it from your server with the same key.</p>
+                    <textarea
+                      readOnly
+                      value={installServer}
+                      className="h-28 w-full rounded-md border border-white/10 bg-black/40 p-2 text-xs text-zinc-100"
+                    />
+                  </div>
+                )}
+              </motion.div>
+            ) : step === 1 ? (
               <motion.div
                 key="step1"
                 initial={{ opacity: 0, x: -20 }}
@@ -1293,7 +1376,7 @@ export function CreateMonitorDialog({
                         : "Leave this on unless your site blocks the check."}
                     </p>
                     <p className="mt-1 text-[11px] leading-snug text-zinc-600">
-                      Add a page your company owns. If that site blocks automated checks, verify the domain or install the site script. WatchFlowing does not bypass protection.
+                      Add a page your company owns. If that site blocks automated checks, paste the site script. WatchFlowing does not bypass protection.
                     </p>
                   </div>
                   <Switch
@@ -1321,7 +1404,7 @@ export function CreateMonitorDialog({
 
         {/* Footer */}
         <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-white/[0.06] bg-black/40 px-4 py-4 sm:flex-row sm:justify-between sm:px-7">
-          {step === 1 ? (
+          {step === 1 || step === 3 ? (
             <div />
           ) : (
             <Button
@@ -1340,7 +1423,15 @@ export function CreateMonitorDialog({
           )}
 
           <div className="flex gap-2 sm:ml-auto">
-            {step === 1 ? (
+            {step === 3 ? (
+              <Button
+                type="button"
+                onClick={finishInstall}
+                className="min-h-12 w-full bg-cyan-500 text-black hover:bg-cyan-400 sm:w-auto"
+              >
+                I pasted the script
+              </Button>
+            ) : step === 1 ? (
               <Button
                 type="button"
                 onClick={() => {

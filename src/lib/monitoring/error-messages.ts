@@ -42,12 +42,12 @@ const KIND_COPY: Record<
   BLOCKED: {
     title: "This website denied automated access.",
     description:
-      "The site refused this check (often HTTP 401/403). If this is your company's site, verify the domain or install the site script. WatchFlowing does not bypass protection.",
+      "The site refused this check (often HTTP 401/403). If this is your company's site, send the public page from your server. WatchFlowing does not bypass protection.",
     suggestions: [
       "Add a page on your site that loads without a login",
-      "Verify the domain or install the site script",
+      "Send the public page from your server",
       "Use a feed your company publishes, if you have one",
-      "The site script reports errors from your page. It does not bypass the challenge",
+      "Your server can send the public page it already rendered. That does not bypass the challenge",
     ],
     statusLabel: "Access denied",
     tone: "red",

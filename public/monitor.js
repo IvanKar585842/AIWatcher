@@ -1,6 +1,6 @@
 /* Owner-installed Watchflowing script.
-   Reports JavaScript errors and whether data-watch selectors exist.
-   It does not read forms, cookies, storage, or page text. */
+   Sends the public page text after removing forms, then reports errors and named pieces.
+   It does not read cookies, storage, form values, or who visited. */
 (function () {
   var script = document.currentScript;
   if (!script || !script.src) return;
@@ -13,12 +13,11 @@
     .filter(Boolean)
     .slice(0, 8);
   var sent = 0;
+  var reportedPage = false;
 
-  function send(body) {
-    if (sent >= 8) return;
-    sent += 1;
+  function post(body) {
     var payload = JSON.stringify(body);
-    if (navigator.sendBeacon) {
+    if (navigator.sendBeacon && payload.length < 60000) {
       navigator.sendBeacon(endpoint, new Blob([payload], { type: "text/plain" }));
       return;
     }
@@ -29,6 +28,36 @@
       keepalive: true,
       credentials: "omit",
     }).catch(function () {});
+  }
+
+  function send(body) {
+    if (sent >= 8) return;
+    sent += 1;
+    post(body);
+  }
+
+  function publicText() {
+    var root = document.querySelector("main") || document.body;
+    if (!root) return "";
+    var clone = root.cloneNode(true);
+    var nodes = clone.querySelectorAll("script,style,noscript,iframe,svg,form,input,textarea,select,option,[contenteditable]");
+    var index = nodes.length;
+    while (index--) {
+      if (nodes[index].parentNode) nodes[index].parentNode.removeChild(nodes[index]);
+    }
+    return String(clone.textContent || "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[email]")
+      .slice(0, 50000);
+  }
+
+  function reportPage() {
+    if (reportedPage) return;
+    var text = publicText();
+    if (text.length < 20) return;
+    reportedPage = true;
+    post({ siteKey: key, kind: "page", text: text });
   }
 
   function reportError(message) {
@@ -59,13 +88,8 @@
     reportError(reason && reason.message ? reason.message : "unhandled rejection");
   });
 
-  if (watch.length === 0) return;
-  window.addEventListener("load", checkSelectors);
-  if (!window.MutationObserver || !document.documentElement) return;
-  var observer = new MutationObserver(function () {
-    observer.disconnect();
+  window.addEventListener("load", function () {
+    reportPage();
     checkSelectors();
   });
-  observer.observe(document.documentElement, { childList: true, subtree: true });
-  window.setTimeout(function () { observer.disconnect(); }, 4000);
 })();

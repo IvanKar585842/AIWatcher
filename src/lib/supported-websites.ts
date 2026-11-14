@@ -4,7 +4,7 @@
  */
 
 export const ANTIBOT_DISCLAIMER =
-  "WatchFlowing does not bypass protection on a site. If your own site blocks an automated check, verify the domain or install the site script.";
+  "WatchFlowing does not bypass protection on a site. If your own site blocks an automated check, send the public page from your server.";
 
 export const FULLY_SUPPORTED_SITES = [
   "Your homepage",
@@ -51,7 +51,7 @@ export const CANNOT_MONITOR_REASONS = [
   },
   {
     label: "A challenge on your site",
-    detail: "If your site blocks the check, the last good snapshot stays. Verification and the site script do not bypass that.",
+    detail: "If your site blocks the check, the last good snapshot stays. A report from your server does not bypass that check.",
   },
   {
     label: "A page that never finishes loading",
