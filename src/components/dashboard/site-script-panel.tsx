@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { SAMPLE_SITE_SCRIPT, ScriptInstallGuide, siteKeyFromSnippet } from "@/components/dashboard/script-install-guide";
 
 type Signal = { id: string; kind: string; message: string; selector: string | null };
 type Installation = { active: boolean; prefix: string | null; scriptSeen?: boolean; signals: Signal[] };
@@ -91,40 +92,14 @@ export function SiteScriptPanel({ monitorId }: { monitorId: string }) {
       {installation?.active && (
         <p className="mt-3 text-sm text-zinc-300">Active key {installation.prefix}…</p>
       )}
-      {snippet && (
-        <div className="mt-3">
-          <p className="mb-1 text-sm text-zinc-300">Paste this script before the closing head or body tag. The key is shown only now.</p>
-          <textarea
-            readOnly
-            value={snippet}
-            className="h-24 w-full rounded-md border border-white/10 bg-black/40 p-2 text-xs text-zinc-100"
-          />
-          <Button
-            type="button"
-            className="mt-2"
-            onClick={() => void navigator.clipboard.writeText(snippet).then(() => setMessage("Copied. Paste it before the closing head or body tag."))}
-          >
-            Copy script
-          </Button>
-        </div>
-      )}
-      {serverReport && (
-        <div className="mt-3">
-          <p className="mb-1 text-sm text-zinc-300">Only if nobody visits the page: send it from your server, with the HTTP status.</p>
-          <textarea
-            readOnly
-            value={serverReport}
-            className="h-36 w-full rounded-md border border-white/10 bg-black/40 p-2 text-xs text-zinc-100"
-          />
-          <Button
-            type="button"
-            className="mt-2"
-            onClick={() => void navigator.clipboard.writeText(serverReport).then(() => setMessage("Copied the server report."))}
-          >
-            Copy server report
-          </Button>
-        </div>
-      )}
+      <div className="mt-3">
+        <ScriptInstallGuide
+          snippet={snippet ?? SAMPLE_SITE_SCRIPT}
+          siteKey={snippet ? siteKeyFromSnippet(snippet) : "YOUR_KEY"}
+          serverReport={serverReport}
+          sample={!snippet}
+        />
+      </div>
       <div className="mt-3 flex flex-wrap gap-2">
         <Button type="button" disabled={busy} onClick={() => void issue()}>
           {installation?.active ? "New key" : "Allow watching"}

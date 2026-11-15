@@ -1,6 +1,8 @@
+import { SAMPLE_SITE_SCRIPT, ScriptInstallGuide } from "@/components/dashboard/script-install-guide";
+
 /**
- * Server Component — how a company connects the assistant to a site it owns.
- * No client JS. The snippet is a placeholder, not a live site key.
+ * How a company connects the assistant to a site it owns.
+ * The sample script uses YOUR_KEY. The real key is created when a site is added.
  */
 export function OsConnect() {
   return (
@@ -45,18 +47,20 @@ export function OsConnect() {
               and email addresses are removed, and no visitor is identified. Delete the script,
               or revoke the key, and the reports stop. It does not bypass a bot check.
             </p>
-            <pre className="mt-4 overflow-x-auto rounded-xl border border-white/[0.06] bg-black/50 p-4 text-[11px] leading-relaxed text-cyan-100/90">
-              <code>{`<script
-  src="https://watchflowing.com/monitor.js"
-  data-site-key="YOUR_KEY"
-  defer></script>`}</code>
-            </pre>
             <p className="mt-3 text-xs leading-relaxed text-zinc-600">
-              Put it before the closing head or body tag. The real key is shown once, on the
-              page settings. If the site has no visitors, the same key can send the page from
-              your server, including the HTTP status.
+              YOUR_KEY below is only a placeholder. WatchFlowing fills in the real site key when you add the page. It starts with wfsite_ and is shown once.
             </p>
           </article>
+        </div>
+
+        <div className="mt-8 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
+          <h3 className="text-lg font-medium text-zinc-100">The script, the key, and the steps</h3>
+          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-500">
+            Copy the fields. Open a section to read the steps or to see what the site key is. Do not publish the placeholder YOUR_KEY.
+          </p>
+          <div className="mt-4">
+            <ScriptInstallGuide snippet={SAMPLE_SITE_SCRIPT} siteKey="YOUR_KEY" sample />
+          </div>
         </div>
       </div>
     </section>

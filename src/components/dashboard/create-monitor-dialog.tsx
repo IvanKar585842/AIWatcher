@@ -23,6 +23,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SAMPLE_SITE_SCRIPT, ScriptInstallGuide, siteKeyFromSnippet } from "@/components/dashboard/script-install-guide";
 import {
   Dialog,
   DialogContent,
@@ -718,41 +719,14 @@ export function CreateMonitorDialog({
                 <div>
                   <h3 className="text-base font-medium text-zinc-50">Paste this script or the watch cannot see the page</h3>
                   <p className="mt-1 text-sm leading-relaxed text-zinc-400">
-                    Open the HTML of the page you just added. Paste the script once, just before the closing body tag. The closing head tag also works. Then publish the site.
+                    Copy the fields below. The script already contains your site key. Open the sections to read each step and what the key is.
                   </p>
                 </div>
-                <textarea
-                  readOnly
-                  value={installSnippet ?? ""}
-                  className="h-24 w-full rounded-md border border-white/10 bg-black/40 p-2 text-xs text-zinc-100"
+                <ScriptInstallGuide
+                  snippet={installSnippet ?? ""}
+                  siteKey={siteKeyFromSnippet(installSnippet ?? "")}
+                  serverReport={installServer}
                 />
-                <Button
-                  type="button"
-                  onClick={() => {
-                    if (!installSnippet) return;
-                    void navigator.clipboard.writeText(installSnippet).then(() => toast("Script copied", "success"));
-                  }}
-                  className="bg-cyan-500 text-black hover:bg-cyan-400"
-                >
-                  Copy script
-                </Button>
-                <ul className="space-y-1 text-sm text-zinc-300">
-                  <li>It sends the public words in main. If the page has no main, it sends the body.</li>
-                  <li>It removes forms and fields before reading. It does not read cookies or browser storage.</li>
-                  <li>An email address is replaced with the word email. It does not send who opened the page.</li>
-                  <li>A report from a different site is rejected. The key is stored as a hash and shown only here.</li>
-                  <li>Remove the script, or choose Stop watching later, and the reports stop. It does not bypass a bot check.</li>
-                </ul>
-                {installServer && (
-                  <div>
-                    <p className="mb-1 text-sm text-zinc-400">Only if nobody visits the page, send it from your server with the same key.</p>
-                    <textarea
-                      readOnly
-                      value={installServer}
-                      className="h-28 w-full rounded-md border border-white/10 bg-black/40 p-2 text-xs text-zinc-100"
-                    />
-                  </div>
-                )}
               </motion.div>
             ) : step === 1 ? (
               <motion.div
@@ -766,16 +740,11 @@ export function CreateMonitorDialog({
                 <div className="rounded-lg border border-cyan-500/25 bg-cyan-500/[0.06] px-4 py-3">
                   <p className="text-sm font-medium text-zinc-100">Paste one script or the watch cannot see the page</p>
                   <p className="mt-1 text-sm leading-relaxed text-zinc-400">
-                    Open the HTML of the page you add. Paste the script once, just before the closing body tag. The closing head tag also works. Then publish the site. The real key appears on the last step and is shown only then.
+                    YOUR_KEY in the sample is a placeholder. The real site key starts with wfsite_ and is filled in on the last step. Copy that finished script, not this sample.
                   </p>
-                  <pre className="mt-3 overflow-x-auto rounded-md border border-white/10 bg-black/40 p-2 text-[11px] leading-relaxed text-cyan-100/90">
-                    <code>{`<script src="https://watchflowing.com/monitor.js" data-site-key="YOUR_KEY" defer></script>`}</code>
-                  </pre>
-                  <ul className="mt-3 space-y-1 text-sm text-zinc-300">
-                    <li>It sends the public words on the page. It removes forms and fields before reading.</li>
-                    <li>It does not read cookies or browser storage, and it does not send who opened the page.</li>
-                    <li>The report stays on this account. Remove the script and the reports stop.</li>
-                  </ul>
+                  <div className="mt-3">
+                    <ScriptInstallGuide snippet={SAMPLE_SITE_SCRIPT} siteKey="YOUR_KEY" sample />
+                  </div>
                 </div>
                 <p className="text-sm leading-relaxed text-zinc-400">
                   Add the address. Then either watch everything important, or choose exactly what the company cares about.
