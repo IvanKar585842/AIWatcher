@@ -61,19 +61,16 @@ export function IntelligenceCenter({
     id: CenterTab;
     label: string;
     mobileLabel: string;
-    emoji: string;
   }[] = [
     {
       id: "feed",
       label: "What changed",
       mobileLabel: "Feed",
-      emoji: "🧠",
     },
     {
       id: "assistant",
       label: "Ask the assistant",
       mobileLabel: "Assistant",
-      emoji: "🤖",
     },
   ];
 
@@ -125,9 +122,6 @@ export function IntelligenceCenter({
                     transition={{ type: "spring", stiffness: 420, damping: 32 }}
                   />
                 )}
-                <span className="relative shrink-0 text-base leading-none" aria-hidden>
-                  {t.emoji}
-                </span>
                 <span className="relative truncate sm:hidden">{t.mobileLabel}</span>
                 <span className="relative hidden truncate sm:inline">{t.label}</span>
               </button>
