@@ -622,6 +622,25 @@ async function processMonitorInternal(
       : null;
 
   try {
+    const siteToken = await prisma.siteToken.findUnique({
+      where: { monitorId: monitor.id },
+      select: { revokedAt: true },
+    });
+    if (siteToken && !siteToken.revokedAt) {
+      await prisma.monitor.update({
+        where: { id: monitor.id },
+        data: {
+          status: MonitorStatus.ACTIVE,
+          errorCount: 0,
+          errorMessage: null,
+          nextCheckAt,
+        },
+      });
+      await syncMonitorQueue(monitor.id, nextCheckAt);
+      await resolveMonitorErrorAlerts(monitor.id);
+      return { status: "skipped", reason: "awaiting_server_report" };
+    }
+
     const result = await fetchPageContent({
       url: monitor.url,
       mode: monitor.mode,

@@ -616,17 +616,33 @@ export function CreateMonitorDialog({
     }
 
     const monitorId = result.data.monitor.id;
-    const installation = result.data.installation;
-    onCreated?.(monitorId);
+    let installation = result.data.installation;
+    if (!installation?.serverKey) {
+      const issued = await fetch(`/api/monitors/${monitorId}/site-token`, { method: "POST" });
+      const issuedBody = (await issued.json().catch(() => ({}))) as {
+        serverKey?: string;
+        serverReport?: string;
+      };
+      if (issued.ok && issuedBody.serverKey) {
+        installation = {
+          snippet: "",
+          serverReport: issuedBody.serverReport ?? "",
+          serverKey: issuedBody.serverKey,
+        };
+      }
+    }
     if (!installation?.serverKey) {
       setError("The site was added, but the private key was not created. Open the site and choose Allow watching.");
+      onCreated?.(monitorId);
       return;
     }
     allowCloseRef.current = false;
     setCreatedId(monitorId);
     setInstallServer(installation.serverReport);
-    setInstallServerKey(installation.serverKey ?? null);
+    setInstallServerKey(installation.serverKey);
     setStep(3);
+    setOpen(true);
+    onCreated?.(monitorId);
     toast("Copy the private key to the server", "success");
   }
 
@@ -647,7 +663,10 @@ export function CreateMonitorDialog({
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        if (!next && step === 3 && !allowCloseRef.current) return;
+        if (!next && !allowCloseRef.current && (step === 3 || createdId)) {
+          setOpen(true);
+          return;
+        }
         if (!next) {
           setStep(1);
           setInstallServer(null);

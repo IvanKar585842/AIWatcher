@@ -530,9 +530,6 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
         variant="os"
         onCreated={async () => {
           setMonitorCreated(true);
-          setCreateOpen(false);
-          toast("First monitor created", "success");
-          // Persist + dismiss welcome immediately (refresh/login already covered server-side)
           try {
             await fetch("/api/user/onboarding", {
               method: "PATCH",
