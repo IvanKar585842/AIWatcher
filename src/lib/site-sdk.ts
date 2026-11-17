@@ -37,17 +37,30 @@ export type SiteEventInput = z.infer<typeof siteEventSchema>;
 export function buildSiteInstall(origin: string, publicId: string, serverKey: string) {
   const base = origin.replace(/\/$/, "");
   const serverReport = [
-    `POST ${base}/api/ingest/report`,
-    "Content-Type: application/json",
+    "// Save as watchflowing-report.mjs on the server that already built the public page.",
+    "// Run it on a timer: node watchflowing-report.mjs ./page.html",
+    "// ./page.html is the public page that server already wrote. Keep this file on that server.",
     "",
-    JSON.stringify(
-      { siteKey: serverKey, status: 200, html: "<html><!-- public page your server already rendered --></html>" },
-      null,
-      2
-    ),
+    'import { readFile } from "node:fs/promises";',
     "",
-    "Run this on a timer from the server that already built the page.",
-    "No visitor is required. The private key stays in this request, never in the public HTML.",
+    `const siteKey = ${JSON.stringify(serverKey)};`,
+    "const pageFile = process.argv[2];",
+    "if (!pageFile) {",
+    '  console.error("Pass the HTML file your server already wrote.");',
+    "  process.exit(1);",
+    "}",
+    'const html = await readFile(pageFile, "utf8");',
+    `const response = await fetch(${JSON.stringify(`${base}/api/ingest/report`)}, {`,
+    '  method: "POST",',
+    '  headers: { "content-type": "application/json" },',
+    "  body: JSON.stringify({ siteKey, status: 200, html }),",
+    "});",
+    "if (!response.ok) {",
+    '  console.error("WatchFlowing did not accept the page", response.status);',
+    "  process.exit(1);",
+    "}",
+    'console.log("WatchFlowing accepted the page");',
+    "",
   ].join("\n");
   return { snippet: "", serverReport, publicId, serverKey };
 }

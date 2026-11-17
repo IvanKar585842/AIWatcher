@@ -40,7 +40,7 @@ export function OsConnect() {
               A timer, not a visitor
             </h3>
             <p className="mt-3 text-sm leading-relaxed text-zinc-500">
-              The private key and the report are copied onto the server. A timer sends the public HTML that the server already rendered. Nobody has to open the page. The key is never placed in the public HTML.
+              Save the server program on the machine that builds the page. A timer sends the HTML that machine already wrote. Nobody has to open the page.
             </p>
           </article>
         </div>
@@ -48,7 +48,7 @@ export function OsConnect() {
         <div className="mt-8 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
           <h3 className="text-lg font-medium text-zinc-100">The script, the key, and the steps</h3>
           <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-500">
-            Copy the private key into the server environment. Open a section to read how a check runs when nobody visits. The key never goes into HTML.
+            The steps below are the whole connection. The private key is created when you add the site, and it travels only inside the server program.
           </p>
           <div className="mt-4">
             <ScriptInstallGuide />

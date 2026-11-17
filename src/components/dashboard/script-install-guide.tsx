@@ -70,32 +70,18 @@ export function ScriptInstallGuide({
   const script = snippet?.trim() || "";
   return (
     <div className="space-y-3">
-      {script ? (
-        <CopyField label="Do not paste this into the public page" value={script} rows={3} />
-      ) : null}
-      {privateKey ? (
-        <CopyField label="Private server key. Put it in the server environment. Never paste it into HTML" value={privateKey} rows={2} />
-      ) : null}
-      {serverReport ? (
-        <CopyField label="Scheduled server report. Runs even when nobody opens the page" value={serverReport} rows={8} />
-      ) : null}
+      {script ? <CopyField label="Page script" value={script} rows={3} /> : null}
+      {privateKey ? <CopyField label="Private key" value={privateKey} rows={2} /> : null}
+      {serverReport ? <CopyField label="Server program" value={serverReport} rows={16} /> : null}
 
-      <GuideDetails title="How this works when a bot check is on the site" open>
+      <GuideDetails title="How to connect your site" open>
         <ol className="list-decimal space-y-2 pl-4">
-          <li>Your server already creates the public page. WatchFlowing does not ask the bot check to let it in.</li>
-          <li>Add the page in WatchFlowing. The last step shows a private key and a report. Copy both onto the server, never into the public HTML.</li>
-          <li>On a timer, that server sends the public HTML it already rendered, together with the private key. Nobody has to open the page.</li>
-          <li>WatchFlowing compares that report with the previous one and tells you what appeared or disappeared.</li>
-          <li>To stop, choose Stop watching. The private key then stops accepting reports.</li>
+          <li>Add the page in WatchFlowing. The last step shows a private key and a server program. The key starts with wfsite_ and is stored here only as a hash.</li>
+          <li>On the server that already builds that page, save the program as watchflowing-report.mjs. The key inside that file stays on the server.</li>
+          <li>Save the public HTML that server already rendered, for example the homepage file it just wrote. Run node watchflowing-report.mjs ./page.html. The file must be the real page. A comment is stored as the page.</li>
+          <li>Repeat that command on a timer, about every 5 minutes. On Windows this is Task Scheduler. On a Linux server it is cron. WatchFlowing compares this copy with the previous one and reports what appeared or disappeared.</li>
+          <li>The check does not open the site and does not wait for a visitor. Choose Stop watching, or New key, and the old key stops accepting reports.</li>
         </ol>
-      </GuideDetails>
-
-      <GuideDetails title="What goes in the script, and what must stay secret">
-        <div className="space-y-2">
-          <p>WatchFlowing does not open the page from outside, and it does not wait for a visitor. The report comes from your server, which already has the page.</p>
-          <p>The private server key starts with wfsite_. It is shown once. It travels only in the server report. It is never pasted into the public HTML, because anything in the HTML can be read by anyone.</p>
-          <p>If that key was copied into a page, choose New key. The old key stops working. WatchFlowing stores only a hash of it.</p>
-        </div>
       </GuideDetails>
     </div>
   );

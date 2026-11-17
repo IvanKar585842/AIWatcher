@@ -74,17 +74,10 @@ export function SiteScriptPanel({ monitorId }: { monitorId: string }) {
   return (
     <section className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
       <p className="font-mono text-[10px] uppercase tracking-widest text-zinc-500">Your permission</p>
-      <h2 className="text-lg font-medium text-zinc-100">Checked on a schedule, with no visitor</h2>
+      <h2 className="text-lg font-medium text-zinc-100">Checked from your server</h2>
       <p className="mt-1 text-sm leading-relaxed text-zinc-400">
-        Your server already has the page, so it sends a copy on a timer. A visitor is not required, and a bot check is not asked to step aside. The private key never goes into the public HTML.
+        Save the server program next to the page your server already builds, then run it about every 5 minutes. Each run sends that HTML and the private key. Stop watching turns the key off.
       </p>
-        <p className="mt-3 text-sm text-zinc-300">A server report uses the private key. A copied page id cannot send a page.</p>
-      <ul className="mt-3 space-y-1 text-sm text-zinc-300">
-        <li>Your server sends the public page on a timer. Nobody has to open it.</li>
-        <li>The private key stays on that server. It is never pasted into HTML.</li>
-        <li>A copied page id cannot store a page report.</li>
-        <li>Choose Stop watching and the private key stops accepting reports.</li>
-      </ul>
       {installation?.active && (
         <p className="mt-3 text-sm text-zinc-300">Active key {installation.prefix}…</p>
       )}

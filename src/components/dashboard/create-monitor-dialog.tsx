@@ -705,7 +705,7 @@ export function CreateMonitorDialog({
               </p>
               <h2 className="mt-1 text-lg font-semibold text-zinc-50 sm:text-xl">A page your company owns</h2>
               <p className="mt-1 text-sm text-zinc-500">
-                Step {step} of 3 — {step === 1 ? "Your site" : step === 3 ? "Paste the script" : watchChoice === "everything" ? "Where to send the report" : "What to watch"}
+                Step {step} of 3 — {step === 1 ? "Your site" : step === 3 ? "Connect the server" : watchChoice === "everything" ? "Where to send the report" : "What to watch"}
               </p>
             </div>
             <Sparkles className="hidden h-5 w-5 shrink-0 text-cyan-500/40 sm:block" />
@@ -736,9 +736,9 @@ export function CreateMonitorDialog({
                 className="space-y-4"
               >
                 <div>
-                  <h3 className="text-base font-medium text-zinc-50">Copy the private key. The page is checked without a visitor</h3>
+                  <h3 className="text-base font-medium text-zinc-50">Save the server program, then run it on a timer</h3>
                   <p className="mt-1 text-sm leading-relaxed text-zinc-400">
-                    Copy the private key and the report onto the server that already builds the page. A timer sends the page. Nobody has to open it, and the key never goes into the public HTML.
+                    The program goes on the server that already builds this page. Each run sends the HTML file that server just wrote, together with the private key.
                   </p>
                 </div>
                 <ScriptInstallGuide
