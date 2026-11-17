@@ -259,6 +259,7 @@ export function CreateMonitorDialog({
   const [installServerKey, setInstallServerKey] = useState<string | null>(null);
   const [createdId, setCreatedId] = useState<string | null>(null);
   const allowCloseRef = useRef(false);
+  const holdingInstallRef = useRef(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState(DEFAULT_FORM);
@@ -322,7 +323,10 @@ export function CreateMonitorDialog({
   useEffect(() => {
     if (!enableTourControl) return;
     const openFromTour = () => setOpen(true);
-    const closeFromTour = () => setOpen(false);
+    const closeFromTour = () => {
+      if (holdingInstallRef.current) return;
+      setOpen(false);
+    };
     window.addEventListener(PRODUCT_TOUR_EVENTS.OPEN_CREATE, openFromTour);
     window.addEventListener(PRODUCT_TOUR_EVENTS.CLOSE_CREATE, closeFromTour);
     return () => {
@@ -333,7 +337,14 @@ export function CreateMonitorDialog({
 
   useEffect(() => {
     if (!open) {
+      if (holdingInstallRef.current) {
+        setOpen(true);
+        return;
+      }
       setStep(1);
+      setCreatedId(null);
+      setInstallServer(null);
+      setInstallServerKey(null);
       setError("");
       setTypeSearch("");
       setTypeFilter("All");
@@ -362,7 +373,7 @@ export function CreateMonitorDialog({
         /* keep FREE default */
       });
     return () => controller.abort();
-  }, [open, prefillRequest]);
+  }, [open, prefillRequest, setOpen]);
 
   const planAllowedIntervals = useMemo(
     () => allowedIntervals ?? getAllowedIntervals(plan),
@@ -631,23 +642,22 @@ export function CreateMonitorDialog({
         };
       }
     }
-    if (!installation?.serverKey) {
-      setError("The site was added, but the private key was not created. Open the site and choose Allow watching.");
-      onCreated?.(monitorId);
-      return;
-    }
+    holdingInstallRef.current = true;
     allowCloseRef.current = false;
     setCreatedId(monitorId);
-    setInstallServer(installation.serverReport);
-    setInstallServerKey(installation.serverKey);
+    setInstallServer(installation?.serverReport ?? null);
+    setInstallServerKey(installation?.serverKey ?? null);
     setStep(3);
     setOpen(true);
-    onCreated?.(monitorId);
-    toast("Copy the private key to the server", "success");
+    if (!installation?.serverKey) {
+      setError("The site was added, but the private key was not created. On the site page, choose Allow watching.");
+    }
+    toast("Save the server program, then run it on a timer", "success");
   }
 
   function finishInstall() {
     const id = createdId;
+    holdingInstallRef.current = false;
     allowCloseRef.current = true;
     setInstallServer(null);
     setInstallServerKey(null);
@@ -655,6 +665,7 @@ export function CreateMonitorDialog({
     setForm(formDefaultsFromUserSettings());
     setClientId("");
     setStep(1);
+    if (id) onCreated?.(id);
     setOpen(false);
     if (id) router.push(`/dashboard/monitors/${id}`);
   }
@@ -663,12 +674,13 @@ export function CreateMonitorDialog({
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        if (!next && !allowCloseRef.current && (step === 3 || createdId)) {
+        if (!next && holdingInstallRef.current && !allowCloseRef.current) {
           setOpen(true);
           return;
         }
         if (!next) {
           setStep(1);
+          setCreatedId(null);
           setInstallServer(null);
           setInstallServerKey(null);
         }
@@ -694,7 +706,19 @@ export function CreateMonitorDialog({
 
       <DialogContent
         data-tour={enableTourControl ? "create-monitor-dialog" : undefined}
-        className="flex max-h-[min(92dvh,900px)] w-[min(calc(100vw-1rem),56rem)] max-w-none flex-col gap-0 overflow-hidden border border-cyan-500/20 bg-[#0a0a0a] p-0 text-zinc-100 shadow-[0_0_80px_-16px_rgba(34,211,238,0.45)] sm:w-[min(calc(100vw-1.5rem),56rem)]"
+        onPointerDownOutside={(event) => {
+          if (holdingInstallRef.current) event.preventDefault();
+        }}
+        onInteractOutside={(event) => {
+          if (holdingInstallRef.current) event.preventDefault();
+        }}
+        onEscapeKeyDown={(event) => {
+          if (holdingInstallRef.current) event.preventDefault();
+        }}
+        className={cn(
+          "flex max-h-[min(92dvh,900px)] w-[min(calc(100vw-1rem),56rem)] max-w-none flex-col gap-0 overflow-hidden border border-cyan-500/20 bg-[#0a0a0a] p-0 text-zinc-100 shadow-[0_0_80px_-16px_rgba(34,211,238,0.45)] sm:w-[min(calc(100vw-1.5rem),56rem)]",
+          step === 3 && "[&>button.absolute]:hidden"
+        )}
       >
         {/* Header */}
         <div className="shrink-0 border-b border-white/[0.06] bg-gradient-to-r from-cyan-500/[0.08] via-transparent to-blue-500/[0.05] px-4 py-4 pr-14 sm:px-7 sm:py-5 sm:pr-16">
@@ -744,6 +768,7 @@ export function CreateMonitorDialog({
                 <ScriptInstallGuide
                   serverKey={installServerKey}
                   serverReport={installServer}
+                  guideOpen
                 />
               </motion.div>
             ) : step === 1 ? (
@@ -758,7 +783,7 @@ export function CreateMonitorDialog({
                 <div className="rounded-lg border border-cyan-500/25 bg-cyan-500/[0.06] px-4 py-3">
                   <p className="text-sm font-medium text-zinc-100">The page is checked even when nobody opens it</p>
                   <p className="mt-1 text-sm leading-relaxed text-zinc-400">
-                    The private key is created on the last step. It stays on the server that builds the page. A bot check does not have to let anyone in, and a visitor is not required.
+                    Open the full guide for Windows, Mac, and Linux. The last step gives you the server program with the private key already inside.
                   </p>
                   <div className="mt-3">
                     <ScriptInstallGuide />
@@ -1377,7 +1402,7 @@ export function CreateMonitorDialog({
                         : "Leave this on unless your site blocks the check."}
                     </p>
                     <p className="mt-1 text-[11px] leading-snug text-zinc-600">
-                      Add a page your company owns. If that site blocks automated checks, paste the site script. WatchFlowing does not bypass protection.
+                      Add a page your company owns. The last step gives you the server program. WatchFlowing does not bypass protection.
                     </p>
                   </div>
                   <Switch
@@ -1430,7 +1455,7 @@ export function CreateMonitorDialog({
                 onClick={finishInstall}
                 className="min-h-12 w-full bg-cyan-500 text-black hover:bg-cyan-400 sm:w-auto"
               >
-                I pasted the script
+                I saved the program
               </Button>
             ) : step === 1 ? (
               <Button
