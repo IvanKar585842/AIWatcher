@@ -297,6 +297,9 @@ model SiteToken {
   id         String    @id @default(cuid())
   monitorId  String    @unique
   monitor    Monitor   @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  /// Visible in the page script. Not a password and not accepted by the server report.
+  publicId   String    @unique
+  /// Hash of the private server key. The raw key is never stored and never placed in HTML.
   tokenHash  String    @unique
   prefix     String
   revokedAt  DateTime?

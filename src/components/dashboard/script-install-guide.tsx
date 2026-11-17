@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 
 export const SAMPLE_SITE_SCRIPT =
-  '<script src="https://watchflowing.com/monitor.js" data-site-key="YOUR_KEY" defer></script>';
+  '<script src="https://watchflowing.com/monitor.js" data-site-key="YOUR_SITE_ID" defer></script>';
 
 export function siteKeyFromSnippet(snippet: string): string {
   return snippet.match(/data-site-key="([^"]+)"/)?.[1] ?? "";
@@ -58,49 +58,43 @@ function GuideDetails({ title, children, open = false }: { title: string; childr
 
 export function ScriptInstallGuide({
   snippet,
-  siteKey,
+  serverKey,
   serverReport,
-  sample = false,
 }: {
-  snippet: string;
-  siteKey?: string | null;
+  snippet?: string | null;
+  serverKey?: string | null;
   serverReport?: string | null;
   sample?: boolean;
 }) {
-  const key = siteKey?.trim() || "";
+  const privateKey = serverKey?.trim() || "";
+  const script = snippet?.trim() || "";
   return (
     <div className="space-y-3">
-      <CopyField label="Script to paste into your page" value={snippet} rows={sample ? 3 : 4} />
-      {key ? (
-        <CopyField
-          label={sample ? "Placeholder only. The real site key is created on the last step" : "Site key. It is already inside the script above"}
-          value={key}
-          rows={2}
-        />
+      {script ? (
+        <CopyField label="Do not paste this into the public page" value={script} rows={3} />
+      ) : null}
+      {privateKey ? (
+        <CopyField label="Private server key. Put it in the server environment. Never paste it into HTML" value={privateKey} rows={2} />
       ) : null}
       {serverReport ? (
-        <CopyField label="Server report. Use this only when nobody visits the page" value={serverReport} rows={8} />
+        <CopyField label="Scheduled server report. Runs even when nobody opens the page" value={serverReport} rows={8} />
       ) : null}
 
-      <GuideDetails title="How to connect the script, step by step" open>
+      <GuideDetails title="How this works when a bot check is on the site" open>
         <ol className="list-decimal space-y-2 pl-4">
-          <li>Add the page in WatchFlowing and finish the form. The last step shows the script with your site key already filled in.</li>
-          <li>Copy the script field. Do not type the key by hand, and do not leave the word YOUR_KEY in the tag.</li>
-          <li>Open the HTML of that same page in your site editor, theme, or page template.</li>
-          <li>Paste the script once, immediately before the closing body tag. Before the closing head tag also works.</li>
-          <li>Publish or deploy the site so the new HTML is the page visitors open.</li>
-          <li>Open that page once in a browser. WatchFlowing then receives the public words and can report what changed.</li>
-          <li>To stop, delete the script from the page, or choose Stop watching on the site page. The key then stops accepting reports.</li>
+          <li>Your server already creates the public page. WatchFlowing does not ask the bot check to let it in.</li>
+          <li>Add the page in WatchFlowing. The last step shows a private key and a report. Copy both onto the server, never into the public HTML.</li>
+          <li>On a timer, that server sends the public HTML it already rendered, together with the private key. Nobody has to open the page.</li>
+          <li>WatchFlowing compares that report with the previous one and tells you what appeared or disappeared.</li>
+          <li>To stop, choose Stop watching. The private key then stops accepting reports.</li>
         </ol>
       </GuideDetails>
 
-      <GuideDetails title="What the site key is">
+      <GuideDetails title="What goes in the script, and what must stay secret">
         <div className="space-y-2">
-          <p>The site key is a secret WatchFlowing creates for this one page. It starts with wfsite_ and continues as a long random string.</p>
-          <p>It belongs in the attribute data-site-key. The script field already contains it, so pasting the whole script is the right step.</p>
-          <p>The key is shown once. If you close the step without copying it, open the site page and choose New key. The previous key stops working.</p>
-          <p>It is not a password for your website, and it does not sign anyone in. WatchFlowing stores only a hash of the key. The report stays on this account.</p>
-          <p>The script sends the public words on the page. It removes forms and fields first. It does not read cookies or browser storage, and it does not send who opened the page. An email address is saved as the word email.</p>
+          <p>WatchFlowing does not open the page from outside, and it does not wait for a visitor. The report comes from your server, which already has the page.</p>
+          <p>The private server key starts with wfsite_. It is shown once. It travels only in the server report. It is never pasted into the public HTML, because anything in the HTML can be read by anyone.</p>
+          <p>If that key was copied into a page, choose New key. The old key stops working. WatchFlowing stores only a hash of it.</p>
         </div>
       </GuideDetails>
     </div>

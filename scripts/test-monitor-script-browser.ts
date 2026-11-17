@@ -85,37 +85,26 @@ async function main() {
       <p>Write to sales@example.com for a quote.</p>
       <form><label>Card</label><input value="secret-card-4111"><textarea>secret note</textarea></form>
     </main>
-    <script src="${appOrigin}/monitor.js" data-site-key="${issued.token}" defer></script>
+    <script src="${appOrigin}/monitor.js" data-site-key="${issued.publicId}" defer></script>
   </body></html>`);
 
   const executablePath = installedChromium();
   const browser = await chromium.launch({ headless: true, executablePath });
   try {
     const page = await browser.newPage();
-    const posted = page.waitForResponse(
-      (response) => response.url().includes("/api/ingest/site") && response.request().method() === "POST",
-      { timeout: 15_000 }
-    );
+    let posted = false;
+    page.on("request", (request) => {
+      if (request.method() === "POST" && request.url().includes("/api/ingest/")) posted = true;
+    });
     await page.goto(`http://127.0.0.1:${pageServer.port}/pricing`, { waitUntil: "load" });
-    const response = await posted;
-    assert("the script posted the page from the browser", response.ok());
+    await page.waitForTimeout(400);
+    assert("a visit does not send a report", !posted);
   } finally {
     await browser.close();
   }
 
-  let stored: { extractedText: string | null } | null = null;
-  for (let attempt = 0; attempt < 10 && !stored; attempt += 1) {
-    stored = await prisma.snapshot.findFirst({
-      where: { monitorId: monitor.id },
-      orderBy: { createdAt: "desc" },
-      select: { extractedText: true },
-    });
-    if (!stored) await new Promise((resolve) => setTimeout(resolve, 300));
-  }
-  const text = stored?.extractedText ?? "";
-  assert("the stored page includes the public price", text.includes("nineteen dollars"));
-  assert("an email address is redacted", text.includes("[email]") && !text.includes("sales@example.com"));
-  assert("a form value is not stored", !text.includes("secret-card-4111") && !text.includes("secret note"));
+  const stored = await prisma.snapshot.count({ where: { monitorId: monitor.id } });
+  assert("a visit does not store a snapshot", stored === 0);
 
   await prisma.user.deleteMany({ where: { clerkId: { startsWith: "script-browser-" } } });
   await pageServer.close();

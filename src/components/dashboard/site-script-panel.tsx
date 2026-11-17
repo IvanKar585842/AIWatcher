@@ -2,15 +2,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { SAMPLE_SITE_SCRIPT, ScriptInstallGuide, siteKeyFromSnippet } from "@/components/dashboard/script-install-guide";
+import { ScriptInstallGuide } from "@/components/dashboard/script-install-guide";
 
 type Signal = { id: string; kind: string; message: string; selector: string | null };
 type Installation = { active: boolean; prefix: string | null; scriptSeen?: boolean; signals: Signal[] };
 
 export function SiteScriptPanel({ monitorId }: { monitorId: string }) {
   const [installation, setInstallation] = useState<Installation | null>(null);
-  const [snippet, setSnippet] = useState<string | null>(null);
   const [serverReport, setServerReport] = useState<string | null>(null);
+  const [serverKey, setServerKey] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -43,8 +43,8 @@ export function SiteScriptPanel({ monitorId }: { monitorId: string }) {
         setMessage(typeof data.error === "string" ? data.error : "Could not create the site key");
         return;
       }
-      setSnippet(typeof data.snippet === "string" ? data.snippet : null);
       setServerReport(typeof data.serverReport === "string" ? data.serverReport : null);
+      setServerKey(typeof data.serverKey === "string" ? data.serverKey : null);
       await load();
     } finally {
       setBusy(false);
@@ -54,8 +54,8 @@ export function SiteScriptPanel({ monitorId }: { monitorId: string }) {
   async function revoke() {
     setBusy(true);
     setMessage(null);
-    setSnippet(null);
     setServerReport(null);
+    setServerKey(null);
     try {
       const response = await fetch(`/api/monitors/${monitorId}/site-token`, { method: "DELETE" });
       const data = await response.json().catch(() => ({}));
@@ -74,31 +74,22 @@ export function SiteScriptPanel({ monitorId }: { monitorId: string }) {
   return (
     <section className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
       <p className="font-mono text-[10px] uppercase tracking-widest text-zinc-500">Your permission</p>
-      <h2 className="text-lg font-medium text-zinc-100">Paste one script into the site you own</h2>
+      <h2 className="text-lg font-medium text-zinc-100">Checked on a schedule, with no visitor</h2>
       <p className="mt-1 text-sm leading-relaxed text-zinc-400">
-        The script is shown when you add the site. Until it is on the page, this watch cannot see it. Place it once, just before the closing body tag.
+        Your server already has the page, so it sends a copy on a timer. A visitor is not required, and a bot check is not asked to step aside. The private key never goes into the public HTML.
       </p>
-      {installation?.scriptSeen ? (
-        <p className="mt-3 text-sm text-emerald-300">The script has reported this page.</p>
-      ) : (
-        <p className="mt-3 text-sm text-amber-200">Waiting for the script. Without it, the page is not being watched.</p>
-      )}
+        <p className="mt-3 text-sm text-zinc-300">A server report uses the private key. A copied page id cannot send a page.</p>
       <ul className="mt-3 space-y-1 text-sm text-zinc-300">
-        <li>You see the public page, including prices, headings, and the words on it.</li>
-        <li>Forms, cookies, and email addresses are removed. No visitor is identified.</li>
-        <li>Delete the script, or revoke the key, and the reports stop.</li>
-        <li>With no visitors, the same key can send the page from your server, including the HTTP status.</li>
+        <li>Your server sends the public page on a timer. Nobody has to open it.</li>
+        <li>The private key stays on that server. It is never pasted into HTML.</li>
+        <li>A copied page id cannot store a page report.</li>
+        <li>Choose Stop watching and the private key stops accepting reports.</li>
       </ul>
       {installation?.active && (
         <p className="mt-3 text-sm text-zinc-300">Active key {installation.prefix}…</p>
       )}
       <div className="mt-3">
-        <ScriptInstallGuide
-          snippet={snippet ?? SAMPLE_SITE_SCRIPT}
-          siteKey={snippet ? siteKeyFromSnippet(snippet) : "YOUR_KEY"}
-          serverReport={serverReport}
-          sample={!snippet}
-        />
+        <ScriptInstallGuide serverKey={serverKey} serverReport={serverReport} />
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
         <Button type="button" disabled={busy} onClick={() => void issue()}>

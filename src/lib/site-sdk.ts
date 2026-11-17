@@ -34,25 +34,28 @@ export const siteEventSchema = z
 
 export type SiteEventInput = z.infer<typeof siteEventSchema>;
 
-export function buildSiteInstall(origin: string, token: string) {
+export function buildSiteInstall(origin: string, publicId: string, serverKey: string) {
   const base = origin.replace(/\/$/, "");
-  const snippet = `<script src="${base}/monitor.js" data-site-key="${token}" defer></script>`;
   const serverReport = [
     `POST ${base}/api/ingest/report`,
     "Content-Type: application/json",
     "",
     JSON.stringify(
-      { siteKey: token, status: 200, html: "<html><!-- the public page your server rendered --></html>" },
+      { siteKey: serverKey, status: 200, html: "<html><!-- public page your server already rendered --></html>" },
       null,
       2
     ),
+    "",
+    "Run this on a timer from the server that already built the page.",
+    "No visitor is required. The private key stays in this request, never in the public HTML.",
   ].join("\n");
-  return { snippet, serverReport };
+  return { snippet: "", serverReport, publicId, serverKey };
 }
 
 export function createSiteTokenMaterial() {
+  const publicId = `wfsite_pub_${randomBytes(16).toString("base64url")}`;
   const token = `wfsite_${randomBytes(24).toString("base64url")}`;
-  return { token, prefix: token.slice(0, 14), hash: hashSecret(token) };
+  return { publicId, token, prefix: token.slice(0, 14), hash: hashSecret(token) };
 }
 
 export function originMatchesMonitor(origin: string | null, monitorUrl: string): boolean {
@@ -90,8 +93,14 @@ export async function issueSiteToken(userId: string, monitorId: string) {
   try {
     await prisma.siteToken.upsert({
       where: { monitorId },
-      create: { monitorId, tokenHash: material.hash, prefix: material.prefix },
-      update: { tokenHash: material.hash, prefix: material.prefix, revokedAt: null, createdAt: new Date() },
+      create: { monitorId, publicId: material.publicId, tokenHash: material.hash, prefix: material.prefix },
+      update: {
+        publicId: material.publicId,
+        tokenHash: material.hash,
+        prefix: material.prefix,
+        revokedAt: null,
+        createdAt: new Date(),
+      },
     });
   } catch (error) {
     if (missingTable(error)) schemaUnavailable();
@@ -120,7 +129,7 @@ export async function readSiteInstallation(userId: string, monitorId: string) {
   try {
     const token = await prisma.siteToken.findUnique({
       where: { monitorId },
-      select: { prefix: true, createdAt: true, revokedAt: true },
+      select: { publicId: true, prefix: true, createdAt: true, revokedAt: true },
     });
     const signals = await prisma.siteSignal.findMany({
       where: { monitorId },
@@ -145,6 +154,7 @@ export async function readSiteInstallation(userId: string, monitorId: string) {
     });
     return {
       active: Boolean(token && !token.revokedAt),
+      publicId: token && !token.revokedAt ? token.publicId : null,
       prefix: token?.prefix ?? null,
       createdAt: token?.createdAt ?? null,
       scriptSeen,
@@ -157,9 +167,8 @@ export async function readSiteInstallation(userId: string, monitorId: string) {
 }
 
 export async function acceptSiteSignal(input: { token: string; origin: string | null; event: SiteEventInput }) {
-  const tokenHash = hashSecret(input.token);
   const row = await prisma.siteToken.findUnique({
-    where: { tokenHash },
+    where: { publicId: input.token },
     select: { revokedAt: true, monitor: { select: { id: true, url: true } } },
   });
   if (!row || row.revokedAt) throw new ApiError("Not found", 404);

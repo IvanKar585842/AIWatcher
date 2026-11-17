@@ -29,7 +29,7 @@ export async function POST(
     const user = await requireUser();
     return withRateLimit(`site-token-issue-${id}`, async () => {
       const material = await issueSiteToken(user.id, id);
-      const installation = buildSiteInstall(request.nextUrl.origin, material.token);
+      const installation = buildSiteInstall(request.nextUrl.origin, material.publicId, material.token);
       return NextResponse.json(
         { token: material.token, prefix: material.prefix, ...installation },
         { status: 201 }

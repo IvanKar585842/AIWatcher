@@ -14,6 +14,7 @@ import { POST as postReport } from "../src/app/api/ingest/report/route";
 import { acceptOwnerReport, acceptScriptPage, ownerReportSchema } from "../src/lib/monitoring/owner-report";
 import {
   acceptSiteSignal,
+  buildSiteInstall,
   cleanSignalMessage,
   issueSiteToken,
   originMatchesMonitor,
@@ -47,14 +48,13 @@ async function denied(name: string, run: () => Promise<unknown>, status: number)
 async function main() {
   const script = readFileSync("public/monitor.js", "utf8");
   assert(
-    "the script does not read cookies, storage, or form values",
+    "the browser script does not read the page or send a report",
     !script.includes("document.cookie") &&
       !script.includes("localStorage") &&
       !script.includes("sessionStorage") &&
-      !script.includes("innerHTML") &&
-      !script.includes(".value") &&
-      script.includes("textContent") &&
-      script.includes("form,input,textarea")
+      !script.includes("textContent") &&
+      !script.includes("sendBeacon") &&
+      !script.includes("fetch(")
   );
   assert("a matching origin is accepted", originMatchesMonitor("https://example.com", "https://example.com/pricing"));
   assert("another host is rejected", !originMatchesMonitor("https://evil.test", "https://example.com/pricing"));
@@ -87,39 +87,48 @@ async function main() {
 
   await denied("an outsider cannot create a key for this monitor", () => issueSiteToken(outsider.id, monitor.id), 404);
   const issued = await issueSiteToken(owner.id, monitor.id);
+  const install = buildSiteInstall("https://watchflowing.com", issued.publicId, issued.token);
+  assert(
+    "the install text does not put the private key in a page script",
+    install.snippet === "" && !install.snippet.includes(issued.token) && install.serverReport.includes(issued.token) && !install.serverReport.includes(issued.publicId)
+  );
   const stored = await prisma.siteToken.findUnique({ where: { monitorId: monitor.id } });
   assert(
-    "the key is stored only as a hash",
-    stored?.tokenHash === hashSecret(issued.token) && stored.tokenHash !== issued.token && !stored.prefix.includes(issued.token.slice(-8))
+    "the private key is stored only as a hash",
+    stored?.tokenHash === hashSecret(issued.token) &&
+      stored.tokenHash !== issued.token &&
+      stored.publicId === issued.publicId &&
+      issued.publicId !== issued.token &&
+      !stored.prefix.includes(issued.token.slice(-8))
   );
 
   await acceptSiteSignal({
-    token: issued.token,
+    token: issued.publicId,
     origin: "https://example.com",
-    event: { siteKey: issued.token, kind: "js_error", message: "checkout broke" },
+    event: { siteKey: issued.publicId, kind: "js_error", message: "checkout broke" },
   });
   await acceptSiteSignal({
-    token: issued.token,
+    token: issued.publicId,
     origin: "https://example.com",
-    event: { siteKey: issued.token, kind: "element_missing", selector: "#checkout" },
+    event: { siteKey: issued.publicId, kind: "element_missing", selector: "#checkout" },
   });
   await acceptSiteSignal({
-    token: issued.token,
+    token: issued.publicId,
     origin: "https://example.com",
-    event: { siteKey: issued.token, kind: "element_present", selector: ".selected" },
+    event: { siteKey: issued.publicId, kind: "element_present", selector: ".selected" },
   });
   await denied("a form selector is not stored", () =>
     acceptSiteSignal({
-      token: issued.token,
+      token: issued.publicId,
       origin: "https://example.com",
-      event: { siteKey: issued.token, kind: "element_missing", selector: "input[name=card]" },
+      event: { siteKey: issued.publicId, kind: "element_missing", selector: "input[name=card]" },
     }),
   400);
   await denied("a different host cannot send a signal", () =>
     acceptSiteSignal({
-      token: issued.token,
+      token: issued.publicId,
       origin: "https://evil.test",
-      event: { siteKey: issued.token, kind: "js_error", message: "stolen" },
+      event: { siteKey: issued.publicId, kind: "js_error", message: "stolen" },
     }),
   403);
 
@@ -146,7 +155,7 @@ async function main() {
     new NextRequest("http://localhost:3000/api/ingest/site", {
       method: "POST",
       headers: { origin: "https://example.com", "content-type": "text/plain" },
-      body: JSON.stringify({ siteKey: issued.token, kind: "js_error", message: "from the route", html: "<form>" }),
+      body: JSON.stringify({ siteKey: issued.publicId, kind: "js_error", message: "from the route", html: "<form>" }),
     })
   );
   assert("the ingest route rejects extra fields", response.status === 400);
@@ -155,7 +164,7 @@ async function main() {
     new NextRequest("http://localhost:3000/api/ingest/site", {
       method: "POST",
       headers: { origin: "https://example.com", "content-type": "text/plain" },
-      body: JSON.stringify({ siteKey: issued.token, kind: "js_error", message: "from the route" }),
+      body: JSON.stringify({ siteKey: issued.publicId, kind: "js_error", message: "from the route" }),
     })
   );
   assert("the ingest route stores a valid event", accepted.status === 200);
@@ -176,6 +185,11 @@ async function main() {
   assert(
     "extra owner report fields are rejected",
     !ownerReportSchema.safeParse({ siteKey: issued.token, status: 200, html: page, cookie: "session" }).success
+  );
+  await denied(
+    "the public site id cannot send a server report",
+    () => acceptOwnerReport({ siteKey: issued.publicId, status: 200, html: page }),
+    404
   );
   const first = await acceptOwnerReport({ siteKey: issued.token, status: 200, html: page });
   const afterFirst = await prisma.snapshot.count({ where: { monitorId: monitor.id } });
@@ -215,48 +229,30 @@ async function main() {
   });
   const scriptKey = await issueSiteToken(owner.id, watched.id);
   const pageText = "Pricing The public plan costs nineteen dollars. Contact [email] for the company plan.";
-  const seen = await acceptScriptPage({
-    token: scriptKey.token,
-    origin: "https://example.com",
-    text: pageText.replace("[email]", "sales@example.com"),
-  });
-  const scriptSnapshot = await prisma.snapshot.findFirst({
-    where: { monitorId: watched.id },
-    orderBy: { createdAt: "desc" },
-    select: { extractedText: true },
-  });
-  assert(
-    "a consented script stores the public page and redacts email addresses",
-    seen.storedPage &&
-      seen.result === "baseline" &&
-      (scriptSnapshot?.extractedText ?? "").includes("[email]") &&
-      !(scriptSnapshot?.extractedText ?? "").includes("sales@example.com")
+  const seenCount = await prisma.snapshot.count({ where: { monitorId: watched.id } });
+  await denied(
+    "a copied public id cannot store a page",
+    () =>
+      acceptScriptPage({
+        token: scriptKey.publicId,
+        origin: "https://example.com",
+        text: pageText.replace("[email]", "sales@example.com"),
+      }),
+    403
   );
-  const again = await acceptScriptPage({ token: scriptKey.token, origin: "https://example.com", text: pageText });
-  const scriptSnapshots = await prisma.snapshot.count({ where: { monitorId: watched.id } });
-  assert("a second look in the same minute does not store another snapshot", !again.storedPage && scriptSnapshots === 1);
-  await denied("another host cannot send the public page", () =>
-    acceptScriptPage({ token: scriptKey.token, origin: "https://evil.test", text: pageText }),
-  403);
-  await denied("cookies are not accepted in the public page", () =>
-    acceptScriptPage({
-      token: scriptKey.token,
-      origin: "https://example.com",
-      text: "authorization: Bearer secret The public plan costs nineteen dollars today.",
-    }),
-  400);
+  assert("a rejected browser report does not store a snapshot", seenCount === 0 && (await prisma.snapshot.count({ where: { monitorId: watched.id } })) === 0);
   assert(
     "a small error event cannot carry page text",
-    !siteEventSchema.safeParse({ siteKey: scriptKey.token, kind: "js_error", message: "broken", text: pageText }).success
+    !siteEventSchema.safeParse({ siteKey: scriptKey.publicId, kind: "js_error", message: "broken", text: pageText }).success
   );
 
   await revokeSiteToken(owner.id, monitor.id);
   await denied("a revoked key cannot send a server report", () => acceptOwnerReport({ siteKey: issued.token, status: 200, html: page }), 404);
   await denied("a revoked key is rejected", () =>
     acceptSiteSignal({
-      token: issued.token,
+      token: issued.publicId,
       origin: "https://example.com",
-      event: { siteKey: issued.token, kind: "js_error", message: "after revoke" },
+      event: { siteKey: issued.publicId, kind: "js_error", message: "after revoke" },
     }),
   404);
   await denied("an outsider cannot revoke this key", () => revokeSiteToken(outsider.id, monitor.id), 404);

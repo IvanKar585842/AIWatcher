@@ -57,7 +57,7 @@ export function LandingPage() {
               <p className="mt-5 max-w-xl text-base leading-relaxed text-zinc-500">
                 WatchFlowing is an assistant for your own websites. It explains important
                 changes, notices when a page fails, and tells your team what needs attention.
-                If a bot check blocks the outside look, paste one script into the site you own. That is your consent, and the public page reports itself.
+                If a bot check is on the site, your own server sends the page it already rendered. No visitor is required, and the private key stays off the public page.
               </p>
               <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
                 <Link

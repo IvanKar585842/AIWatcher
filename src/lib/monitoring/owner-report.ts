@@ -5,7 +5,6 @@ import { prisma } from "@/lib/db";
 import { ApiError } from "@/lib/errors";
 import { getEffectivePlan } from "@/lib/admin";
 import { hashSecret } from "@/lib/access/secrets";
-import { originMatchesMonitor } from "@/lib/site-sdk";
 import { parseMonitorConfig } from "@/lib/monitor-config";
 import { cleanHtml, extractTextFromHtml } from "./content-cleaner";
 import { computeContentHash } from "./compare";
@@ -17,7 +16,6 @@ import { persistSuccessfulCheck } from "./processor";
 
 const SECRET_MATERIAL = /document\.cookie|set-cookie:|authorization:/i;
 const EMAIL_ADDRESS = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
-const SCRIPT_GAP_MS = 60_000;
 
 export function sanitizePublicPageText(raw: string): string {
   const text = raw.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, " ").replace(/\s+/g, " ").trim();
@@ -165,64 +163,7 @@ export async function acceptOwnerReport(report: OwnerReportInput) {
   }
 }
 
-/** A consented script on the owner's page. One stored look per minute, with no visitor identity. */
-export async function acceptScriptPage(input: { token: string; origin: string | null; text: string }) {
-  const row = await prisma.siteToken.findUnique({
-    where: { tokenHash: hashSecret(input.token) },
-    select: { revokedAt: true, monitor: { select: { id: true, url: true, status: true } } },
-  });
-  if (!row || row.revokedAt) throw new ApiError("Not found", 404);
-  if (!originMatchesMonitor(input.origin, row.monitor.url)) throw new ApiError("Origin is not allowed", 403);
-  if (row.monitor.status === MonitorStatus.PAUSED) throw new ApiError("This site is paused", 409);
-
-  const text = sanitizePublicPageText(input.text);
-  const latest = await prisma.snapshot.findFirst({
-    where: { monitorId: row.monitor.id },
-    orderBy: { createdAt: "desc" },
-    select: { createdAt: true, metadata: true },
-  });
-  const meta = latest?.metadata;
-  const recentScript =
-    Boolean(latest) &&
-    meta != null &&
-    typeof meta === "object" &&
-    !Array.isArray(meta) &&
-    (meta as { adapter?: unknown }).adapter === "site-script" &&
-    Date.now() - latest!.createdAt.getTime() < SCRIPT_GAP_MS;
-  if (recentScript) return { accepted: true, storedPage: false as const };
-
-  if (!acquireMonitorLock(row.monitor.id)) return { accepted: true, storedPage: false as const };
-  try {
-    const monitor = await prisma.monitor.findUnique({
-      where: { id: row.monitor.id },
-      include: {
-        user: { include: { subscription: true } },
-        snapshots: { orderBy: { createdAt: "desc" }, take: 1 },
-      },
-    });
-    if (!monitor || monitor.status === MonitorStatus.PAUSED) throw new ApiError("Not found", 404);
-    const plan = getEffectivePlan(monitor.user);
-    const config = parseMonitorConfig(monitor.config);
-    const now = new Date();
-    const nextCheckAt = new Date(
-      now.getTime() + INTERVAL_MINUTES[resolveEffectiveInterval(plan, monitor.interval)] * 60 * 1000
-    );
-    const result = buildOwnerFetchResult(monitor.mode, { siteKey: input.token, status: 200, text });
-    result.metadata.engine = "site-script";
-    result.metadata.adapter = "site-script";
-    result.metadata.captureType = "site-script";
-    result.metadata.fetchStrategy = "site-script";
-    const saved = await persistSuccessfulCheck({
-      monitor,
-      result,
-      plan,
-      nextCheckAt,
-      now,
-      config,
-      allowAssetFetch: false,
-    });
-    return { accepted: true, storedPage: true as const, result: saved.status };
-  } finally {
-    releaseMonitorLock(row.monitor.id);
-  }
+/** Browser page text is not accepted. A public id can be copied, and a visit is not required for a check. */
+export async function acceptScriptPage(_input: { token: string; origin: string | null; text: string }): Promise<never> {
+  throw new ApiError("Browser page reports are not accepted", 403);
 }

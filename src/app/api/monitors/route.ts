@@ -233,7 +233,7 @@ export async function POST(request: NextRequest) {
           let installation: { snippet: string; serverReport: string } | null = null;
           try {
             const material = await issueSiteToken(user.id, monitor.id);
-            installation = buildSiteInstall(request.nextUrl.origin, material.token);
+            installation = buildSiteInstall(request.nextUrl.origin, material.publicId, material.token);
           } catch (error) {
             console.error("Could not create the site script", error instanceof Error ? error.name : "error");
           }

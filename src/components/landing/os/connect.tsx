@@ -1,8 +1,8 @@
-import { SAMPLE_SITE_SCRIPT, ScriptInstallGuide } from "@/components/dashboard/script-install-guide";
+import { ScriptInstallGuide } from "@/components/dashboard/script-install-guide";
 
 /**
  * How a company connects the assistant to a site it owns.
- * The sample script uses YOUR_KEY. The real key is created when a site is added.
+ * The private server key is created when a site is added and is never placed in HTML.
  */
 export function OsConnect() {
   return (
@@ -14,23 +14,21 @@ export function OsConnect() {
             How you connect
           </p>
           <h2 className="text-3xl font-light tracking-tight text-zinc-100 md:text-4xl">
-            Two ways onto a site you own
+            The report comes from your server
           </h2>
           <p className="mt-4 text-sm leading-relaxed text-zinc-500">
-            Every plan includes both. The outside look compares the page on a schedule.
-            When a bot check stops that look, paste one script into the site you own.
+            A bot check stops an outside look, and a visit is not required. Your server already has the public page, so it sends that page to WatchFlowing on a timer. The private key stays on the server.
           </p>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
           <article className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
             <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-cyan-500/70">
-              From outside
+              The page
             </p>
-            <h3 className="mt-2 text-lg font-medium text-zinc-100">Add the page address</h3>
+            <h3 className="mt-2 text-lg font-medium text-zinc-100">Your server already has the page</h3>
             <p className="mt-3 text-sm leading-relaxed text-zinc-500">
-              WatchFlowing opens the page you added, stores a baseline, and explains the next
-              important change. This works when the page loads without a login.
+              It built the HTML before any visitor arrived. That same server sends a copy to WatchFlowing. The bot check is never asked to step aside.
             </p>
           </article>
 
@@ -39,16 +37,10 @@ export function OsConnect() {
               From your code
             </p>
             <h3 className="mt-2 text-lg font-medium text-zinc-100">
-              Paste one script into your site
+              A timer, not a visitor
             </h3>
             <p className="mt-3 text-sm leading-relaxed text-zinc-500">
-              You add it, so the watch is your decision. After the page loads, WatchFlowing
-              receives the public text and reports what appeared or disappeared. Forms, cookies,
-              and email addresses are removed, and no visitor is identified. Delete the script,
-              or revoke the key, and the reports stop. It does not bypass a bot check.
-            </p>
-            <p className="mt-3 text-xs leading-relaxed text-zinc-600">
-              YOUR_KEY below is only a placeholder. WatchFlowing fills in the real site key when you add the page. It starts with wfsite_ and is shown once.
+              The private key and the report are copied onto the server. A timer sends the public HTML that the server already rendered. Nobody has to open the page. The key is never placed in the public HTML.
             </p>
           </article>
         </div>
@@ -56,10 +48,10 @@ export function OsConnect() {
         <div className="mt-8 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
           <h3 className="text-lg font-medium text-zinc-100">The script, the key, and the steps</h3>
           <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-500">
-            Copy the fields. Open a section to read the steps or to see what the site key is. Do not publish the placeholder YOUR_KEY.
+            Copy the private key into the server environment. Open a section to read how a check runs when nobody visits. The key never goes into HTML.
           </p>
           <div className="mt-4">
-            <ScriptInstallGuide snippet={SAMPLE_SITE_SCRIPT} siteKey="YOUR_KEY" sample />
+            <ScriptInstallGuide />
           </div>
         </div>
       </div>

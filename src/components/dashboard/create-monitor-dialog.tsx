@@ -23,7 +23,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { SAMPLE_SITE_SCRIPT, ScriptInstallGuide, siteKeyFromSnippet } from "@/components/dashboard/script-install-guide";
+import { ScriptInstallGuide } from "@/components/dashboard/script-install-guide";
 import {
   Dialog,
   DialogContent,
@@ -255,8 +255,8 @@ export function CreateMonitorDialog({
   const open = controlledOpen ?? internalOpen;
   const setOpen = controlledOnOpenChange ?? setInternalOpen;
   const [step, setStep] = useState(1);
-  const [installSnippet, setInstallSnippet] = useState<string | null>(null);
   const [installServer, setInstallServer] = useState<string | null>(null);
+  const [installServerKey, setInstallServerKey] = useState<string | null>(null);
   const [createdId, setCreatedId] = useState<string | null>(null);
   const allowCloseRef = useRef(false);
   const [loading, setLoading] = useState(false);
@@ -579,7 +579,7 @@ export function CreateMonitorDialog({
 
     const result = await fetchApi<{
       monitor: Monitor;
-      installation?: { snippet: string; serverReport: string } | null;
+      installation?: { snippet: string; serverReport: string; serverKey?: string; publicId?: string } | null;
     }>("/api/monitors", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -618,23 +618,23 @@ export function CreateMonitorDialog({
     const monitorId = result.data.monitor.id;
     const installation = result.data.installation;
     onCreated?.(monitorId);
-    if (!installation?.snippet) {
-      setError("The site was added, but the script was not created. Open the site and choose Allow watching.");
+    if (!installation?.serverKey) {
+      setError("The site was added, but the private key was not created. Open the site and choose Allow watching.");
       return;
     }
     allowCloseRef.current = false;
     setCreatedId(monitorId);
-    setInstallSnippet(installation.snippet);
     setInstallServer(installation.serverReport);
+    setInstallServerKey(installation.serverKey ?? null);
     setStep(3);
-    toast("Paste the script to start watching", "success");
+    toast("Copy the private key to the server", "success");
   }
 
   function finishInstall() {
     const id = createdId;
     allowCloseRef.current = true;
-    setInstallSnippet(null);
     setInstallServer(null);
+    setInstallServerKey(null);
     setCreatedId(null);
     setForm(formDefaultsFromUserSettings());
     setClientId("");
@@ -650,8 +650,8 @@ export function CreateMonitorDialog({
         if (!next && step === 3 && !allowCloseRef.current) return;
         if (!next) {
           setStep(1);
-          setInstallSnippet(null);
           setInstallServer(null);
+          setInstallServerKey(null);
         }
         setOpen(next);
       }}
@@ -717,14 +717,13 @@ export function CreateMonitorDialog({
                 className="space-y-4"
               >
                 <div>
-                  <h3 className="text-base font-medium text-zinc-50">Paste this script or the watch cannot see the page</h3>
+                  <h3 className="text-base font-medium text-zinc-50">Copy the private key. The page is checked without a visitor</h3>
                   <p className="mt-1 text-sm leading-relaxed text-zinc-400">
-                    Copy the fields below. The script already contains your site key. Open the sections to read each step and what the key is.
+                    Copy the private key and the report onto the server that already builds the page. A timer sends the page. Nobody has to open it, and the key never goes into the public HTML.
                   </p>
                 </div>
                 <ScriptInstallGuide
-                  snippet={installSnippet ?? ""}
-                  siteKey={siteKeyFromSnippet(installSnippet ?? "")}
+                  serverKey={installServerKey}
                   serverReport={installServer}
                 />
               </motion.div>
@@ -738,12 +737,12 @@ export function CreateMonitorDialog({
                 className="space-y-4"
               >
                 <div className="rounded-lg border border-cyan-500/25 bg-cyan-500/[0.06] px-4 py-3">
-                  <p className="text-sm font-medium text-zinc-100">Paste one script or the watch cannot see the page</p>
+                  <p className="text-sm font-medium text-zinc-100">The page is checked even when nobody opens it</p>
                   <p className="mt-1 text-sm leading-relaxed text-zinc-400">
-                    YOUR_KEY in the sample is a placeholder. The real site key starts with wfsite_ and is filled in on the last step. Copy that finished script, not this sample.
+                    The private key is created on the last step. It stays on the server that builds the page. A bot check does not have to let anyone in, and a visitor is not required.
                   </p>
                   <div className="mt-3">
-                    <ScriptInstallGuide snippet={SAMPLE_SITE_SCRIPT} siteKey="YOUR_KEY" sample />
+                    <ScriptInstallGuide />
                   </div>
                 </div>
                 <p className="text-sm leading-relaxed text-zinc-400">

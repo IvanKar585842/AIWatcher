@@ -9,7 +9,7 @@ const FAQS = [
   },
   {
     q: "What if our site blocks automated checks?",
-    a: "The outside look stops, and the last good snapshot stays. WatchFlowing does not bypass the bot check. Paste one script into the site you own. After the page loads, it sends the public text with forms, cookies, and email addresses removed. Nobody is identified. Delete the script and the reports stop. A call from your server can send the same page, plus the HTTP status, when nobody is visiting.",
+    a: "WatchFlowing does not try to pass the bot check, and it does not wait for a visitor. The server that already rendered the public page sends that page on a timer, with a private key that never goes into the HTML. Delete the timer, or revoke the key, and the reports stop.",
   },
   {
     q: "What can the assistant watch on our site?",
