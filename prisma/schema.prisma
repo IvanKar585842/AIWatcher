@@ -329,6 +329,10 @@ model DomainVerification {
   method     String?
   checkedAt  DateTime?
   lastError  String?
+  /// Challenge deadline. A verified domain stays verified until a recheck fails or the owner revokes it.
+  expiresAt  DateTime?
+  /// Site path of the unique verification file. Null rows keep the older fixed path.
+  filePath   String?
   createdAt  DateTime  @default(now())
 }
 

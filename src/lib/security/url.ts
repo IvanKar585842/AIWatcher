@@ -38,7 +38,7 @@ function isBlockedIpv6(ip: string): boolean {
   const normalized = ip.toLowerCase().replace(/^\[|\]$/g, "");
   if (normalized === "::1" || normalized === "::") return true;
   if (normalized.startsWith("fc") || normalized.startsWith("fd")) return true; // ULA
-  if (normalized.startsWith("fe80")) return true; // link-local
+  if (normalized.startsWith("fe80") || normalized.startsWith("ff")) return true; // link-local / multicast
   // IPv4-mapped IPv6 ::ffff:x.x.x.x
   const mapped = normalized.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
   if (mapped) return isBlockedIpv4(mapped[1]);
@@ -164,6 +164,11 @@ export async function assertSafeFetchUrl(urlString: string): Promise<URL> {
 
 const MAX_SAFE_REDIRECTS = 5;
 
+/** Fetch only after assertSafeFetchUrl. Redirects stay manual so the caller can re-check each hop. */
+export async function fetchValidated(url: URL, init: RequestInit): Promise<Response> {
+  return fetch(url, { ...init, redirect: "manual" });
+}
+
 /**
  * Fetch with manual redirect following; re-validates each hop against SSRF rules.
  */
@@ -177,7 +182,7 @@ export async function fetchWithSafeRedirects(
   installSystemCa();
 
   for (let hops = 0; hops <= maxRedirects; hops++) {
-    const response = await fetch(current, { ...rest, redirect: "manual" });
+    const response = await fetchValidated(new URL(current), rest);
 
     if (response.status < 300 || response.status >= 400) {
       return response;

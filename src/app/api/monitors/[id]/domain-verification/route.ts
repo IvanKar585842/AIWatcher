@@ -11,7 +11,7 @@ import {
   revokeDomainVerification,
 } from "@/lib/domain-verification";
 
-const bodySchema = z.object({ action: z.enum(["issue", "check"]) }).strict();
+const bodySchema = z.object({ action: z.enum(["issue", "check", "renew"]) }).strict();
 
 export async function GET(
   _request: NextRequest,
@@ -38,8 +38,8 @@ export async function POST(
     const user = await requireUser();
     return withRateLimit(`domain-verification-check-${id}`, async () => {
       const body = bodySchema.parse(await parseJsonBody(request));
-      if (body.action === "issue") {
-        const issued = await issueDomainVerification(user.id, id);
+      if (body.action === "issue" || body.action === "renew") {
+        const issued = await issueDomainVerification(user.id, id, { renew: body.action === "renew" });
         const verification = await readDomainVerification(user.id, id);
         return NextResponse.json({ token: issued.token, verification }, { status: issued.created ? 201 : 200 });
       }

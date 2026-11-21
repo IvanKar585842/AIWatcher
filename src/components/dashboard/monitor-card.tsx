@@ -17,6 +17,7 @@ import {
   getDomainFromUrl,
 } from "@/lib/utils";
 import type { Monitor } from "@prisma/client";
+import { isWaitingForServerReport } from "@/lib/monitoring/error-messages";
 import { MonitorErrorBanner } from "@/components/dashboard/monitor-error-banner";
 import { WebsiteLogo } from "@/components/dashboard/website-logo";
 
@@ -60,6 +61,13 @@ const STATUS_STYLES = {
     ring: "border-red-500/30",
     glow: "shadow-[0_0_24px_-6px_rgba(248,113,113,0.3)]",
     pulse: true,
+  },
+  WAITING: {
+    label: "Waiting",
+    dot: "bg-zinc-400",
+    ring: "border-white/15",
+    glow: "",
+    pulse: false,
   },
 } as const;
 
@@ -121,7 +129,9 @@ export function MonitorCard({
   onDelete,
   onDuplicate,
 }: MonitorCardProps) {
-  const status = STATUS_STYLES[monitor.status as keyof typeof STATUS_STYLES] ?? STATUS_STYLES.PAUSED;
+  const status = isWaitingForServerReport(monitor.errorMessage)
+    ? STATUS_STYLES.WAITING
+    : (STATUS_STYLES[monitor.status as keyof typeof STATUS_STYLES] ?? STATUS_STYLES.PAUSED);
   const confidence = getAiConfidence(monitor);
   const domain = getDomainFromUrl(monitor.url);
 

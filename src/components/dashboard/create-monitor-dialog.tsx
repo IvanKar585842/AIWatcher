@@ -23,6 +23,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DomainVerificationPanel } from "@/components/dashboard/domain-verification-panel";
 import { ScriptInstallGuide } from "@/components/dashboard/script-install-guide";
 import {
   Dialog,
@@ -627,32 +628,14 @@ export function CreateMonitorDialog({
     }
 
     const monitorId = result.data.monitor.id;
-    let installation = result.data.installation;
-    if (!installation?.serverKey) {
-      const issued = await fetch(`/api/monitors/${monitorId}/site-token`, { method: "POST" });
-      const issuedBody = (await issued.json().catch(() => ({}))) as {
-        serverKey?: string;
-        serverReport?: string;
-      };
-      if (issued.ok && issuedBody.serverKey) {
-        installation = {
-          snippet: "",
-          serverReport: issuedBody.serverReport ?? "",
-          serverKey: issuedBody.serverKey,
-        };
-      }
-    }
     holdingInstallRef.current = true;
     allowCloseRef.current = false;
     setCreatedId(monitorId);
-    setInstallServer(installation?.serverReport ?? null);
-    setInstallServerKey(installation?.serverKey ?? null);
+    setInstallServer(null);
+    setInstallServerKey(null);
     setStep(3);
     setOpen(true);
-    if (!installation?.serverKey) {
-      setError("The site was added, but the private key was not created. On the site page, choose Allow watching.");
-    }
-    toast("Save the server program, then run it on a timer", "success");
+    toast("Confirm the domain to start checks", "success");
   }
 
   function finishInstall() {
@@ -729,7 +712,7 @@ export function CreateMonitorDialog({
               </p>
               <h2 className="mt-1 text-lg font-semibold text-zinc-50 sm:text-xl">A page your company owns</h2>
               <p className="mt-1 text-sm text-zinc-500">
-                Step {step} of 3 — {step === 1 ? "Your site" : step === 3 ? "Connect the server" : watchChoice === "everything" ? "Where to send the report" : "What to watch"}
+                Step {step} of 3 — {step === 1 ? "Your site" : step === 3 ? "Confirm the domain" : watchChoice === "everything" ? "Where to send the report" : "What to watch"}
               </p>
             </div>
             <Sparkles className="hidden h-5 w-5 shrink-0 text-cyan-500/40 sm:block" />
@@ -760,16 +743,12 @@ export function CreateMonitorDialog({
                 className="space-y-4"
               >
                 <div>
-                  <h3 className="text-base font-medium text-zinc-50">Save the server program, then run it on a timer</h3>
+                  <h3 className="text-base font-medium text-zinc-50">Confirm the domain. Then the page is checked</h3>
                   <p className="mt-1 text-sm leading-relaxed text-zinc-400">
-                    The program goes on the server that already builds this page. Each run sends the HTML file that server just wrote, together with the private key.
+                    Put the file in the site root, or add the DNS TXT record. Then choose Check domain. WatchFlowing opens the page only after that succeeds.
                   </p>
                 </div>
-                <ScriptInstallGuide
-                  serverKey={installServerKey}
-                  serverReport={installServer}
-                  guideOpen
-                />
+                {createdId && <DomainVerificationPanel monitorId={createdId} />}
               </motion.div>
             ) : step === 1 ? (
               <motion.div
@@ -1455,7 +1434,7 @@ export function CreateMonitorDialog({
                 onClick={finishInstall}
                 className="min-h-12 w-full bg-cyan-500 text-black hover:bg-cyan-400 sm:w-auto"
               >
-                I saved the program
+                I saved the confirmation
               </Button>
             ) : step === 1 ? (
               <Button

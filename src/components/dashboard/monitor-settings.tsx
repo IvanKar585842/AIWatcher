@@ -395,7 +395,13 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
 
   useEffect(() => {
     if (!monitor || baselineStarted.current) return;
-    if (monitor.status === "ACTIVE" && monitor._count.snapshots === 0 && !monitor.lastCheckedAt) {
+    if (
+      monitor.status === "ACTIVE" &&
+      monitor._count.snapshots === 0 &&
+      !monitor.lastCheckedAt &&
+      !monitor.errorMessage?.includes("awaiting_server_report") &&
+      !monitor.errorMessage?.includes("awaiting_domain")
+    ) {
       baselineStarted.current = true;
       void checkNow();
     }
@@ -1215,7 +1221,9 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
           <div className="rounded-lg border border-dashed border-white/[0.08] bg-black/20 px-4 py-8 text-center">
             <p className="text-sm font-medium text-zinc-300">No changes detected yet</p>
             <p className="mt-1 text-xs leading-relaxed text-zinc-500">
-              Your monitor is active and watching your website.
+              {monitor.errorMessage?.includes("awaiting_domain")
+                ? "The first check starts after the domain is confirmed."
+                : "Your monitor is active and watching your website."}
             </p>
           </div>
         ) : (

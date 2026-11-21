@@ -105,6 +105,8 @@ function skipTitle(reason?: string | null): string {
   if (reason === "interval_not_elapsed") return "The scheduled interval has not elapsed";
   if (reason?.startsWith("status_")) return "This monitor is not active";
   if (reason === "not_found") return "Monitor was not found";
+  if (reason === "awaiting_server_report" || reason === "awaiting_domain") return "Confirm that you own this domain";
+  if (reason === "server_report") return "This page is checked from your server";
   return "Check was skipped";
 }
 

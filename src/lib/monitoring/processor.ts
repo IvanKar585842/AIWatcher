@@ -24,7 +24,7 @@ import {
   releaseCheckSlot,
   releaseMonitorLock,
 } from "./lock";
-import { classifyMonitoringError, serializeMonitorError } from "./error-messages";
+import { classifyMonitoringError, serializeMonitorError, waitingForDomain } from "./error-messages";
 import { monitorLog, monitorLogError } from "./logger";
 import {
   createMonitorErrorAlert,
@@ -626,19 +626,35 @@ async function processMonitorInternal(
       where: { monitorId: monitor.id },
       select: { revokedAt: true },
     });
-    if (siteToken && !siteToken.revokedAt) {
-      await prisma.monitor.update({
-        where: { id: monitor.id },
-        data: {
-          status: MonitorStatus.ACTIVE,
-          errorCount: 0,
-          errorMessage: null,
-          nextCheckAt,
+    const hasKey = Boolean(siteToken && !siteToken.revokedAt);
+    const verification = await prisma.domainVerification.findUnique({
+      where: { monitorId: monitor.id },
+      select: { verifiedAt: true },
+    });
+    const domainVerified = Boolean(verification?.verifiedAt);
+    const mustWaitForDomain = !domainVerified && (Boolean(verification) || hasKey);
+    if (mustWaitForDomain) {
+      const serverReport = await prisma.snapshot.findFirst({
+        where: {
+          monitorId: monitor.id,
+          metadata: { path: ["captureType"], equals: "owner-report" },
         },
+        select: { id: true },
       });
-      await syncMonitorQueue(monitor.id, nextCheckAt);
-      await resolveMonitorErrorAlerts(monitor.id);
-      return { status: "skipped", reason: "awaiting_server_report" };
+      if (!serverReport) {
+        await prisma.monitor.update({
+          where: { id: monitor.id },
+          data: {
+            status: MonitorStatus.ACTIVE,
+            errorCount: 0,
+            errorMessage: serializeMonitorError(waitingForDomain()),
+            nextCheckAt,
+          },
+        });
+        await syncMonitorQueue(monitor.id, nextCheckAt);
+        await resolveMonitorErrorAlerts(monitor.id);
+        return { status: "skipped", reason: "awaiting_domain" };
+      }
     }
 
     const result = await fetchPageContent({

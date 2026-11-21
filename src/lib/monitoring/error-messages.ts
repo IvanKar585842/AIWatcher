@@ -245,6 +245,52 @@ function kindFromHttp(status: number): Exclude<MonitoringErrorKind, "SUCCESS"> {
   return "UNKNOWN";
 }
 
+export const SERVER_REPORT_WAIT = "awaiting_server_report";
+
+export function waitingForServerReport(): MonitoringErrorInfo {
+  return {
+    kind: "WARNING",
+    title: "Waiting for the report from your server",
+    description:
+      "The private key is ready. This page is checked when your server sends the HTML it already built. Nothing has arrived yet.",
+    suggestions: [
+      "Save watchflowing-report.mjs on the server that builds the page",
+      "Run it on a timer with the HTML file that server already wrote",
+      "A successful run prints WatchFlowing accepted the page",
+    ],
+    statusLabel: "Waiting for your server",
+    technical: SERVER_REPORT_WAIT,
+    tone: "zinc",
+    icon: "clock",
+  };
+}
+
+export const DOMAIN_WAIT = "awaiting_domain";
+
+export function waitingForDomain(): MonitoringErrorInfo {
+  return {
+    kind: "WARNING",
+    title: "Confirm that you own this domain",
+    description:
+      "WatchFlowing checks this page after the domain is verified. Publish the DNS record or the verification file, then choose Check domain.",
+    suggestions: [
+      "Add the TXT record shown on the domain step",
+      "Or upload the verification file at the exact address shown there",
+      "If the site blocks the check, send the page from your own server",
+    ],
+    statusLabel: "Waiting for domain confirmation",
+    technical: DOMAIN_WAIT,
+    tone: "zinc",
+    icon: "link",
+  };
+}
+
+export function isWaitingForServerReport(errorMessage: string | null | undefined): boolean {
+  if (!errorMessage) return false;
+  const technical = classifyMonitoringError(errorMessage).technical;
+  return technical === SERVER_REPORT_WAIT || technical === DOMAIN_WAIT;
+}
+
 export function getSuccessMonitoringStatus(): MonitoringErrorInfo {
   return {
     kind: "SUCCESS",
@@ -429,6 +475,8 @@ function tryParseStored(raw: string): MonitoringErrorInfo | null {
   try {
     const parsed = JSON.parse(raw) as StoredErrorV1;
     if (parsed?.v !== 1 || !parsed.kind || parsed.kind === "SUCCESS") return null;
+    if (parsed.technical === SERVER_REPORT_WAIT) return waitingForServerReport();
+    if (parsed.technical === DOMAIN_WAIT) return waitingForDomain();
     return fromKind(
       parsed.kind as Exclude<MonitoringErrorKind, "SUCCESS">,
       parsed.technical ?? null,

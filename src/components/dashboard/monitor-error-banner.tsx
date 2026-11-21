@@ -67,6 +67,7 @@ export function MonitorErrorBanner({
   retrying?: boolean;
 }) {
   const info = classifyMonitoringError(errorMessage);
+  const waiting = info.technical === "awaiting_server_report" || info.technical === "awaiting_domain";
   const [openAdvanced, setOpenAdvanced] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiText, setAiText] = useState<string | null>(null);
@@ -133,7 +134,7 @@ export function MonitorErrorBanner({
           )}
 
           <div className="flex flex-wrap gap-2 pt-1">
-            {onRetry && (
+            {onRetry && !waiting && (
               <button
                 type="button"
                 onClick={onRetry}
@@ -144,7 +145,7 @@ export function MonitorErrorBanner({
                 Retry check
               </button>
             )}
-            {monitorId && (
+            {monitorId && !waiting && (
               <button
                 type="button"
                 onClick={askAi}

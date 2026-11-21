@@ -6,11 +6,14 @@ import { ApiError } from "@/lib/errors";
 import { classifyMonitoringError } from "@/lib/monitoring/error-messages";
 import { assertMonitorOwnedBy } from "@/lib/security/ownership";
 import { installSystemCa } from "@/lib/security/system-ca";
-import { assertSafeFetchUrl } from "@/lib/security/url";
+import { assertSafeFetchUrl, fetchValidated } from "@/lib/security/url";
+import { publishedEgressIps } from "@/lib/monitoring/egress";
 
 const FETCH_TIMEOUT_MS = 8000;
 const FILE_BYTES = 256;
 const PAGE_BYTES = 200_000;
+const CHALLENGE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const DEFAULT_FILE_PATH = "/.well-known/watchflowing-verify.txt";
 
 export type VerificationMethod = "dns" | "file" | "meta";
 
@@ -22,15 +25,41 @@ export function createVerificationToken() {
   return `wfverify_${randomBytes(18).toString("base64url")}`;
 }
 
-export function verificationTargets(monitorUrl: string) {
+export function verificationFilePath(filePath?: string | null): string {
+  const path = filePath?.trim() || DEFAULT_FILE_PATH;
+  if (!path.startsWith("/") || path.includes("..") || path.includes("\\") || path.includes("://")) {
+    return DEFAULT_FILE_PATH;
+  }
+  return path;
+}
+
+export function verificationTargets(monitorUrl: string, filePath?: string | null) {
   const url = new URL(monitorUrl);
-  const fileUrl = new URL("/.well-known/watchflowing-verify.txt", `${url.protocol}//${url.host}`);
-  return { host: url.hostname.replace(/^\[|\]$/g, ""), pageUrl: url.toString(), fileUrl: fileUrl.toString() };
+  const host = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  const path = verificationFilePath(filePath);
+  const fileUrl = new URL(path, `${url.protocol}//${host}`);
+  if (fileUrl.hostname.toLowerCase() !== host) {
+    throw new Error("The verification file must stay on the monitored host");
+  }
+  return {
+    host,
+    txtName: `_watchflowing-verification.${host}`,
+    pageUrl: url.toString(),
+    filePath: path,
+    fileUrl: fileUrl.toString(),
+  };
+}
+
+export function isVerificationExpired(expiresAt: Date | null | undefined, now = new Date()): boolean {
+  return expiresAt != null && expiresAt.getTime() <= now.getTime();
 }
 
 export function dnsTokenPresent(records: string[], token: string): boolean {
-  const expected = `watchflowing-verify=${token}`;
-  return records.some((record) => record.trim() === expected);
+  const prefixed = `watchflowing-verify=${token}`;
+  return records.some((record) => {
+    const value = record.trim();
+    return value === token || value === prefixed;
+  });
 }
 
 export function fileTokenPresent(body: ProbeBody, token: string): boolean {
@@ -100,7 +129,7 @@ export async function fetchVerificationUrl(url: string, maxBytes: number): Promi
   try {
     const safe = await assertSafeFetchUrl(url);
     installSystemCa();
-    const response = await fetch(safe, { redirect: "manual", signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+    const response = await fetchValidated(safe, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
     if (response.status >= 300 && response.status < 400) {
       await response.body?.cancel().catch(() => undefined);
       return { status: response.status, body: "", redirected: true };
@@ -113,13 +142,47 @@ export async function fetchVerificationUrl(url: string, maxBytes: number): Promi
   }
 }
 
-export async function lookupVerificationTxt(host: string): Promise<string[]> {
-  try {
-    const records = await resolveTxt(host);
-    return records.map((parts) => parts.join(""));
-  } catch {
-    return [];
+export async function lookupVerificationTxt(host: string): Promise<{ records: string[]; temporaryError: string | null }> {
+  const names = host.startsWith("_watchflowing-verification.")
+    ? [host]
+    : [`_watchflowing-verification.${host}`, host];
+  const records: string[] = [];
+  let temporaryError: string | null = null;
+  for (const name of names) {
+    try {
+      const found = await resolveTxt(name);
+      records.push(...found.map((parts) => parts.join("")));
+    } catch (error) {
+      const code = typeof error === "object" && error && "code" in error ? String(error.code) : "";
+      if (code === "ENOTFOUND" || code === "ENODATA" || code === "ENOENT" || code === "ENOTXT") continue;
+      temporaryError = "DNS is not ready yet. Wait for the record to spread, then check again.";
+    }
   }
+  return { records, temporaryError: records.length > 0 ? null : temporaryError };
+}
+
+function challengeExpiry(now = new Date()): Date {
+  return new Date(now.getTime() + CHALLENGE_TTL_MS);
+}
+
+function newFilePath(): string {
+  return `/watchflowing-verify-${randomBytes(9).toString("base64url")}.txt`;
+}
+
+async function assertHostAvailable(userId: string, monitorUrl: string) {
+  const host = new URL(monitorUrl).hostname.toLowerCase();
+  const rows = await prisma.domainVerification.findMany({
+    where: { verifiedAt: { not: null }, monitor: { userId: { not: userId } } },
+    select: { monitor: { select: { url: true } } },
+  });
+  const taken = rows.some((row) => {
+    try {
+      return new URL(row.monitor.url).hostname.toLowerCase() === host;
+    } catch {
+      return false;
+    }
+  });
+  if (taken) throw new ApiError("This domain is already verified on another account", 409);
 }
 
 export async function readDomainVerification(userId: string, monitorId: string) {
@@ -127,16 +190,28 @@ export async function readDomainVerification(userId: string, monitorId: string) 
   try {
     const row = await prisma.domainVerification.findUnique({
       where: { monitorId },
-      select: { token: true, verifiedAt: true, method: true, checkedAt: true, lastError: true },
+      select: {
+        token: true,
+        verifiedAt: true,
+        method: true,
+        checkedAt: true,
+        lastError: true,
+        expiresAt: true,
+        filePath: true,
+      },
     });
+    const targets = verificationTargets(monitor.url, row?.filePath);
     return {
       token: row?.token ?? null,
       verifiedAt: row?.verifiedAt ?? null,
       method: row?.method ?? null,
       checkedAt: row?.checkedAt ?? null,
       lastError: row?.lastError ?? null,
+      expiresAt: row?.expiresAt ?? null,
+      expired: isVerificationExpired(row?.expiresAt),
       guidance: refusalGuidance(monitor.errorMessage, Boolean(row?.verifiedAt)),
-      targets: verificationTargets(monitor.url),
+      egressIps: publishedEgressIps(),
+      targets,
     };
   } catch (error) {
     if (missingTable(error)) schemaUnavailable();
@@ -144,16 +219,32 @@ export async function readDomainVerification(userId: string, monitorId: string) 
   }
 }
 
-export async function issueDomainVerification(userId: string, monitorId: string) {
-  await assertMonitorOwnedBy(userId, monitorId);
+export async function issueDomainVerification(userId: string, monitorId: string, options?: { renew?: boolean }) {
+  const monitor = await assertMonitorOwnedBy(userId, monitorId);
+  await assertHostAvailable(userId, monitor.url);
   const token = createVerificationToken();
+  const filePath = newFilePath();
+  const expiresAt = challengeExpiry();
   try {
-    const row = await prisma.domainVerification.findUnique({ where: { monitorId }, select: { id: true, token: true } });
-    if (row) return { token: row.token, created: false };
-    await prisma.domainVerification.create({ data: { monitorId, token } });
+    const row = await prisma.domainVerification.findUnique({
+      where: { monitorId },
+      select: { id: true, token: true, expiresAt: true, verifiedAt: true },
+    });
+    if (row && !options?.renew && !isVerificationExpired(row.expiresAt)) {
+      return { token: row.token, created: false };
+    }
+    if (row) {
+      await prisma.domainVerification.update({
+        where: { monitorId },
+        data: { token, filePath, expiresAt, verifiedAt: null, method: null, lastError: null, checkedAt: null },
+      });
+      return { token, created: false, renewed: true };
+    }
+    await prisma.domainVerification.create({ data: { monitorId, token, filePath, expiresAt } });
     return { token, created: true };
   } catch (error) {
     if (missingTable(error)) schemaUnavailable();
+    if (error instanceof ApiError) throw error;
     throw error;
   }
 }
@@ -161,15 +252,43 @@ export async function issueDomainVerification(userId: string, monitorId: string)
 export async function checkDomainVerification(userId: string, monitorId: string) {
   const monitor = await assertMonitorOwnedBy(userId, monitorId);
   await assertSafeFetchUrl(monitor.url);
-  const issued = await issueDomainVerification(userId, monitorId);
-  const targets = verificationTargets(monitor.url);
-  const [dnsRecords, file, page] = await Promise.all([
+  await assertHostAvailable(userId, monitor.url);
+  let row = await prisma.domainVerification.findUnique({
+    where: { monitorId },
+    select: { expiresAt: true, verifiedAt: true, filePath: true, token: true },
+  });
+  if (!row) {
+    await issueDomainVerification(userId, monitorId);
+    row = await prisma.domainVerification.findUnique({
+      where: { monitorId },
+      select: { expiresAt: true, verifiedAt: true, filePath: true, token: true },
+    });
+  }
+  if (!row) throw new ApiError("Create the domain check first", 404);
+  if (isVerificationExpired(row.expiresAt)) {
+    const lastError = "The verification token expired. Create a new token and publish it again.";
+    await prisma.domainVerification.update({
+      where: { monitorId },
+      data: { checkedAt: new Date(), verifiedAt: null, method: null, lastError },
+    });
+    return { verified: false, method: null, lastError };
+  }
+  const targets = verificationTargets(monitor.url, row.filePath);
+  const [dns, file, page] = await Promise.all([
     lookupVerificationTxt(targets.host),
     fetchVerificationUrl(targets.fileUrl, FILE_BYTES),
     fetchVerificationUrl(targets.pageUrl, PAGE_BYTES),
   ]);
-  const matched = matchVerification({ token: issued.token, dnsRecords, file, page });
+  if (dns.temporaryError && !fileTokenPresent(file, row.token) && !metaTokenPresent(page, row.token)) {
+    await prisma.domainVerification.update({
+      where: { monitorId },
+      data: { checkedAt: new Date(), lastError: dns.temporaryError },
+    });
+    return { verified: Boolean(row.verifiedAt), method: null, lastError: dns.temporaryError };
+  }
+  const matched = matchVerification({ token: row.token, dnsRecords: dns.records, file, page });
   const verified = "method" in matched;
+  const lastError = verified ? null : matched.error;
   try {
     await prisma.domainVerification.update({
       where: { monitorId },
@@ -177,14 +296,22 @@ export async function checkDomainVerification(userId: string, monitorId: string)
         checkedAt: new Date(),
         verifiedAt: verified ? new Date() : null,
         method: verified ? matched.method : null,
-        lastError: verified ? null : matched.error,
+        lastError,
       },
     });
   } catch (error) {
     if (missingTable(error)) schemaUnavailable();
     throw error;
   }
-  return { verified, method: verified ? matched.method : null, lastError: verified ? null : matched.error };
+  if (verified) {
+    try {
+      const { processMonitor } = await import("@/lib/monitoring/processor");
+      await processMonitor(monitorId, { force: true });
+    } catch {
+      // The domain is verified. A blocked page stays a failed check and keeps the last good snapshot.
+    }
+  }
+  return { verified, method: verified ? matched.method : null, lastError };
 }
 
 export async function revokeDomainVerification(userId: string, monitorId: string) {

@@ -26,7 +26,8 @@ import {
 import { invalidateUserMonitoringContext } from "@/lib/ai/chat-user-context";
 import { monitorReadFilter } from "@/lib/security/ownership";
 import { resolveClientForNewMonitor } from "@/lib/workspace-access";
-import { buildSiteInstall, issueSiteToken } from "@/lib/site-sdk";
+import { serializeMonitorError, waitingForDomain } from "@/lib/monitoring/error-messages";
+import { issueDomainVerification } from "@/lib/domain-verification";
 
 function isVisualMode(mode: MonitoringMode): boolean {
   return mode === MonitoringMode.VISUAL_CHANGES || mode === MonitoringMode.SCREENSHOT_DIFF;
@@ -230,12 +231,21 @@ export async function POST(request: NextRequest) {
             });
           }
 
-          let installation: { snippet: string; serverReport: string } | null = null;
+          let installation: { snippet: string; serverReport: string; serverKey?: string } | null = null;
           try {
-            const material = await issueSiteToken(user.id, monitor.id);
-            installation = buildSiteInstall(request.nextUrl.origin, material.publicId, material.token);
+            await issueDomainVerification(user.id, monitor.id);
+            const waiting = serializeMonitorError(waitingForDomain());
+            await prisma.monitor.update({
+              where: { id: monitor.id },
+              data: { errorMessage: waiting },
+            });
+            monitor.errorMessage = waiting;
           } catch (error) {
-            console.error("Could not create the site script", error instanceof Error ? error.name : "error");
+            if (error instanceof ApiError && error.status === 409) {
+              await prisma.monitor.delete({ where: { id: monitor.id } }).catch(() => undefined);
+              throw error;
+            }
+            console.error("Could not start domain confirmation", error instanceof Error ? error.name : "error");
           }
 
           void trackEvent({

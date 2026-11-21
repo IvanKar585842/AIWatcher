@@ -9,7 +9,9 @@ import { ApiError } from "../src/lib/errors";
 import { containsAntiBotChallenge } from "../src/lib/monitoring/compatibility";
 import { classifyMonitoringError } from "../src/lib/monitoring/error-messages";
 import {
+  checkDomainVerification,
   fileTokenPresent,
+  isVerificationExpired,
   issueDomainVerification,
   matchVerification,
   metaTokenPresent,
@@ -17,6 +19,8 @@ import {
   revokeDomainVerification,
   verificationTargets,
 } from "../src/lib/domain-verification";
+import { publishedEgressIps } from "../src/lib/monitoring/egress";
+import { validateMonitorUrl } from "../src/lib/security/url";
 
 const prisma = new PrismaClient();
 const token = "wfverify_testtokenvalue";
@@ -42,8 +46,8 @@ async function denied(name: string, run: () => Promise<unknown>) {
 async function main() {
   const source = readFileSync("src/lib/domain-verification.ts", "utf8");
   assert(
-    "verification does not call the page fetcher",
-    !source.includes("monitoring/fetcher") && !source.includes("monitoring/processor") && !source.includes("solve_cloudflare")
+    "verification does not bypass a challenge while proving the domain",
+    !source.includes("solve_cloudflare") && !source.includes('from "@/lib/monitoring/fetcher"')
   );
 
   const targets = verificationTargets("https://example.com/pricing");
@@ -92,6 +96,34 @@ async function main() {
     page: { status: 200, body: "<html>challenge-platform</html>", redirected: false },
   });
   assert("a challenge page without the token stays unverified", "error" in missed);
+  const wrongTxt = matchVerification({
+    token,
+    dnsRecords: ["watchflowing-verify=someone-else"],
+    file: { status: 404, body: "", redirected: false },
+    page: { error: "missing" },
+  });
+  assert("a different TXT value does not verify", "error" in wrongTxt);
+  const missingTxt = matchVerification({
+    token,
+    dnsRecords: [],
+    file: { status: 404, body: "missing", redirected: false },
+    page: { error: "missing" },
+  });
+  assert("a missing TXT record does not verify", "error" in missingTxt);
+  assert(
+    "a file with the wrong body does not verify",
+    !fileTokenPresent({ status: 200, body: "not-the-token", redirected: false }, token)
+  );
+  assert("an expired challenge is rejected", isVerificationExpired(new Date(Date.now() - 1000)));
+  assert("a current challenge is still open", !isVerificationExpired(new Date(Date.now() + 60_000)));
+  assert("HTTP 429 is not a successful page", classifyMonitoringError("HTTP 429").kind === "TEMPORARILY_UNAVAILABLE");
+  assert("HTTP 403 stays blocked", classifyMonitoringError("HTTP 403").kind === "BLOCKED");
+  assert("a private crawl address is not published", publishedEgressIps("127.0.0.1, 203.0.113.10").join(",") === "203.0.113.10");
+  for (const blocked of ["http://127.0.0.1/", "http://169.254.169.254/", "http://10.1.1.1/", "http://[::1]/", "file:///etc/passwd"]) {
+    assert(`blocked address ${blocked}`, validateMonitorUrl(blocked).ok === false);
+  }
+  const browserScript = readFileSync("public/monitor.js", "utf8");
+  assert("the public script has no private key and does not send a report", !browserScript.includes("wfsite_") && !browserScript.includes("fetch("));
 
   assert(
     "a blocked check tells the owner this is not a bypass",
@@ -126,7 +158,37 @@ async function main() {
   const second = await issueDomainVerification(owner.id, monitor.id);
   assert("the same monitor keeps one verification token", first.token === second.token && second.created === false);
   const stored = await prisma.domainVerification.findUnique({ where: { monitorId: monitor.id } });
-  assert("the token is stored and the monitor is not verified yet", stored?.token === first.token && stored.verifiedAt === null);
+  assert("the token is stored and the monitor is not verified yet", stored?.token === first.token && stored.verifiedAt === null && stored.filePath?.startsWith("/watchflowing-verify-") === true);
+
+  await prisma.domainVerification.update({
+    where: { monitorId: monitor.id },
+    data: { expiresAt: new Date(Date.now() - 1000) },
+  });
+  const expired = await checkDomainVerification(owner.id, monitor.id);
+  assert("an expired token does not verify the domain", expired.verified === false && (expired.lastError ?? "").includes("expired"));
+  const renewed = await issueDomainVerification(owner.id, monitor.id);
+  assert("a new token replaces the expired one", renewed.token !== first.token);
+
+  const sameOwnerPage = await prisma.monitor.create({
+    data: { userId: owner.id, name: "Second page", url: `https://example.com/domain-again-${stamp}` },
+  });
+  const secondPage = await issueDomainVerification(owner.id, sameOwnerPage.id);
+  assert("the same account can verify another page on its domain", secondPage.token.length > 10);
+
+  const outsiderMonitor = await prisma.monitor.create({
+    data: { userId: outsider.id, name: "Taken host", url: `https://example.com/taken-${stamp}` },
+  });
+  await prisma.domainVerification.create({
+    data: { monitorId: outsiderMonitor.id, token: "wfverify_taken", verifiedAt: new Date(), method: "dns", filePath: "/.well-known/wf-verify-taken.txt" },
+  });
+  let conflict = false;
+  try {
+    await checkDomainVerification(owner.id, monitor.id);
+  } catch (error) {
+    conflict = error instanceof ApiError && error.status === 409;
+  }
+  assert("another account cannot verify the same host", conflict);
+
   await revokeDomainVerification(owner.id, monitor.id);
   const gone = await prisma.domainVerification.findUnique({ where: { monitorId: monitor.id } });
   assert("removing the check deletes the proof", gone === null);
