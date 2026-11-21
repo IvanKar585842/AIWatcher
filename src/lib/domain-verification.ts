@@ -303,14 +303,6 @@ export async function checkDomainVerification(userId: string, monitorId: string)
     if (missingTable(error)) schemaUnavailable();
     throw error;
   }
-  if (verified) {
-    try {
-      const { processMonitor } = await import("@/lib/monitoring/processor");
-      await processMonitor(monitorId, { force: true });
-    } catch {
-      // The domain is verified. A blocked page stays a failed check and keeps the last good snapshot.
-    }
-  }
   return { verified, method: verified ? matched.method : null, lastError };
 }
 

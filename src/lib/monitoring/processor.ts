@@ -24,7 +24,7 @@ import {
   releaseCheckSlot,
   releaseMonitorLock,
 } from "./lock";
-import { classifyMonitoringError, serializeMonitorError, waitingForDomain } from "./error-messages";
+import { classifyMonitoringError, serializeMonitorError, waitingForServerReport } from "./error-messages";
 import { monitorLog, monitorLogError } from "./logger";
 import {
   createMonitorErrorAlert,
@@ -626,14 +626,7 @@ async function processMonitorInternal(
       where: { monitorId: monitor.id },
       select: { revokedAt: true },
     });
-    const hasKey = Boolean(siteToken && !siteToken.revokedAt);
-    const verification = await prisma.domainVerification.findUnique({
-      where: { monitorId: monitor.id },
-      select: { verifiedAt: true },
-    });
-    const domainVerified = Boolean(verification?.verifiedAt);
-    const mustWaitForDomain = !domainVerified && (Boolean(verification) || hasKey);
-    if (mustWaitForDomain) {
+    if (siteToken && !siteToken.revokedAt) {
       const serverReport = await prisma.snapshot.findFirst({
         where: {
           monitorId: monitor.id,
@@ -647,14 +640,20 @@ async function processMonitorInternal(
           data: {
             status: MonitorStatus.ACTIVE,
             errorCount: 0,
-            errorMessage: serializeMonitorError(waitingForDomain()),
+            errorMessage: serializeMonitorError(waitingForServerReport()),
             nextCheckAt,
           },
         });
         await syncMonitorQueue(monitor.id, nextCheckAt);
         await resolveMonitorErrorAlerts(monitor.id);
-        return { status: "skipped", reason: "awaiting_domain" };
+        return { status: "skipped", reason: "awaiting_server_report" };
       }
+      await prisma.monitor.update({
+        where: { id: monitor.id },
+        data: { nextCheckAt },
+      });
+      await syncMonitorQueue(monitor.id, nextCheckAt);
+      return { status: "skipped", reason: "server_report" };
     }
 
     const result = await fetchPageContent({

@@ -26,8 +26,8 @@ import {
 import { invalidateUserMonitoringContext } from "@/lib/ai/chat-user-context";
 import { monitorReadFilter } from "@/lib/security/ownership";
 import { resolveClientForNewMonitor } from "@/lib/workspace-access";
-import { serializeMonitorError, waitingForDomain } from "@/lib/monitoring/error-messages";
-import { issueDomainVerification } from "@/lib/domain-verification";
+import { serializeMonitorError, waitingForServerReport } from "@/lib/monitoring/error-messages";
+import { buildSiteInstall, issueSiteToken } from "@/lib/site-sdk";
 
 function isVisualMode(mode: MonitoringMode): boolean {
   return mode === MonitoringMode.VISUAL_CHANGES || mode === MonitoringMode.SCREENSHOT_DIFF;
@@ -233,19 +233,16 @@ export async function POST(request: NextRequest) {
 
           let installation: { snippet: string; serverReport: string; serverKey?: string } | null = null;
           try {
-            await issueDomainVerification(user.id, monitor.id);
-            const waiting = serializeMonitorError(waitingForDomain());
+            const material = await issueSiteToken(user.id, monitor.id);
+            installation = buildSiteInstall(request.nextUrl.origin, material.publicId, material.token);
+            const waiting = serializeMonitorError(waitingForServerReport());
             await prisma.monitor.update({
               where: { id: monitor.id },
               data: { errorMessage: waiting },
             });
             monitor.errorMessage = waiting;
           } catch (error) {
-            if (error instanceof ApiError && error.status === 409) {
-              await prisma.monitor.delete({ where: { id: monitor.id } }).catch(() => undefined);
-              throw error;
-            }
-            console.error("Could not start domain confirmation", error instanceof Error ? error.name : "error");
+            console.error("Could not create the server program", error instanceof Error ? error.name : "error");
           }
 
           void trackEvent({

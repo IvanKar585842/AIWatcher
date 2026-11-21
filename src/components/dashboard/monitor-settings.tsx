@@ -56,7 +56,6 @@ import {
 import { getProtectedSiteWarning } from "@/lib/monitor-types";
 import { WebsiteLogo } from "@/components/dashboard/website-logo";
 import { SiteScriptPanel } from "@/components/dashboard/site-script-panel";
-import { DomainVerificationPanel } from "@/components/dashboard/domain-verification-panel";
 import { cn, formatRelativeTime, getDomainFromUrl } from "@/lib/utils";
 
 interface MonitorChange {
@@ -1201,7 +1200,6 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
       </div>
 
       <SiteScriptPanel monitorId={monitorId} />
-      <DomainVerificationPanel monitorId={monitorId} errorMessage={monitor.errorMessage} />
 
       {/* Recent Changes */}
       <motion.div
@@ -1221,8 +1219,8 @@ export function MonitorSettings({ monitorId }: { monitorId: string }) {
           <div className="rounded-lg border border-dashed border-white/[0.08] bg-black/20 px-4 py-8 text-center">
             <p className="text-sm font-medium text-zinc-300">No changes detected yet</p>
             <p className="mt-1 text-xs leading-relaxed text-zinc-500">
-              {monitor.errorMessage?.includes("awaiting_domain")
-                ? "The first check starts after the domain is confirmed."
+              {monitor.errorMessage?.includes("awaiting_server_report")
+                ? "The first check arrives when your server sends the page."
                 : "Your monitor is active and watching your website."}
             </p>
           </div>
